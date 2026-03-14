@@ -21,15 +21,22 @@ Netty 기반 엔터프라이즈 WAS 파운데이션.
 ## 모듈 구조
 
 ```
-velo-was
+velo-was (13 modules)
 ├── was-config              서버 설정 모델 (순수 POJO, 외부 의존성 없음)
-├── was-protocol-http       HTTP 요청/응답 추상화, 핸들러 라우팅
-├── was-transport-netty     Netty 서버 부트스트랩, TLS, 네이티브 전송
-├── was-servlet-core        서블릿 컨테이너 (Filter, Listener, Session, Dispatcher)
-└── was-bootstrap           서버 진입점, YAML 로딩, 샘플 앱
+├── was-observability       구조화된 로깅 (액세스/에러/감사)
+├── was-protocol-http       HTTP 프로토콜 추상화 + WebSocket
+├── was-transport-netty     Netty 서버 부트스트랩 (HTTP/2, TLS ALPN)
+├── was-servlet-core        서블릿 컨테이너 (AsyncContext, 세션 TTL)
+├── was-classloader         웹 애플리케이션 클래스로더 격리
+├── was-deploy              WAR 배포 파이프라인
+├── was-jndi                JNDI 네이밍 + DataSource 커넥션 풀
+├── was-admin               관리 CLI (jeusadmin 호환, 73개 명령어)
+├── was-jsp                 JSP 지원 (실험적)
+├── was-tcp-listener        TCP 리스너
+└── was-bootstrap           기동 진입점 + 통합 테스트
 ```
 
-각 모듈의 상세 문서는 모듈 디렉토리의 `README.md`를 참고한다. 아키텍처 상세는 [`docs/architecture.md`](docs/architecture.md)를 참고한다.
+각 모듈의 상세 문서는 모듈 디렉토리의 `README.md`를 참고한다. 아키텍처 상세는 [`docs/ko/architecture.md`](docs/ko/architecture.md)를 참고한다.
 
 ## 빌드
 
@@ -112,79 +119,46 @@ curl http://localhost:8080/app/hello
 
 ## 현재 구현 범위
 
-- Maven 멀티모듈 프로젝트 레이아웃
+- Maven 멀티모듈 프로젝트 레이아웃 (13개 모듈, 155+ 테스트)
 - YAML 기반 서버 설정 로딩 및 검증
-- Netty HTTP/1.1 런타임 (graceful shutdown)
+- Netty HTTP/1.1 + **HTTP/2** 런타임 (graceful shutdown)
 - 네이티브 전송 자동 선택 (epoll/kqueue/nio)
-- TLS 부트스트랩 및 인증서 핫 리로드 (connection-safe)
+- TLS 부트스트랩 및 인증서 핫 리로드 (ALPN h2/h1.1 협상 포함)
+- **HTTP/2**: TLS ALPN + 클리어텍스트 h2c + 스트림 멀티플렉싱
+- **WebSocket**: 경로 기반 핸들러 레지스트리, 텍스트/바이너리 프레임
 - 서블릿 컨테이너
   - `HttpServlet` dispatch (context path + servlet path longest-match)
   - `Filter` chain 실행 (DispatcherType 기반 매칭)
   - `ServletContextListener`, `ServletRequestListener` lifecycle
   - `RequestDispatcher` forward/include (상대 경로 및 `..` 해석 포함)
-  - In-memory `JSESSIONID` 쿠키 세션
+  - In-memory `JSESSIONID` 쿠키 세션 + **TTL 만료 스케줄러**
+  - **AsyncContext**: dispatch, complete, timeout, listener
   - 동적 프록시 기반 `HttpServletRequest`/`HttpServletResponse`/`ServletContext`/`HttpSession`
+- **WAR 배포**: web.xml 파싱, 클래스로더 격리 (parent-first/child-first)
+- **구조화된 로깅**: 액세스/에러/감사 로그 (JSON 형식)
+- **JNDI / DataSource**: In-Memory 네이밍 컨텍스트, JDBC 커넥션 풀
+- **Admin CLI**: 14개 카테고리 73개 명령어, JLine 인터랙티브 셸, JMX 통합
 - 내장 health/info 엔드포인트
 - 보안 헤더 기본 포함 (nosniff, DENY, no-store, no-referrer)
 
-## 프로젝트 구조
+## 문서
 
-```
-velo-was/
-├── conf/
-│   └── server.yaml                           서버 설정 파일
-├── docs/
-│   └── architecture.md                       아키텍처 상세 문서
-├── scripts/
-│   └── use-local-toolchain.ps1               로컬 JDK/Maven 환경 설정
-├── was-config/
-│   └── src/main/java/.../config/
-│       ├── ServerConfiguration.java          설정 모델 (Server, Listener, Threading, Tls)
-│       └── TlsMode.java                     TLS 키 형식 enum (PEM, PKCS12)
-├── was-protocol-http/
-│   └── src/main/java/.../http/
-│       ├── HttpExchange.java                 요청/응답 사이클 레코드
-│       ├── HttpHandler.java                  핸들러 함수형 인터페이스
-│       ├── HttpHandlerRegistry.java          경로 기반 라우팅 레지스트리
-│       ├── HttpResponses.java                응답 팩토리 (보안 헤더 포함)
-│       └── NettyHttpChannelHandler.java      Netty 채널 핸들러
-├── was-transport-netty/
-│   └── src/main/java/.../transport/netty/
-│       ├── NativeTransportSelector.java      OS별 전송 자동 선택
-│       ├── NettyServer.java                  서버 생명주기 관리
-│       └── ReloadingSslContextProvider.java  TLS 인증서 핫 리로드
-├── was-servlet-core/
-│   └── src/main/java/.../servlet/
-│       ├── ServletContainer.java             컨테이너 인터페이스
-│       ├── SimpleServletContainer.java       컨테이너 기본 구현
-│       ├── ServletApplication.java           애플리케이션 정의 인터페이스
-│       ├── SimpleServletApplication.java     빌더 패턴 애플리케이션 구현
-│       ├── ServletProxyFactory.java          동적 프록시 팩토리
-│       ├── ServletRequestContext.java        요청 컨텍스트 관리
-│       ├── ServletResponseContext.java       응답 버퍼 관리
-│       ├── SimpleFilterChain.java            필터 체인 실행
-│       ├── FilterRegistrationSpec.java       필터 등록 정보 레코드
-│       ├── InMemoryHttpSessionStore.java     세션 저장소
-│       ├── SessionState.java                 세션 상태
-│       ├── ServletBodyInputStream.java       서블릿 입력 스트림
-│       ├── ServletBodyOutputStream.java      서블릿 출력 스트림
-│       ├── InternalRequestBridge.java        내부 요청 브리지
-│       └── InternalResponseBridge.java       내부 응답 브리지
-└── was-bootstrap/
-    └── src/main/java/.../bootstrap/
-        ├── VeloWasApplication.java           메인 클래스 (진입점)
-        ├── ServerConfigurationLoader.java    YAML 설정 로더
-        ├── SampleHelloServlet.java           샘플 서블릿
-        ├── SampleTraceFilter.java            샘플 필터
-        └── SampleLifecycleListener.java      샘플 리스너
-```
+| 문서 | 설명 |
+|---|---|
+| [아키텍처 개요](docs/ko/architecture.md) | 모듈 구조, 요청 처리 흐름, 설계 결정 |
+| [아키텍처 상세](docs/ko/architecture-detail.md) | 내부 동작 심층 분석 |
+| [AsyncContext](docs/ko/async-context.md) | 비동기 서블릿 지원 |
+| [WAR 배포](docs/ko/war-deployment.md) | WAR 배포 + 클래스로더 격리 |
+| [구조화된 로깅](docs/ko/structured-logging.md) | 액세스/에러/감사 로그 (JSON) |
+| [HTTP/2 + WebSocket](docs/ko/http2-websocket.md) | ALPN, h2c, WebSocket 업그레이드 |
+| [세션 관리](docs/ko/session-management.md) | TTL 만료 + 이중 제거 전략 |
+| [JNDI / DataSource](docs/ko/jndi-datasource.md) | JNDI 네이밍 + 커넥션 풀 |
+| [Admin CLI](docs/ko/admin-cli.md) | 73개 관리 명령어 레퍼런스 |
+| [라이프사이클](docs/ko/lifecycle.md) | 서버/앱 생명주기 |
 
 ## 향후 계획
 
-- 비동기 서블릿 (AsyncContext)
-- WAR 배포 및 애플리케이션 클래스로더 격리
-- 구조화된 액세스/에러/감사 로깅
-- Admin REST API, 메트릭스, JMX
-- HTTP/2 ALPN + WebSocket 업그레이드
-- TTL 기반 세션 만료 스케줄러
-- JNDI / DataSource SPI
+1. **관리 API**: Admin REST 엔드포인트 (CLI의 RemoteAdminClient 연동)
+2. **JSP 엔진**: 컴파일 기반 JSP 지원
+3. **클러스터 세션**: 분산 세션 복제
+4. **메트릭 수집**: Micrometer / Prometheus 연동

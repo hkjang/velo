@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(xargs:*)",
+      "Bash(find:*)",
+      "Bash(.tools/maven/apache-maven-3.9.13/bin/mvn compile:*)",
+      "Bash(xxd:*)",
+      "Bash(.tools/maven/apache-maven-3.9.13/bin/mvn:*)",
+      "Bash(java -version:*)",
+      "Bash(export JAVA_HOME=\"/d/project/velo/.tools/jdk/jdk-21.0.10+7\")",
+      "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
+      "Bash(export JAVA_HOME=\"D:/project/velo/.tools/jdk/jdk-21.0.10+7\")",
+      "Bash(java.exe:*)",
+      "Bash(\"D:/project/velo/.tools/jdk/jdk-21.0.10+7/bin/java.exe\" -version)",
+      "Bash(JAVA_HOME=\"D:\\\\project\\\\velo\\\\.tools\\\\jdk\\\\jdk-21.0.10+7\" PATH=\"D:\\\\project\\\\velo\\\\.tools\\\\jdk\\\\jdk-21.0.10+7\\\\bin;D:\\\\project\\\\velo\\\\.tools\\\\maven\\\\apache-maven-3.9.13\\\\bin;$PATH\" cd:*)",
+      "Bash(mvn clean compile:*)",
+      "Bash(JAVA_HOME=\"D:\\\\\\\\project\\\\\\\\velo\\\\\\\\.tools\\\\\\\\jdk\\\\\\\\jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" clean compile:*)",
+      "Bash(JAVA_HOME=\"D:\\\\\\\\project\\\\\\\\velo\\\\\\\\.tools\\\\\\\\jdk\\\\\\\\jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" test:*)",
+      "Bash(test:*)",
+      "Bash(JAVA_HOME=\"D:\\\\\\\\project\\\\\\\\velo\\\\\\\\.tools\\\\\\\\jdk\\\\\\\\jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\":*)",
+      "Bash(JAVA_HOME=\"D:\\\\project\\\\velo\\\\.tools\\\\jdk\\\\jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\":*)",
+      "Bash(JAVA_HOME=\"D:\\\\project\\\\velo\\\\.tools\\\\jdk\\\\jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" test:*)",
+      "Bash(JAVA_HOME=\"D:\\\\project\\\\velo\\\\.tools\\\\jdk\\\\jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" clean test:*)",
+      "Bash(SERVLET_JAR=\"/c/Users/gagag/.m2/repository/jakarta/servlet/jakarta.servlet-api/6.1.0/jakarta.servlet-api-6.1.0.jar\":*)",
+      "Bash(\"D:/project/velo/.tools/jdk/jdk-21.0.10+7/bin/javac\" -cp \"$SERVLET_JAR\" -d \"D:/project/velo/test-war/WEB-INF/classes\" D:/project/velo/test-war/WEB-INF/classes/io/velo/testwar/*.java)"
+    ]
+  }
+}

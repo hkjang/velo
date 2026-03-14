@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         version="6.1">
+
+    <display-name>velo-test-war</display-name>
+
+    <context-param>
+        <param-name>appVersion</param-name>
+        <param-value>1.0.0</param-value>
+    </context-param>
+
+    <listener>
+        <listener-class>io.velo.testwar.AppLifecycleListener</listener-class>
+    </listener>
+
+    <filter>
+        <filter-name>timingFilter</filter-name>
+        <filter-class>io.velo.testwar.TimingFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>timingFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <servlet>
+        <servlet-name>helloServlet</servlet-name>
+        <servlet-class>io.velo.testwar.HelloServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>helloServlet</servlet-name>
+        <url-pattern>/hello</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>sessionServlet</servlet-name>
+        <servlet-class>io.velo.testwar.SessionServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>sessionServlet</servlet-name>
+        <url-pattern>/session</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>infoServlet</servlet-name>
+        <servlet-class>io.velo.testwar.InfoServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>infoServlet</servlet-name>
+        <url-pattern>/info</url-pattern>
+    </servlet-mapping>
+
+</web-app>

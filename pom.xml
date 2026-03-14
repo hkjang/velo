@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.velo.was</groupId>
+    <artifactId>velo-was</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>velo-was</name>
+    <description>Netty-based enterprise WAS foundation focused on servlet compatibility and operations.</description>
+
+    <modules>
+        <module>was-config</module>
+        <module>was-observability</module>
+        <module>was-protocol-http</module>
+        <module>was-transport-netty</module>
+        <module>was-servlet-core</module>
+        <module>was-classloader</module>
+        <module>was-deploy</module>
+        <module>was-jndi</module>
+        <module>was-admin</module>
+        <module>was-jsp</module>
+        <module>was-tcp-listener</module>
+        <module>was-bootstrap</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+        <netty.version>4.1.131.Final</netty.version>
+        <slf4j.version>2.0.17</slf4j.version>
+        <snakeyaml.version>2.5</snakeyaml.version>
+        <jakarta.servlet.version>6.1.0</jakarta.servlet.version>
+        <jakarta.pages.version>4.0.0</jakarta.pages.version>
+        <jakarta.el.version>6.0.1</jakarta.el.version>
+        <junit.version>5.12.1</junit.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.14.0</version>
+                    <configuration>
+                        <release>${maven.compiler.release}</release>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.4</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <version>3.7.1</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

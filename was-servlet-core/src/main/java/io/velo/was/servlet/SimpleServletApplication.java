@@ -22,6 +22,7 @@ public class SimpleServletApplication implements ServletApplication {
     private final List<ServletContextListener> servletContextListeners;
     private final List<ServletRequestListener> servletRequestListeners;
     private final Map<String, String> initParameters;
+    private final List<String> welcomeFiles;
 
     public SimpleServletApplication(String name,
                                     String contextPath,
@@ -31,6 +32,18 @@ public class SimpleServletApplication implements ServletApplication {
                                     List<ServletContextListener> servletContextListeners,
                                     List<ServletRequestListener> servletRequestListeners,
                                     Map<String, String> initParameters) {
+        this(name, contextPath, classLoader, servlets, filters, servletContextListeners, servletRequestListeners, initParameters, List.of());
+    }
+
+    public SimpleServletApplication(String name,
+                                    String contextPath,
+                                    ClassLoader classLoader,
+                                    Map<String, Servlet> servlets,
+                                    List<FilterRegistrationSpec> filters,
+                                    List<ServletContextListener> servletContextListeners,
+                                    List<ServletRequestListener> servletRequestListeners,
+                                    Map<String, String> initParameters,
+                                    List<String> welcomeFiles) {
         this.name = name;
         this.contextPath = normalizeContextPath(contextPath);
         this.classLoader = classLoader;
@@ -39,6 +52,7 @@ public class SimpleServletApplication implements ServletApplication {
         this.servletContextListeners = new ArrayList<>(servletContextListeners);
         this.servletRequestListeners = new ArrayList<>(servletRequestListeners);
         this.initParameters = new LinkedHashMap<>(initParameters);
+        this.welcomeFiles = new ArrayList<>(welcomeFiles);
     }
 
     public static Builder builder(String name, String contextPath) {
@@ -85,6 +99,11 @@ public class SimpleServletApplication implements ServletApplication {
         return Map.copyOf(initParameters);
     }
 
+    @Override
+    public List<String> welcomeFiles() {
+        return List.copyOf(welcomeFiles);
+    }
+
     private static String normalizeContextPath(String contextPath) {
         if (contextPath == null || contextPath.isBlank() || "/".equals(contextPath)) {
             return "";
@@ -101,6 +120,7 @@ public class SimpleServletApplication implements ServletApplication {
         private final List<ServletContextListener> servletContextListeners = new ArrayList<>();
         private final List<ServletRequestListener> servletRequestListeners = new ArrayList<>();
         private final Map<String, String> initParameters = new LinkedHashMap<>();
+        private final List<String> welcomeFiles = new ArrayList<>();
 
         private Builder(String name, String contextPath) {
             this.name = name;
@@ -145,6 +165,16 @@ public class SimpleServletApplication implements ServletApplication {
             return this;
         }
 
+        public Builder welcomeFile(String welcomeFile) {
+            welcomeFiles.add(welcomeFile);
+            return this;
+        }
+
+        public Builder welcomeFiles(List<String> welcomeFiles) {
+            this.welcomeFiles.addAll(welcomeFiles);
+            return this;
+        }
+
         public SimpleServletApplication build() {
             return new SimpleServletApplication(
                     name,
@@ -154,7 +184,8 @@ public class SimpleServletApplication implements ServletApplication {
                     filters,
                     servletContextListeners,
                     servletRequestListeners,
-                    initParameters);
+                    initParameters,
+                    welcomeFiles);
         }
 
         private static String normalizeServletPath(String path) {

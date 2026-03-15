@@ -126,6 +126,12 @@ public class WarDeployer {
             log.debug("app={} mapped filter {} -> {} dispatchers={}", appName, mapping.filterName(), mapping.urlPattern(), types);
         }
 
+        // Register welcome files from web.xml
+        if (!descriptor.welcomeFiles().isEmpty()) {
+            appBuilder.welcomeFiles(descriptor.welcomeFiles());
+            log.debug("app={} welcome files: {}", appName, descriptor.welcomeFiles());
+        }
+
         // Instantiate and register listeners
         for (String listenerClass : descriptor.listenerClasses()) {
             EventListener listener = instantiate(classLoader, listenerClass, EventListener.class);

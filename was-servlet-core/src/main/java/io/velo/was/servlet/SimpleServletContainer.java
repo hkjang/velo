@@ -148,7 +148,8 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 servletRuntimes,
                 filterRuntimes,
                 servletContextListeners,
-                List.copyOf(application.servletRequestListeners())));
+                List.copyOf(application.servletRequestListeners()),
+                List.copyOf(application.welcomeFiles())));
     }
 
     @Override
@@ -176,14 +177,26 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             return HttpResponses.notFound("No servlet application for " + exchange.path());
         }
 
-        ServletRuntime runtime = application.resolveServlet(exchange.path());
-        if (runtime == null) {
-            return HttpResponses.notFound("No servlet mapping for " + exchange.path());
-        }
+        String requestPath = exchange.path();
 
-        String applicationRelative = application.contextPath.isEmpty() ? exchange.path() : exchange.path().substring(application.contextPath.length());
+        // Welcome file resolution: if request path is "/" or ends with "/" and no exact servlet mapping,
+        // try welcome files in order (e.g., index.jsp, index.html)
+        String effectivePath = requestPath;
+        String applicationRelative = application.contextPath.isEmpty() ? requestPath : requestPath.substring(application.contextPath.length());
         if (applicationRelative.isEmpty()) {
             applicationRelative = "/";
+        }
+        if ("/".equals(applicationRelative) || applicationRelative.endsWith("/")) {
+            String welcomeResolved = resolveWelcomeFile(application, applicationRelative);
+            if (welcomeResolved != null) {
+                effectivePath = application.contextPath + welcomeResolved;
+                applicationRelative = welcomeResolved;
+            }
+        }
+
+        ServletRuntime runtime = application.resolveServlet(effectivePath);
+        if (runtime == null) {
+            return HttpResponses.notFound("No servlet mapping for " + exchange.path());
         }
         String servletPath = resolveServletPath(applicationRelative, runtime.mapping);
         String pathInfo = resolvePathInfo(applicationRelative, runtime.mapping);
@@ -480,6 +493,30 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         return null;
     }
 
+    /**
+     * Resolves a welcome file for directory-like requests (e.g., "/" or "/subdir/").
+     * Iterates through the application's welcome-file-list and returns the first
+     * welcome file path that has a matching servlet mapping.
+     *
+     * @return the resolved welcome file path (e.g., "/index.jsp") or null if none found
+     */
+    private String resolveWelcomeFile(DeployedApplication application, String directoryPath) {
+        if (application.welcomeFiles.isEmpty()) {
+            return null;
+        }
+        String base = directoryPath.endsWith("/") ? directoryPath : directoryPath + "/";
+        for (String welcomeFile : application.welcomeFiles) {
+            String candidate = base + welcomeFile;
+            // Check if there's a servlet mapping that can handle this welcome file
+            String testPath = application.contextPath + candidate;
+            ServletRuntime matched = application.resolveServlet(testPath);
+            if (matched != null) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
     private String resolveServletPath(String applicationRelative, String mapping) {
         if ("/".equals(mapping) || mapping.startsWith("*.")) {
             return applicationRelative;
@@ -516,7 +553,8 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             Map<String, ServletRuntime> servlets,
             List<FilterRuntime> filters,
             List<ServletContextListener> servletContextListeners,
-            List<ServletRequestListener> servletRequestListeners
+            List<ServletRequestListener> servletRequestListeners,
+            List<String> welcomeFiles
     ) {
         private boolean matches(String requestPath) {
             if (contextPath.isEmpty()) {

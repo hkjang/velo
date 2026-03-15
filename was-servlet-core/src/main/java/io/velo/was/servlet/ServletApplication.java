@@ -18,4 +18,8 @@ public interface ServletApplication {
     default Map<String, String> initParameters() {
         return Map.of();
     }
+
+    default List<String> welcomeFiles() {
+        return List.of();
+    }
 }

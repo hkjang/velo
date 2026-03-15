@@ -2,6 +2,7 @@ package io.velo.was.webadmin;
 
 import io.velo.was.config.ServerConfiguration;
 import io.velo.was.servlet.SimpleServletApplication;
+import io.velo.was.webadmin.api.AdminApiDocsServlet;
 import io.velo.was.webadmin.api.AdminApiServlet;
 import io.velo.was.webadmin.api.AdminSseServlet;
 import io.velo.was.webadmin.servlet.AdminAuthFilter;
@@ -45,7 +46,7 @@ public final class WebAdminApplication {
     public static SimpleServletApplication create(ServerConfiguration configuration) {
         String contextPath = configuration.getServer().getWebAdmin().getContextPath();
 
-        return SimpleServletApplication.builder(APP_NAME, contextPath)
+        var builder = SimpleServletApplication.builder(APP_NAME, contextPath)
                 .filter(new AdminAuthFilter())
                 // Core pages
                 .servlet("/", new AdminDashboardServlet(configuration))
@@ -69,7 +70,13 @@ public final class WebAdminApplication {
                 .servlet("/api/*", new AdminApiServlet(configuration))
                 .servlet("/sse/*", new AdminSseServlet(configuration))
                 // Static resources
-                .servlet("/static/*", new AdminStaticResourceServlet())
-                .build();
+                .servlet("/static/*", new AdminStaticResourceServlet());
+
+        // Swagger API Documentation (conditional)
+        if (configuration.getServer().getWebAdmin().isApiDocsEnabled()) {
+            builder.servlet("/api-docs/*", new AdminApiDocsServlet(configuration));
+        }
+
+        return builder.build();
     }
 }

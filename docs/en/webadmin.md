@@ -23,6 +23,7 @@ server:
   webAdmin:
     enabled: true          # Set to false to disable Web Admin
     contextPath: /admin    # Change to any desired path
+    apiDocsEnabled: true   # Set to false to disable API docs
 ```
 
 When `webAdmin.enabled: true`, the console is automatically deployed at the configured context path on server startup.
@@ -59,6 +60,9 @@ When `webAdmin.enabled: true`, the console is automatically deployed at the conf
 | Diagnostics | `/diagnostics` | Thread dump, heap dump, deadlock check, JVM/system info |
 | History | `/history` | Change history, audit log, Draft workflow management |
 | Settings | `/settings` | Console preferences (language, auto-refresh, theme), localStorage persistence |
+| API Docs | `/api-docs/ui` | OpenAPI 3.0 Swagger UI (conditional: `apiDocsEnabled: true`) |
+
+> For detailed API documentation guide, see [api-docs.md](api-docs.md).
 
 ## REST API
 
@@ -229,6 +233,7 @@ Notifications auto-dismiss after 4 seconds or can be clicked to dismiss immediat
 was-webadmin/
 ├── WebAdminApplication.java          # Servlet app factory
 ├── api/
+│   ├── AdminApiDocsServlet.java     # OpenAPI 3.0 spec + Swagger UI
 │   ├── AdminApiServlet.java          # REST API (GET/POST)
 │   └── AdminSseServlet.java          # SSE real-time stream
 ├── audit/
@@ -268,3 +273,11 @@ was-webadmin/
 - Responsive sidebar navigation
 - Real-time data refresh (SSE + Polling fallback)
 - Canvas-based live charts (heap memory, threads)
+- Light/dark theme toggle (persisted in localStorage)
+- Built-in OpenAPI 3.0 Swagger UI with Try It functionality
+
+## Related Guides
+
+- [API Documentation (Swagger) Guide](api-docs.md)
+- [Build / Start / Stop Scripts Guide](build-scripts.md)
+- [Admin CLI Guide](admin-cli.md)

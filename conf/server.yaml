@@ -37,6 +37,7 @@ server:
   webAdmin:
     enabled: true
     contextPath: /admin
+    apiDocsEnabled: true
 
   compression:
     enabled: false

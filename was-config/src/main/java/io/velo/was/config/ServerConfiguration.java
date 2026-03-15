@@ -463,11 +463,14 @@ public class ServerConfiguration {
     public static class WebAdmin {
         private boolean enabled = true;
         private String contextPath = "/admin";
+        private boolean apiDocsEnabled = true;
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public String getContextPath() { return contextPath; }
         public void setContextPath(String contextPath) { this.contextPath = contextPath; }
+        public boolean isApiDocsEnabled() { return apiDocsEnabled; }
+        public void setApiDocsEnabled(boolean apiDocsEnabled) { this.apiDocsEnabled = apiDocsEnabled; }
     }
 
     public static class TcpListenerConfig {

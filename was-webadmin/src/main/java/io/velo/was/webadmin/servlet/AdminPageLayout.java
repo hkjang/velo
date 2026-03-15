@@ -245,6 +245,7 @@ public final class AdminPageLayout {
                   <div class="sidebar-section">Administration</div>
                   %s
                   %s
+                  %s
                 </div>
                 """.formatted(
                 sidebarLink(contextPath, "/", "dashboard", activePage, "\u25A3", "Dashboard"),
@@ -260,7 +261,8 @@ public final class AdminPageLayout {
                 sidebarLink(contextPath, "/scripts", "scripts", activePage, "\u2630", "Scripts"),
                 sidebarLink(contextPath, "/domain", "domain", activePage, "\u2B21", "Domain"),
                 sidebarLink(contextPath, "/security", "security", activePage, "\u26BF", "Security"),
-                sidebarLink(contextPath, "/settings", "settings", activePage, "\u2699", "Settings")
+                sidebarLink(contextPath, "/settings", "settings", activePage, "\u2699", "Settings"),
+                sidebarLink(contextPath, "/api-docs/ui", "api-docs", activePage, "\u2B64", "API Docs")
         );
     }
 
@@ -360,6 +362,7 @@ public final class AdminPageLayout {
                     {type:'page',name:'Domain',path:'/domain'},
                     {type:'page',name:'Security',path:'/security'},
                     {type:'page',name:'Settings',path:'/settings'},
+                    {type:'page',name:'API Docs',path:'/api-docs/ui'},
                     {type:'cmd',name:'Server Status',cmd:'status'},
                     {type:'cmd',name:'List Servers',cmd:'listservers'},
                     {type:'cmd',name:'List Applications',cmd:'listapplications'},

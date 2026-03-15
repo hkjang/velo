@@ -52,7 +52,7 @@ buildNumber.properties
 .project
 .classpath
 .settings/
-bin/
+# bin/
 
 # VS Code
 .vscode/

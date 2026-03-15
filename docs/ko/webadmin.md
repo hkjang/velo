@@ -23,6 +23,7 @@ server:
   webAdmin:
     enabled: true          # false로 변경 시 Web Admin 비활성화
     contextPath: /admin    # 원하는 경로로 변경 가능
+    apiDocsEnabled: true   # false로 변경 시 API 문서 비활성화
 ```
 
 서버 기동 시 `webAdmin.enabled: true`이면 자동으로 해당 Context Path에 배포된다.
@@ -59,6 +60,9 @@ server:
 | Diagnostics | `/diagnostics` | 스레드 덤프, 힙 덤프, 데드락 체크, JVM/시스템 정보 |
 | History | `/history` | 변경 이력, 감사 로그, Draft 워크플로우 관리 |
 | Settings | `/settings` | 콘솔 환경설정 (언어, 자동 새로고침, 테마), localStorage 저장 |
+| API Docs | `/api-docs/ui` | OpenAPI 3.0 Swagger UI (조건부: `apiDocsEnabled: true`) |
+
+> API 문서 상세 가이드: [api-docs.md](api-docs.md)
 
 ## REST API
 
@@ -229,6 +233,7 @@ curl -X POST http://localhost:8080/admin/api/users/remove \
 was-webadmin/
 ├── WebAdminApplication.java          # 서블릿 앱 팩토리
 ├── api/
+│   ├── AdminApiDocsServlet.java     # OpenAPI 3.0 스펙 + Swagger UI
 │   ├── AdminApiServlet.java          # REST API (GET/POST)
 │   └── AdminSseServlet.java          # SSE 실시간 스트림
 ├── audit/
@@ -268,3 +273,11 @@ was-webadmin/
 - 반응형 사이드바 네비게이션
 - 실시간 데이터 갱신 (SSE + Polling 폴백)
 - Canvas 기반 실시간 차트 (힙 메모리, 스레드)
+- 라이트/다크 테마 전환 (localStorage 저장)
+- 내장 OpenAPI 3.0 Swagger UI (Try It 기능 포함)
+
+## 관련 문서
+
+- [API Documentation (Swagger) 가이드](api-docs.md)
+- [빌드 / 기동 / 종료 스크립트 가이드](build-scripts.md)
+- [Admin CLI 가이드](admin-cli.md)

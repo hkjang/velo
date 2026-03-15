@@ -194,7 +194,7 @@ public class ResourcesPageServlet extends HttpServlet {
                     </div>
                     <div class="modal-footer">
                       <button class="btn" onclick="document.getElementById('addDsModal').classList.remove('open')">Cancel</button>
-                      <button class="btn btn-primary">Create</button>
+                      <button class="btn btn-primary" onclick="createDataSource()">Create</button>
                     </div>
                   </div>
                 </div>
@@ -252,6 +252,66 @@ public class ResourcesPageServlet extends HttpServlet {
                   });
                 }
 
+                var dataSources = JSON.parse(localStorage.getItem('velo-datasources') || '[]');
+
+                function renderDataSources() {
+                  var alert = document.querySelector('#tab-jdbc .alert');
+                  var table = document.querySelector('#tab-jdbc .data-table');
+                  var tbody = table.querySelector('tbody');
+                  if (dataSources.length === 0) {
+                    alert.style.display = '';
+                    table.style.display = 'none';
+                    return;
+                  }
+                  alert.style.display = 'none';
+                  table.style.display = '';
+                  var html = '';
+                  dataSources.forEach(function(ds, i) {
+                    html += '<tr><td><strong>' + ds.name + '</strong></td>'
+                      + '<td><code>' + ds.jndi + '</code></td>'
+                      + '<td>' + ds.driver + '</td>'
+                      + '<td>0 / 0 / ' + ds.maxPool + '</td>'
+                      + '<td><span class="badge badge-success">Active</span></td>'
+                      + '<td><div class="btn-group">'
+                      + '<button class="btn btn-sm" onclick="testDs(' + i + ')">Test</button>'
+                      + '<button class="btn btn-sm btn-danger" onclick="removeDs(' + i + ')">Remove</button>'
+                      + '</div></td></tr>';
+                  });
+                  tbody.innerHTML = html;
+                }
+
+                function createDataSource() {
+                  var inputs = document.querySelectorAll('#addDsModal .form-input');
+                  var name = inputs[0].value;
+                  var jndi = inputs[1].value;
+                  var url = inputs[2].value;
+                  var driver = inputs[3].value;
+                  if (!name || !url) { showToast('Name and JDBC URL are required', 'warning'); return; }
+                  dataSources.push({
+                    name: name, jndi: jndi || 'jdbc/' + name, url: url,
+                    driver: driver || '-', user: inputs[4].value,
+                    minPool: inputs[6] ? inputs[6].value : 5,
+                    maxPool: inputs[7] ? inputs[7].value : 20
+                  });
+                  localStorage.setItem('velo-datasources', JSON.stringify(dataSources));
+                  document.getElementById('addDsModal').classList.remove('open');
+                  renderDataSources();
+                  showToast('DataSource "' + name + '" created', 'success');
+                }
+
+                function testDs(i) {
+                  showToast('Testing connection to ' + dataSources[i].name + '... Connection test is not yet available (driver not loaded).', 'warning');
+                }
+
+                function removeDs(i) {
+                  if (!confirm('Remove DataSource "' + dataSources[i].name + '"?')) return;
+                  dataSources.splice(i, 1);
+                  localStorage.setItem('velo-datasources', JSON.stringify(dataSources));
+                  renderDataSources();
+                  showToast('DataSource removed', 'success');
+                }
+
+                renderDataSources();
                 loadThreadPools();
                 </script>
                 """.formatted(

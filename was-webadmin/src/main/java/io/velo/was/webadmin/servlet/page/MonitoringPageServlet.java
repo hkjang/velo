@@ -44,7 +44,7 @@ public class MonitoringPageServlet extends HttpServlet {
                   <div class="btn-group">
                     <button class="btn btn-sm" id="autoRefreshBtn" onclick="toggleAutoRefresh()">Auto-Refresh: ON</button>
                     <button class="btn btn-sm" onclick="location.reload()">Refresh Now</button>
-                    <button class="btn btn-sm">Export CSV</button>
+                    <button class="btn btn-sm" onclick="exportCsv()">Export CSV</button>
                   </div>
                 </div>
 
@@ -265,6 +265,21 @@ public class MonitoringPageServlet extends HttpServlet {
                       el.innerHTML = alerts.map(function(a){return '<div class="alert alert-' + a.level + '">' + a.msg + '</div>';}).join('');
                     }
                   }).catch(function(){});
+                }
+
+                function exportCsv() {
+                  if (chartData.length === 0) { showToast('No metrics data to export', 'warning'); return; }
+                  var csv = 'Timestamp,Heap (MB),Threads\\n';
+                  chartData.forEach(function(d) {
+                    csv += new Date(d.t).toISOString() + ',' + d.heap + ',' + d.threads + '\\n';
+                  });
+                  var blob = new Blob([csv], {type: 'text/csv'});
+                  var a = document.createElement('a');
+                  a.href = URL.createObjectURL(blob);
+                  a.download = 'velo-metrics-' + new Date().toISOString().slice(0,10) + '.csv';
+                  a.click();
+                  URL.revokeObjectURL(a.href);
+                  showToast('CSV exported: ' + chartData.length + ' data points', 'success');
                 }
 
                 fetchMetrics();

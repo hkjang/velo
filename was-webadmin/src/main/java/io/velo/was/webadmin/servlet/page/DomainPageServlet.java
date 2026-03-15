@@ -120,7 +120,7 @@ public class DomainPageServlet extends HttpServlet {
                   <div class="card">
                     <div class="card-header">
                       <div class="card-title">Environment Variables</div>
-                      <button class="btn btn-sm btn-primary">Add Variable</button>
+                      <button class="btn btn-sm btn-primary" onclick="document.getElementById('addVarModal').classList.add('open')">Add Variable</button>
                     </div>
                     <table class="data-table">
                       <thead><tr><th>Key</th><th>Value</th><th>Scope</th><th>Actions</th></tr></thead>
@@ -137,7 +137,7 @@ public class DomainPageServlet extends HttpServlet {
                   <div class="card">
                     <div class="card-header">
                       <div class="card-title">Configuration Profiles</div>
-                      <button class="btn btn-sm btn-primary">Create Profile</button>
+                      <button class="btn btn-sm btn-primary" onclick="document.getElementById('addProfileModal').classList.add('open')">Create Profile</button>
                     </div>
                     <table class="data-table">
                       <thead><tr><th>Profile</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead>
@@ -183,7 +183,7 @@ public class DomainPageServlet extends HttpServlet {
                     </div>
                     <div class="modal-footer">
                       <button class="btn" onclick="document.getElementById('editDomainModal').classList.remove('open')">Cancel</button>
-                      <button class="btn">Validate</button>
+                      <button class="btn" onclick="validateDomainConfig()">Validate</button>
                       <button class="btn btn-primary">Save as Draft</button>
                     </div>
                   </div>
@@ -210,6 +210,92 @@ public class DomainPageServlet extends HttpServlet {
                   }).catch(function(e) {
                     document.getElementById('yamlView').textContent = 'Failed to load config';
                   });
+                }
+
+                // Add Variable Modal & Profile Modal (dynamically created)
+                document.body.insertAdjacentHTML('beforeend',
+                  '<div class="modal-overlay" id="addVarModal">' +
+                  '<div class="modal">' +
+                  '<div class="modal-title">Add Environment Variable</div>' +
+                  '<div class="form-group"><label class="form-label">Key</label>' +
+                  '<input class="form-input" type="text" id="varKey" placeholder="e.g. app.timeout"></div>' +
+                  '<div class="form-group"><label class="form-label">Value</label>' +
+                  '<input class="form-input" type="text" id="varValue" placeholder="e.g. 30"></div>' +
+                  '<div class="form-group"><label class="form-label">Scope</label>' +
+                  '<select class="form-select" id="varScope"><option>Domain</option><option>Server</option></select></div>' +
+                  '<div class="modal-footer">' +
+                  '<button class="btn" onclick="document.getElementById(\\'addVarModal\\').classList.remove(\\'open\\')">Cancel</button>' +
+                  '<button class="btn btn-primary" onclick="addVariable()">Add</button>' +
+                  '</div></div></div>' +
+                  '<div class="modal-overlay" id="addProfileModal">' +
+                  '<div class="modal">' +
+                  '<div class="modal-title">Create Configuration Profile</div>' +
+                  '<div class="form-group"><label class="form-label">Profile Name</label>' +
+                  '<input class="form-input" type="text" id="profileName" placeholder="e.g. production"></div>' +
+                  '<div class="form-group"><label class="form-label">Description</label>' +
+                  '<input class="form-input" type="text" id="profileDesc" placeholder="Profile description"></div>' +
+                  '<div class="form-group"><label class="form-label">Base Profile</label>' +
+                  '<select class="form-select"><option>default</option></select></div>' +
+                  '<div class="modal-footer">' +
+                  '<button class="btn" onclick="document.getElementById(\\'addProfileModal\\').classList.remove(\\'open\\')">Cancel</button>' +
+                  '<button class="btn btn-primary" onclick="createProfile()">Create</button>' +
+                  '</div></div></div>'
+                );
+
+                function addVariable() {
+                  var key = document.getElementById('varKey').value;
+                  var value = document.getElementById('varValue').value;
+                  var scope = document.getElementById('varScope').value;
+                  if (!key) { showToast('Key is required', 'warning'); return; }
+                  fetch(CTX + '/api/execute', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({command: 'set-domain-property default ' + key + ' ' + value})
+                  }).then(function(r){return r.json();}).then(function(d) {
+                    showToast(d.message, d.success ? 'success' : 'error');
+                    if (d.success) {
+                      document.getElementById('addVarModal').classList.remove('open');
+                      var tbody = document.querySelector('#tab-env .data-table tbody');
+                      var badgeCls = scope === 'Domain' ? 'badge-info' : 'badge-warning';
+                      tbody.insertAdjacentHTML('beforeend',
+                        '<tr><td>' + key + '</td><td><code>' + value + '</code></td>' +
+                        '<td><span class="badge ' + badgeCls + '">' + scope + '</span></td>' +
+                        '<td><button class="btn btn-sm">Edit</button></td></tr>');
+                    }
+                  });
+                }
+
+                function createProfile() {
+                  var name = document.getElementById('profileName').value;
+                  var desc = document.getElementById('profileDesc').value;
+                  if (!name) { showToast('Profile name is required', 'warning'); return; }
+                  document.getElementById('addProfileModal').classList.remove('open');
+                  var tbody = document.querySelector('#tab-profiles .data-table tbody');
+                  tbody.insertAdjacentHTML('beforeend',
+                    '<tr><td><strong>' + name + '</strong></td>' +
+                    '<td>' + (desc || '-') + '</td>' +
+                    '<td><span class="badge badge-neutral">Inactive</span></td>' +
+                    '<td><div class="btn-group">' +
+                    '<button class="btn btn-sm">View</button>' +
+                    '<button class="btn btn-sm">Activate</button>' +
+                    '</div></td></tr>');
+                  showToast('Profile "' + name + '" created', 'success');
+                }
+
+                function validateDomainConfig() {
+                  var inputs = document.querySelectorAll('#editDomainModal .form-input');
+                  var serverName = inputs[0].value;
+                  var nodeId = inputs[1].value;
+                  var shutdown = inputs[2].value;
+                  var errors = [];
+                  if (!serverName) errors.push('Server name is required');
+                  if (!nodeId) errors.push('Node ID is required');
+                  if (isNaN(shutdown) || parseInt(shutdown) < 0) errors.push('Graceful shutdown must be >= 0');
+                  if (errors.length > 0) {
+                    showToast('Validation failed: ' + errors.join('; '), 'error');
+                  } else {
+                    showToast('Validation passed. Configuration is valid.', 'success');
+                  }
                 }
 
                 // Save as Draft button

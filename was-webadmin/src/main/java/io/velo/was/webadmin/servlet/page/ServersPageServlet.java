@@ -75,7 +75,7 @@ public class ServersPageServlet extends HttpServlet {
                   <div class="card-header">
                     <div class="card-title">Server Instances</div>
                     <div class="btn-group">
-                      <button class="btn btn-sm">Refresh</button>
+                      <button class="btn btn-sm" onclick="refreshServerStatus()">Refresh</button>
                     </div>
                   </div>
                   <table class="data-table">

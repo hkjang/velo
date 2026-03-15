@@ -114,7 +114,7 @@ public class SecurityPageServlet extends HttpServlet {
                   <div class="card">
                     <div class="card-header">
                       <div class="card-title">Active Sessions</div>
-                      <button class="btn btn-sm btn-danger">Terminate All</button>
+                      <button class="btn btn-sm btn-danger" onclick="terminateAllSessions()">Terminate All</button>
                     </div>
                     <table class="data-table">
                       <thead><tr><th>User</th><th>IP</th><th>Started</th><th>Last Activity</th><th>Actions</th></tr></thead>
@@ -235,6 +235,23 @@ public class SecurityPageServlet extends HttpServlet {
                     }
                   });
                 });
+
+                function terminateAllSessions() {
+                  if (!confirm('Terminate all sessions? All users (including you) will be logged out.')) return;
+                  fetch(CTX + '/api/execute', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({command: 'invalidate-all-sessions'})
+                  }).then(function(r){return r.json();}).then(function(d) {
+                    showToast(d.message || 'All sessions terminated', d.success ? 'success' : 'error');
+                    if (d.success) {
+                      setTimeout(function(){ location.href = CTX + '/login'; }, 1500);
+                    }
+                  }).catch(function() {
+                    showToast('Sessions terminated. Redirecting to login...', 'info');
+                    setTimeout(function(){ location.href = CTX + '/login'; }, 1500);
+                  });
+                }
 
                 loadUsers();
                 </script>

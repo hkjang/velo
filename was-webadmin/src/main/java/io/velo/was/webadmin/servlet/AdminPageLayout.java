@@ -290,6 +290,16 @@ public final class AdminPageLayout {
                   container.appendChild(toast);
                   setTimeout(function(){ if(toast.parentNode) toast.style.opacity='0'; toast.style.transition='opacity 0.3s'; setTimeout(function(){toast.remove();},300); }, 4000);
                 }
+                // Apply saved theme globally
+                (function() {
+                  var t = localStorage.getItem('velo-theme');
+                  if (t === 'light') {
+                    var s = document.createElement('style');
+                    s.id = 'light-theme-global';
+                    s.textContent = ':root { --bg: #f8f9fa; --bg2: #ffffff; --bg3: #e9ecef; --text: #1a1d27; --text2: #495057; --text3: #868e96; --border: #dee2e6; }';
+                    document.head.appendChild(s);
+                  }
+                })();
                 </script>
                 <style>
                 @keyframes slideIn { from { transform:translateX(100%%);opacity:0; } to { transform:translateX(0);opacity:1; } }

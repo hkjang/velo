@@ -49,11 +49,11 @@ public class ApplicationsPageServlet extends HttpServlet {
                   </div>
                   <div class="card">
                     <div class="card-title">Stopped</div>
-                    <div class="metric-value" style="font-size:32px;color:var(--text3);">0</div>
+                    <div class="metric-value" style="font-size:32px;color:var(--text3);" id="app-stopped">0</div>
                   </div>
                   <div class="card">
                     <div class="card-title">Failed</div>
-                    <div class="metric-value danger" style="font-size:32px;">0</div>
+                    <div class="metric-value danger" style="font-size:32px;" id="app-failed">0</div>
                   </div>
                 </div>
 
@@ -156,6 +156,10 @@ public class ApplicationsPageServlet extends HttpServlet {
                     var runEl = document.getElementById('app-running');
                     if (totalEl) totalEl.textContent = apps.length;
                     if (runEl) runEl.textContent = apps.filter(function(a){return a.status==='RUNNING';}).length;
+                    var stoppedEl = document.getElementById('app-stopped');
+                    var failedEl = document.getElementById('app-failed');
+                    if (stoppedEl) stoppedEl.textContent = apps.filter(function(a){return a.status==='STOPPED';}).length;
+                    if (failedEl) failedEl.textContent = apps.filter(function(a){return a.status==='FAILED';}).length;
                     var html = '';
                     apps.forEach(function(a) {
                       var statusBadge = a.status === 'RUNNING' ? 'badge-success' : a.status === 'STOPPED' ? 'badge-neutral' : 'badge-danger';
@@ -208,6 +212,31 @@ public class ApplicationsPageServlet extends HttpServlet {
                     showToast(d.message, d.success ? 'success' : 'error');
                     document.getElementById('directDeployModal').classList.remove('open');
                     if(d.success) loadApps();
+                  });
+                });
+
+                // WAR Upload form handler
+                document.getElementById('uploadForm').addEventListener('submit', function(e) {
+                  e.preventDefault();
+                  var fileInput = this.querySelector('input[type="file"]');
+                  var ctxInput = this.querySelectorAll('.form-input')[1];
+                  if (!fileInput.files.length) { showToast('Please select a WAR file', 'warning'); return; }
+                  var formData = new FormData();
+                  formData.append('file', fileInput.files[0]);
+                  if (ctxInput && ctxInput.value) formData.append('contextPath', ctxInput.value);
+                  showToast('Uploading WAR file...', 'info');
+                  fetch(CTX + '/api/deploy/upload', {
+                    method: 'POST',
+                    body: formData
+                  }).then(function(r){return r.json();}).then(function(d) {
+                    showToast(d.message || (d.success ? 'Deployed successfully' : 'Deploy failed'), d.success ? 'success' : 'error');
+                    document.getElementById('deployModal').classList.remove('open');
+                    if (d.success) loadApps();
+                  }).catch(function(err) {
+                    // Fallback: deploy via copy to deploy dir
+                    var fileName = fileInput.files[0].name;
+                    var ctxPath = ctxInput && ctxInput.value ? ctxInput.value : '/' + fileName.replace('.war', '');
+                    showToast('Upload endpoint not available. Use Direct Deploy with server file path instead.', 'warning');
                   });
                 });
 

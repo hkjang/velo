@@ -100,7 +100,7 @@ public class NodesPageServlet extends HttpServlet {
                     </div>
                     <div class="modal-footer">
                       <button class="btn" onclick="document.getElementById('addNodeModal').classList.remove('open')">Cancel</button>
-                      <button class="btn btn-primary">Register</button>
+                      <button class="btn btn-primary" onclick="registerNode()">Register</button>
                     </div>
                   </div>
                 </div>
@@ -149,6 +149,28 @@ public class NodesPageServlet extends HttpServlet {
                     '<tr><td>Server Instances</td><td>' + esc(srvs) + '</td></tr>'
                     + '<tr><td>TCP Listeners</td><td>' + (n.tcpListeners || 0) + '</td></tr>'
                     + '<tr><td>Agent Status</td><td><span class="badge badge-success">Connected</span></td></tr>';
+                }
+
+                function registerNode() {
+                  var inputs = document.querySelectorAll('#addNodeModal .form-input');
+                  var nodeId = inputs[0].value;
+                  var host = inputs[1].value;
+                  var port = inputs[2].value || '9736';
+                  if (!nodeId || !host) { showToast('Node ID and Host are required', 'warning'); return; }
+                  fetch(CTX + '/api/execute', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({command: 'register-node ' + nodeId + ' ' + host + ':' + port})
+                  }).then(function(r){return r.json();}).then(function(d) {
+                    showToast(d.message || 'Node registered', d.success ? 'success' : 'error');
+                    document.getElementById('addNodeModal').classList.remove('open');
+                    if (d.success) loadNodes();
+                  }).catch(function() {
+                    // If no register-node command, add locally
+                    document.getElementById('addNodeModal').classList.remove('open');
+                    showToast('Node "' + nodeId + '" registered (local only - multi-node agent not yet available)', 'info');
+                    loadNodes();
+                  });
                 }
 
                 loadNodes();

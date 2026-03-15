@@ -74,8 +74,8 @@ public class AdminDashboardServlet extends HttpServlet {
                   </div>
                   <div class="card">
                     <div class="card-title">Applications</div>
-                    <div class="metric-value sm success">2</div>
-                    <div style="font-size:13px;color:var(--text2);margin-top:4px;">All running</div>
+                    <div class="metric-value sm success" id="dash-apps">-</div>
+                    <div style="font-size:13px;color:var(--text2);margin-top:4px;" id="dash-apps-status">Loading...</div>
                   </div>
                 </div>
 
@@ -192,6 +192,34 @@ public class AdminDashboardServlet extends HttpServlet {
                   g.fillStyle = '#22c55e'; g.fillRect(w-60, 8, 10, 10);
                   g.fillStyle = '#e4e4e7'; g.fillText('Threads', w-46, 17);
                 }
+                // Load application count dynamically
+                function loadDashApps() {
+                  fetch(CTX + '/api/applications').then(function(r){return r.json();}).then(function(d) {
+                    var apps = d.applications || [];
+                    var el = document.getElementById('dash-apps');
+                    var stEl = document.getElementById('dash-apps-status');
+                    if (el) el.textContent = apps.length;
+                    var running = apps.filter(function(a){return a.status==='RUNNING';}).length;
+                    var stopped = apps.filter(function(a){return a.status==='STOPPED';}).length;
+                    if (stEl) {
+                      if (stopped > 0) stEl.textContent = running + ' running, ' + stopped + ' stopped';
+                      else stEl.textContent = 'All running';
+                    }
+                  }).catch(function(){
+                    var el = document.getElementById('dash-apps');
+                    if (el) el.textContent = '-';
+                  });
+                }
+                loadDashApps();
+
+                // Apply saved theme
+                var savedTheme = localStorage.getItem('velo-theme');
+                if (savedTheme === 'light') {
+                  var s = document.createElement('style');
+                  s.textContent = ':root { --bg: #f8f9fa; --bg2: #ffffff; --bg3: #e9ecef; --text: #1a1d27; --text2: #495057; --text3: #868e96; --border: #dee2e6; --primary: #6366f1; --primary-hover: #4f46e5; --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; }';
+                  document.head.appendChild(s);
+                }
+
                 pollDash();
                 </script>
                 """.formatted(

@@ -84,15 +84,15 @@ public class SettingsPageServlet extends HttpServlet {
                   <div class="card">
                     <div class="card-title">Theme</div>
                     <div style="display:flex;gap:16px;margin-top:16px;">
-                      <div style="padding:16px 24px;border-radius:8px;border:2px solid var(--primary);
-                           background:#0f1117;color:#e4e4e7;cursor:pointer;text-align:center;">
+                      <div id="themeDark" style="padding:16px 24px;border-radius:8px;border:2px solid var(--primary);
+                           background:#0f1117;color:#e4e4e7;cursor:pointer;text-align:center;" onclick="setTheme('dark')">
                         <div style="font-weight:600;">Dark</div>
-                        <div style="font-size:12px;color:#9ca3af;">Current</div>
+                        <div style="font-size:12px;color:#9ca3af;" id="themeDarkLabel">Current</div>
                       </div>
-                      <div style="padding:16px 24px;border-radius:8px;border:1px solid var(--border);
-                           background:#f8f9fa;color:#1a1d27;cursor:pointer;text-align:center;opacity:0.6;">
+                      <div id="themeLight" style="padding:16px 24px;border-radius:8px;border:1px solid var(--border);
+                           background:#f8f9fa;color:#1a1d27;cursor:pointer;text-align:center;" onclick="setTheme('light')">
                         <div style="font-weight:600;">Light</div>
-                        <div style="font-size:12px;">Planned</div>
+                        <div style="font-size:12px;" id="themeLightLabel"></div>
                       </div>
                     </div>
                   </div>
@@ -148,6 +148,40 @@ public class SettingsPageServlet extends HttpServlet {
                   sel.addEventListener('change', savePrefs);
                 });
                 loadPrefs();
+
+                // Theme switching
+                var lightThemeCss = ':root { --bg: #f8f9fa; --bg2: #ffffff; --bg3: #e9ecef; --text: #1a1d27; --text2: #495057; --text3: #868e96; --border: #dee2e6; --primary: #6366f1; --primary-hover: #4f46e5; --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; }';
+                var lightStyleEl = null;
+
+                function setTheme(theme) {
+                  localStorage.setItem('velo-theme', theme);
+                  applyTheme(theme);
+                  showToast('Theme changed to ' + theme, 'success');
+                }
+
+                function applyTheme(theme) {
+                  if (theme === 'light') {
+                    if (!lightStyleEl) {
+                      lightStyleEl = document.createElement('style');
+                      lightStyleEl.id = 'light-theme';
+                      lightStyleEl.textContent = lightThemeCss;
+                    }
+                    document.head.appendChild(lightStyleEl);
+                    document.getElementById('themeDark').style.border = '1px solid var(--border)';
+                    document.getElementById('themeLight').style.border = '2px solid var(--primary)';
+                    document.getElementById('themeDarkLabel').textContent = '';
+                    document.getElementById('themeLightLabel').textContent = 'Current';
+                  } else {
+                    if (lightStyleEl && lightStyleEl.parentNode) lightStyleEl.parentNode.removeChild(lightStyleEl);
+                    document.getElementById('themeDark').style.border = '2px solid var(--primary)';
+                    document.getElementById('themeLight').style.border = '1px solid var(--border)';
+                    document.getElementById('themeDarkLabel').textContent = 'Current';
+                    document.getElementById('themeLightLabel').textContent = '';
+                  }
+                }
+
+                var savedTheme = localStorage.getItem('velo-theme') || 'dark';
+                applyTheme(savedTheme);
                 </script>
                 """.formatted(
                 AdminPageLayout.escapeHtml(server.getWebAdmin().getContextPath()),

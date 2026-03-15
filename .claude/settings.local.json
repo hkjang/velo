@@ -70,7 +70,10 @@
       "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn compile -pl was-admin -am -q)",
       "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn test -pl was-admin -am)",
       "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn compile -q)",
-      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn compile test -pl was-admin,was-webadmin,was-servlet-core -am)"
+      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn compile test -pl was-admin,was-webadmin,was-servlet-core -am)",
+      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn compile -pl was-webadmin -am -q)",
+      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn test -pl was-admin -q)",
+      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn test -pl was-admin -am -q)"
     ]
   }
 }

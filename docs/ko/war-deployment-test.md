@@ -142,3 +142,37 @@ $ curl -s http://localhost:8080/test-app/info.jsp
 ![test-app 서버 정보 페이지 화면](../images/test_app_info.png)
 
 위와 같이 `No servlet mapping` 에러나 `500 Server Error` 없이 HTML 본문과 정상적인 200 상태 코드가 반환되면 모든 JSP 컴파일, 트랜스레이션 및 클래스로더 연동이 완벽하게 성공한 것입니다.
+
+### 4.4. 추가 API 엔드포인트 검증
+
+`test-app`은 혼합 모드(JSP + 서블릿) 라우팅을 검증하기 위해 `WEB-INF/classes` 내부에 일반 서블릿들도 포함하고 있습니다. 해당 서블릿들이 정상 호출되는지 확인합니다.
+
+```sh
+# 1. Greeting 서블릿 테스트
+$ curl -s "http://localhost:8080/test-app/greeting?name=Velo"
+
+<!DOCTYPE html>
+<html><head><title>Greeting</title></head>
+<body>
+<h1>Hello, Velo!</h1>
+...
+</html>
+```
+
+![Greeting 서블릿 화면](../images/test_app_greeting.png)
+
+```sh
+# 2. 상태 조회 API 테스트
+$ curl -s http://localhost:8080/test-app/api/status
+
+{
+  "status": "running",
+  "appName": "test-app",
+  "uptimeMs": 5564648,
+  "memory": { ... },
+  "javaVersion": "21.0.10",
+  "threads": 23
+}
+```
+
+![상태 정보 JSON 응답 화면](../images/test_app_status.png)

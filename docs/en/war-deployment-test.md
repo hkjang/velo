@@ -142,3 +142,37 @@ $ curl -s http://localhost:8080/test-app/info.jsp
 ![test-app Server Information Page](../images/test_app_info.png)
 
 If you receive normal 200 HTTP response codes and the HTML body correctly displays without any `No servlet mapping` or `500 Server Error` errors, it signifies that JSP compilation, translation, and classloader integration have completely succeeded.
+
+### 4.4. Additional API Endpoints Verification
+
+The `test-app` also includes standard Servlets in its `WEB-INF/classes` directory to verify mixed-mode (JSP + Servlet) routing capabilities.
+
+```sh
+# 1. Greeting Servlet Test
+$ curl -s "http://localhost:8080/test-app/greeting?name=Velo"
+
+<!DOCTYPE html>
+<html><head><title>Greeting</title></head>
+<body>
+<h1>Hello, Velo!</h1>
+...
+</html>
+```
+
+![Greeting Servlet Page](../images/test_app_greeting.png)
+
+```sh
+# 2. Status API Test
+$ curl -s http://localhost:8080/test-app/api/status
+
+{
+  "status": "running",
+  "appName": "test-app",
+  "uptimeMs": 5564648,
+  "memory": { ... },
+  "javaVersion": "21.0.10",
+  "threads": 23
+}
+```
+
+![Status API JSON Response](../images/test_app_status.png)

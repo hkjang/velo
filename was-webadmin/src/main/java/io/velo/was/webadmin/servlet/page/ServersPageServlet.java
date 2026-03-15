@@ -55,19 +55,19 @@ public class ServersPageServlet extends HttpServlet {
                 <div class="grid grid-4" style="margin-bottom:24px;">
                   <div class="card">
                     <div class="card-title">Total Servers</div>
-                    <div class="metric-value" style="font-size:32px;">1</div>
+                    <div class="metric-value" style="font-size:32px;" id="srv-total">-</div>
                   </div>
                   <div class="card">
                     <div class="card-title">Running</div>
-                    <div class="metric-value success" style="font-size:32px;">1</div>
+                    <div class="metric-value success" style="font-size:32px;" id="srv-running">-</div>
                   </div>
                   <div class="card">
                     <div class="card-title">Stopped</div>
-                    <div class="metric-value" style="font-size:32px;color:var(--text3);">0</div>
+                    <div class="metric-value" style="font-size:32px;color:var(--text3);" id="srv-stopped">0</div>
                   </div>
                   <div class="card">
                     <div class="card-title">Failed</div>
-                    <div class="metric-value danger" style="font-size:32px;">0</div>
+                    <div class="metric-value danger" style="font-size:32px;" id="srv-failed">0</div>
                   </div>
                 </div>
 
@@ -187,6 +187,16 @@ public class ServersPageServlet extends HttpServlet {
                     if (thrCell) thrCell.textContent = d.threadCount;
                   }).catch(function(){});
                 }
+                function loadServerCounts() {
+                  fetch(CTX + '/api/servers').then(function(r){return r.json();}).then(function(d) {
+                    var servers = d.servers || [];
+                    document.getElementById('srv-total').textContent = servers.length;
+                    document.getElementById('srv-running').textContent = servers.filter(function(s){return s.status==='RUNNING';}).length;
+                    document.getElementById('srv-stopped').textContent = servers.filter(function(s){return s.status==='STOPPED';}).length;
+                    document.getElementById('srv-failed').textContent = servers.filter(function(s){return s.status==='FAILED';}).length;
+                  }).catch(function(){});
+                }
+                loadServerCounts();
                 setInterval(refreshServerStatus, 5000);
                 </script>
                 """.formatted(

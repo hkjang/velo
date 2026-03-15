@@ -69,25 +69,8 @@ public class SecurityPageServlet extends HttpServlet {
                     </div>
                     <table class="data-table">
                       <thead><tr><th>Role</th><th>Description</th><th>Permissions</th><th>Members</th></tr></thead>
-                      <tbody>
-                        <tr>
-                          <td><strong>ADMIN</strong></td>
-                          <td>Full system administrator</td>
-                          <td><span class="badge badge-danger">ALL</span></td>
-                          <td>1</td>
-                        </tr>
-                        <tr>
-                          <td><strong>OPERATOR</strong></td>
-                          <td>Server and application operations</td>
-                          <td><span class="badge badge-warning">READ, EXECUTE</span></td>
-                          <td>0</td>
-                        </tr>
-                        <tr>
-                          <td><strong>VIEWER</strong></td>
-                          <td>Read-only monitoring access</td>
-                          <td><span class="badge badge-info">READ</span></td>
-                          <td>0</td>
-                        </tr>
+                      <tbody id="rolesTbody">
+                        <tr><td colspan="4" style="text-align:center;color:var(--text2);">Loading...</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -118,14 +101,8 @@ public class SecurityPageServlet extends HttpServlet {
                     </div>
                     <table class="data-table">
                       <thead><tr><th>User</th><th>IP</th><th>Started</th><th>Last Activity</th><th>Actions</th></tr></thead>
-                      <tbody>
-                        <tr>
-                          <td>admin</td>
-                          <td>127.0.0.1</td>
-                          <td>Current</td>
-                          <td>Active</td>
-                          <td><span style="color:var(--text3);font-size:12px;">Current session</span></td>
-                        </tr>
+                      <tbody id="sessionsTbody">
+                        <tr><td colspan="5" style="text-align:center;color:var(--text2);">Loading...</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -236,6 +213,77 @@ public class SecurityPageServlet extends HttpServlet {
                   });
                 });
 
+                function loadRoles() {
+                  fetch(CTX + '/api/users').then(function(r){return r.json();}).then(function(d) {
+                    var users = d.users || [];
+                    var adminCount = users.filter(function(u){return u.username === 'admin';}).length;
+                    var totalCount = users.length;
+                    var roles = [
+                      {name:'ADMIN', desc:'Full system administrator', perm:'ALL', badge:'badge-danger', members: adminCount},
+                      {name:'OPERATOR', desc:'Server and application operations', perm:'READ, EXECUTE', badge:'badge-warning', members: Math.max(0, totalCount - adminCount)},
+                      {name:'VIEWER', desc:'Read-only monitoring access', perm:'READ', badge:'badge-info', members: 0}
+                    ];
+                    var tb = document.getElementById('rolesTbody');
+                    var html = '';
+                    roles.forEach(function(r) {
+                      html += '<tr><td><strong>' + r.name + '</strong></td>'
+                        + '<td>' + r.desc + '</td>'
+                        + '<td><span class="badge ' + r.badge + '">' + r.perm + '</span></td>'
+                        + '<td>' + r.members + '</td></tr>';
+                    });
+                    tb.innerHTML = html;
+                  }).catch(function() {
+                    document.getElementById('rolesTbody').innerHTML =
+                      '<tr><td colspan="4" style="text-align:center;color:var(--text2);">Failed to load</td></tr>';
+                  });
+                }
+
+                function loadSessions() {
+                  fetch(CTX + '/api/execute', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({command: 'list-sessions'})
+                  }).then(function(r){return r.json();}).then(function(d) {
+                    var tb = document.getElementById('sessionsTbody');
+                    if (d.success && d.message && d.message.indexOf('No active') < 0) {
+                      var lines = d.message.split('\\n').filter(function(l){return l.trim();});
+                      var html = '';
+                      lines.forEach(function(line) {
+                        var parts = line.split(/\\s*[|,]\\s*/);
+                        html += '<tr><td>' + esc(parts[0] || '-') + '</td>'
+                          + '<td>' + esc(parts[1] || '-') + '</td>'
+                          + '<td>' + esc(parts[2] || '-') + '</td>'
+                          + '<td>' + esc(parts[3] || '-') + '</td>'
+                          + '<td><button class="btn btn-sm btn-danger" onclick="terminateSession(\\'' + esc(parts[0] || '') + '\\')">Terminate</button></td></tr>';
+                      });
+                      if (html) { tb.innerHTML = html; return; }
+                    }
+                    // Fallback: show current admin session
+                    tb.innerHTML = '<tr><td>admin</td><td>' + location.hostname + '</td>'
+                      + '<td>' + new Date().toLocaleString() + '</td>'
+                      + '<td>Active</td>'
+                      + '<td><span style="color:var(--text3);font-size:12px;">Current session</span></td></tr>';
+                  }).catch(function() {
+                    document.getElementById('sessionsTbody').innerHTML =
+                      '<tr><td>admin</td><td>' + location.hostname + '</td>'
+                      + '<td>' + new Date().toLocaleString() + '</td>'
+                      + '<td>Active</td>'
+                      + '<td><span style="color:var(--text3);font-size:12px;">Current session</span></td></tr>';
+                  });
+                }
+
+                function terminateSession(username) {
+                  if (!confirm('Terminate session for ' + username + '?')) return;
+                  fetch(CTX + '/api/execute', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({command: 'invalidate-session ' + username})
+                  }).then(function(r){return r.json();}).then(function(d) {
+                    showToast(d.message || 'Session terminated', d.success ? 'success' : 'error');
+                    loadSessions();
+                  });
+                }
+
                 function terminateAllSessions() {
                   if (!confirm('Terminate all sessions? All users (including you) will be logged out.')) return;
                   fetch(CTX + '/api/execute', {
@@ -254,6 +302,8 @@ public class SecurityPageServlet extends HttpServlet {
                 }
 
                 loadUsers();
+                loadRoles();
+                loadSessions();
                 </script>
                 """.formatted(
                 server.getSession().getTimeoutSeconds(),

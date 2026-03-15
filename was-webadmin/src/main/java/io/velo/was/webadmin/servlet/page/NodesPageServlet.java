@@ -29,7 +29,7 @@ public class NodesPageServlet extends HttpServlet {
         String body = """
                 <div class="page-header">
                   <div>
-                    <div class="page-title">Nodes</div>
+                    <div class="page-title" data-i18n="page.nodes">Nodes</div>
                     <div class="page-subtitle">Physical and logical node management, agent status</div>
                   </div>
                   <div class="btn-group">
@@ -68,15 +68,80 @@ public class NodesPageServlet extends HttpServlet {
                 </div>
 
                 <div class="card" style="margin-top:16px;">
-                  <div class="card-title" id="nd-detail-title">Node Detail</div>
-                  <div class="grid grid-2" style="margin-top:12px;">
-                    <div>
-                      <table class="info-table" id="nd-detail-left">
-                        <tr><td colspan="2" style="color:var(--text2);">Select a node to view details</td></tr>
+                  <div class="tabs" id="ndDetailTabs" style="margin-bottom:0;">
+                    <div class="tab active" data-tab="ndInfo">Node Detail</div>
+                    <div class="tab" data-tab="ndAgent">Node Agent</div>
+                    <div class="tab" data-tab="ndProcesses">Processes</div>
+                    <div class="tab" data-tab="ndResources">Resources</div>
+                  </div>
+                  <div class="tab-panel active" id="tab-ndInfo">
+                    <div class="card-title" id="nd-detail-title" style="margin-top:12px;">Node Detail</div>
+                    <div class="grid grid-2" style="margin-top:12px;">
+                      <div>
+                        <table class="info-table" id="nd-detail-left">
+                          <tr><td colspan="2" style="color:var(--text2);">Select a node to view details</td></tr>
+                        </table>
+                      </div>
+                      <div>
+                        <table class="info-table" id="nd-detail-right"></table>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="tab-panel" id="tab-ndAgent">
+                    <div style="margin-top:12px;">
+                      <div class="grid grid-3" style="margin-bottom:16px;">
+                        <div class="card" style="padding:12px;">
+                          <div class="card-title" style="font-size:11px;">Agent Status</div>
+                          <div style="font-size:16px;font-weight:600;color:var(--success);" id="ndAgentStatus">Connected</div>
+                        </div>
+                        <div class="card" style="padding:12px;">
+                          <div class="card-title" style="font-size:11px;">Last Heartbeat</div>
+                          <div style="font-size:14px;color:var(--text2);" id="ndAgentHeartbeat">Just now</div>
+                        </div>
+                        <div class="card" style="padding:12px;">
+                          <div class="card-title" style="font-size:11px;">Agent Version</div>
+                          <div style="font-size:14px;" id="ndAgentVersion">0.1.0</div>
+                        </div>
+                      </div>
+                      <div class="card-title">Agent Operations</div>
+                      <div class="btn-group" style="margin-top:8px;">
+                        <button class="btn btn-sm" onclick="agentAction('ping')">Ping Agent</button>
+                        <button class="btn btn-sm" onclick="agentAction('status')">Full Status</button>
+                        <button class="btn btn-sm btn-danger" onclick="agentAction('restart')">Restart Agent</button>
+                      </div>
+                      <div id="ndAgentResult" style="margin-top:12px;"></div>
+                    </div>
+                  </div>
+                  <div class="tab-panel" id="tab-ndProcesses">
+                    <div style="margin-top:12px;">
+                      <div class="card-title">Server Processes</div>
+                      <p style="color:var(--text2);font-size:13px;margin:4px 0 12px;">Managed JVM processes on this node.</p>
+                      <table class="data-table">
+                        <thead><tr><th>PID</th><th>Server</th><th>Status</th><th>CPU</th><th>Memory</th><th>Started</th><th>Actions</th></tr></thead>
+                        <tbody id="ndProcessesTbody">
+                          <tr><td colspan="7" style="text-align:center;color:var(--text2);">Loading...</td></tr>
+                        </tbody>
                       </table>
                     </div>
-                    <div>
-                      <table class="info-table" id="nd-detail-right"></table>
+                  </div>
+                  <div class="tab-panel" id="tab-ndResources">
+                    <div style="margin-top:12px;">
+                      <div class="grid grid-2">
+                        <div class="card">
+                          <div class="card-title">CPU Usage</div>
+                          <div id="ndCpuInfo" style="margin-top:8px;">
+                            <div class="metric"><span class="metric-label">Processors</span><span class="metric-value sm" id="ndCpuCount">-</span></div>
+                            <div class="metric"><span class="metric-label">Load Average</span><span class="metric-value sm" id="ndLoadAvg">-</span></div>
+                          </div>
+                        </div>
+                        <div class="card">
+                          <div class="card-title">Disk Usage</div>
+                          <div id="ndDiskInfo" style="margin-top:8px;">
+                            <div class="metric"><span class="metric-label">Total</span><span class="metric-value sm" id="ndDiskTotal">-</span></div>
+                            <div class="metric"><span class="metric-label">Free</span><span class="metric-value sm" id="ndDiskFree">-</span></div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -150,6 +215,56 @@ public class NodesPageServlet extends HttpServlet {
                     + '<tr><td>TCP Listeners</td><td>' + (n.tcpListeners || 0) + '</td></tr>'
                     + '<tr><td>Agent Status</td><td><span class="badge badge-success">Connected</span></td></tr>';
                 }
+
+                // Node detail tabs
+                document.querySelectorAll('#ndDetailTabs .tab').forEach(function(tab){
+                  tab.addEventListener('click', function(){
+                    document.querySelectorAll('#ndDetailTabs .tab').forEach(function(t){t.classList.remove('active');});
+                    document.querySelectorAll('#ndDetailTabs ~ .tab-panel, #tab-ndInfo, #tab-ndAgent, #tab-ndProcesses, #tab-ndResources').forEach(function(p){p.classList.remove('active');});
+                    tab.classList.add('active');
+                    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+                  });
+                });
+
+                function agentAction(action) {
+                  var resultEl = document.getElementById('ndAgentResult');
+                  resultEl.innerHTML = '<div class="alert alert-info">Executing ' + action + '...</div>';
+                  fetch(CTX + '/api/execute', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({command:'node-agent-' + action})
+                  }).then(function(r){return r.json();}).then(function(d) {
+                    resultEl.innerHTML = '<div class="alert ' + (d.success ? 'alert-success' : 'alert-warning') + '">' + (d.message || action + ' completed') + '</div>';
+                  }).catch(function() {
+                    resultEl.innerHTML = '<div class="alert alert-info">Agent ' + action + ' sent (agent command not yet implemented)</div>';
+                  });
+                }
+
+                function loadNodeProcesses() {
+                  fetch(CTX + '/api/status').then(function(r){return r.json();}).then(function(d) {
+                    var tb = document.getElementById('ndProcessesTbody');
+                    var pid = 'N/A';
+                    try { pid = d.pid || 'N/A'; } catch(e) {}
+                    tb.innerHTML = '<tr><td>' + pid + '</td><td>' + esc(d.serverName) + '</td>'
+                      + '<td><span class="badge badge-success">RUNNING</span></td>'
+                      + '<td>-</td><td>' + Math.round(d.heapUsedBytes/(1024*1024)) + ' MB</td>'
+                      + '<td>' + new Date(Date.now() - d.uptimeMs).toLocaleString() + '</td>'
+                      + '<td><button class="btn btn-sm" onclick="showToast(\\'Process monitoring active\\',\\'info\\')">Monitor</button></td></tr>';
+                  }).catch(function() {
+                    document.getElementById('ndProcessesTbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);">Unable to load process info</td></tr>';
+                  });
+                }
+
+                function loadNodeResources() {
+                  fetch(CTX + '/api/system').then(function(r){return r.json();}).then(function(d) {
+                    document.getElementById('ndCpuCount').textContent = d['available.processors'] || d.processors || '-';
+                    document.getElementById('ndLoadAvg').textContent = d['system.load.average'] || d.loadAverage || '-';
+                    document.getElementById('ndDiskTotal').textContent = d['disk.total'] || '-';
+                    document.getElementById('ndDiskFree').textContent = d['disk.free'] || '-';
+                  }).catch(function(){});
+                }
+
+                loadNodeProcesses();
+                loadNodeResources();
 
                 function registerNode() {
                   var inputs = document.querySelectorAll('#addNodeModal .form-input');

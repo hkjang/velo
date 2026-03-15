@@ -33,6 +33,7 @@ final class ServletProxyFactory {
                                                String applicationName,
                                                ClassLoader classLoader,
                                                Map<String, String> initParameters,
+                                               Map<String, Object> serverAttributes,
                                                RequestDispatcherResolver dispatcherResolver) {
         Map<String, Object> attributes = new LinkedHashMap<>();
 
@@ -43,7 +44,10 @@ final class ServletProxyFactory {
             case "getServerInfo" -> "velo-was/0.1";
             case "getServletContextName", "getVirtualServerName" -> applicationName;
             case "getClassLoader" -> classLoader;
-            case "getAttribute" -> attributes.get((String) args[0]);
+            case "getAttribute" -> {
+                Object value = attributes.get((String) args[0]);
+                yield value != null ? value : serverAttributes.get((String) args[0]);
+            }
             case "setAttribute" -> {
                 if (args[1] == null) {
                     attributes.remove((String) args[0]);

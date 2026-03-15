@@ -42,7 +42,7 @@ public class ResourcesPageServlet extends HttpServlet {
         String body = """
                 <div class="page-header">
                   <div>
-                    <div class="page-title">Resources</div>
+                    <div class="page-title" data-i18n="page.resources">Resources</div>
                     <div class="page-subtitle">JDBC, JMS, JNDI, Cache, and system resource management</div>
                   </div>
                   <div class="btn-group">
@@ -52,8 +52,10 @@ public class ResourcesPageServlet extends HttpServlet {
 
                 <div class="tabs" id="resTabs">
                   <div class="tab active" data-tab="jdbc">JDBC / DataSource</div>
+                  <div class="tab" data-tab="connpool">Connection Pools</div>
                   <div class="tab" data-tab="jms">JMS</div>
                   <div class="tab" data-tab="jndi">JNDI</div>
+                  <div class="tab" data-tab="cache">Cache</div>
                   <div class="tab" data-tab="memory">Memory</div>
                   <div class="tab" data-tab="threadpools">Thread Pools</div>
                   <div class="tab" data-tab="certs">Certificates</div>
@@ -74,21 +76,63 @@ public class ResourcesPageServlet extends HttpServlet {
                   </div>
                 </div>
 
+                <div class="tab-panel" id="tab-connpool">
+                  <div class="card">
+                    <div class="card-header">
+                      <div class="card-title">Connection Pools</div>
+                      <button class="btn btn-sm" onclick="loadConnPools()">Refresh</button>
+                    </div>
+                    <div id="connpoolAlert" class="alert alert-info" style="display:none;">No connection pools found.</div>
+                    <table class="data-table" id="connpoolTable" style="display:none;">
+                      <thead>
+                        <tr><th>Pool Name</th><th>Active</th><th>Idle</th><th>Max</th><th>Wait Count</th><th>Avg Wait Time</th><th>Status</th><th>Actions</th></tr>
+                      </thead>
+                      <tbody id="connpoolTbody"></tbody>
+                    </table>
+                  </div>
+                </div>
+
                 <div class="tab-panel" id="tab-jms">
                   <div class="card">
-                    <div class="card-header"><div class="card-title">JMS Resources</div></div>
-                    <div class="alert alert-info">No JMS resources configured.</div>
+                    <div class="card-header">
+                      <div class="card-title">JMS Servers</div>
+                      <div class="btn-group">
+                        <button class="btn btn-sm" onclick="loadJmsServers()">Refresh Servers</button>
+                        <button class="btn btn-sm" onclick="loadJmsDestinations()">Load Destinations</button>
+                      </div>
+                    </div>
+                    <div id="jmsServerAlert" class="alert alert-info" style="display:none;">No JMS resources configured.</div>
+                    <table class="data-table" id="jmsServerTable" style="display:none;">
+                      <thead>
+                        <tr><th>Name</th><th>Type</th><th>Status</th><th>Messages</th><th>Consumers</th></tr>
+                      </thead>
+                      <tbody id="jmsServerTbody"></tbody>
+                    </table>
+                  </div>
+                  <div class="card" style="margin-top:16px;">
+                    <div class="card-header">
+                      <div class="card-title">JMS Destinations</div>
+                    </div>
+                    <div id="jmsDestAlert" class="alert alert-info" style="display:none;">No JMS destinations loaded. Click "Load Destinations" above.</div>
+                    <table class="data-table" id="jmsDestTable" style="display:none;">
+                      <thead>
+                        <tr><th>Name</th><th>Type</th><th>Messages Pending</th><th>Consumers</th><th>Actions</th></tr>
+                      </thead>
+                      <tbody id="jmsDestTbody"></tbody>
+                    </table>
                   </div>
                 </div>
 
                 <div class="tab-panel" id="tab-jndi">
                   <div class="card">
-                    <div class="card-header"><div class="card-title">JNDI Bindings</div></div>
-                    <table class="data-table">
-                      <thead><tr><th>Name</th><th>Type</th><th>Bound Object</th></tr></thead>
-                      <tbody>
-                        <tr><td colspan="3" style="color:var(--text3);text-align:center;">No JNDI bindings registered</td></tr>
-                      </tbody>
+                    <div class="card-header">
+                      <div class="card-title">JNDI Bindings</div>
+                      <button class="btn btn-sm" onclick="loadJndiBindings()">Refresh</button>
+                    </div>
+                    <div id="jndiAlert" class="alert alert-info" style="display:none;">No JNDI bindings registered.</div>
+                    <table class="data-table" id="jndiTable" style="display:none;">
+                      <thead><tr><th>Name</th><th>Type</th><th>Bound Object</th><th>Actions</th></tr></thead>
+                      <tbody id="jndiTbody"></tbody>
                     </table>
                   </div>
                 </div>
@@ -140,6 +184,36 @@ public class ResourcesPageServlet extends HttpServlet {
                         <tr><td colspan="5" style="text-align:center;color:var(--text2);">Loading...</td></tr>
                       </tbody>
                     </table>
+                  </div>
+                </div>
+
+                <div class="tab-panel" id="tab-cache">
+                  <div class="card">
+                    <div class="card-header">
+                      <div class="card-title">Cache Management</div>
+                      <div class="btn-group">
+                        <button class="btn btn-sm" onclick="loadCaches()">Refresh</button>
+                        <button class="btn btn-sm btn-danger" onclick="clearAllCaches()">Clear All</button>
+                      </div>
+                    </div>
+                    <div class="alert alert-info" id="cacheAlert">Loading cache information...</div>
+                    <table class="data-table" id="cacheTable" style="display:none;">
+                      <thead>
+                        <tr><th>Name</th><th>Type</th><th>Size</th><th>Hit Rate</th><th>Hits / Misses</th><th>Evictions</th><th>TTL</th><th>Actions</th></tr>
+                      </thead>
+                      <tbody id="cacheTbody"></tbody>
+                    </table>
+                  </div>
+                  <div class="card" style="margin-top:16px;">
+                    <div class="card-header">
+                      <div class="card-title">Cache Statistics</div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:16px;" id="cacheStats">
+                      <div class="stat-card"><div class="stat-label">Total Caches</div><div class="stat-value" id="cacheTotalCount">-</div></div>
+                      <div class="stat-card"><div class="stat-label">Total Entries</div><div class="stat-value" id="cacheTotalEntries">-</div></div>
+                      <div class="stat-card"><div class="stat-label">Overall Hit Rate</div><div class="stat-value" id="cacheOverallHitRate">-</div></div>
+                      <div class="stat-card"><div class="stat-label">Memory Used</div><div class="stat-value" id="cacheMemUsed">-</div></div>
+                    </div>
                   </div>
                 </div>
 
@@ -206,16 +280,25 @@ public class ResourcesPageServlet extends HttpServlet {
                     document.querySelectorAll('#resTabs .tab').forEach(function(t){t.classList.remove('active');});
                     document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
                     tab.classList.add('active');
-                    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+                    var tabId = tab.dataset.tab;
+                    document.getElementById('tab-' + tabId).classList.add('active');
+                    if (tabId === 'jms') loadJmsServers();
+                    if (tabId === 'jndi') loadJndiBindings();
+                    if (tabId === 'connpool') loadConnPools();
+                    if (tabId === 'cache') loadCaches();
                   });
                 });
 
-                function refreshMemory() {
-                  fetch(CTX + '/api/execute', {
+                function execCmd(command) {
+                  return fetch(CTX + '/api/execute', {
                     method: 'POST',
                     headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({command: 'memoryinfo'})
-                  }).then(function(r){return r.json();}).then(function(d) {
+                    body: JSON.stringify({command: command})
+                  }).then(function(r){ return r.json(); });
+                }
+
+                function refreshMemory() {
+                  execCmd('memoryinfo').then(function(d) {
                     showToast(d.message, d.success ? 'success' : 'error');
                     if (d.success) setTimeout(function(){ location.reload(); }, 1000);
                   });
@@ -223,11 +306,7 @@ public class ResourcesPageServlet extends HttpServlet {
 
                 function requestGC() {
                   if (!confirm('Request garbage collection?')) return;
-                  fetch(CTX + '/api/execute', {
-                    method: 'POST',
-                    headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({command: 'gc'})
-                  }).then(function(r){return r.json();}).then(function(d) {
+                  execCmd('gc').then(function(d) {
                     showToast(d.message, d.success ? 'success' : 'error');
                     if (d.success) setTimeout(function(){ location.reload(); }, 1000);
                   });
@@ -252,6 +331,189 @@ public class ResourcesPageServlet extends HttpServlet {
                   });
                 }
 
+                /* --- JMS --- */
+                function loadJmsServers() {
+                  var alert = document.getElementById('jmsServerAlert');
+                  var table = document.getElementById('jmsServerTable');
+                  var tbody = document.getElementById('jmsServerTbody');
+                  alert.style.display = 'none';
+                  table.style.display = 'none';
+                  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);">Loading...</td></tr>';
+                  table.style.display = '';
+                  execCmd('list-jms-servers').then(function(d) {
+                    var servers = d.data || d.result || [];
+                    if (!Array.isArray(servers) || servers.length === 0) {
+                      table.style.display = 'none';
+                      alert.style.display = '';
+                      return;
+                    }
+                    var html = '';
+                    servers.forEach(function(s) {
+                      html += '<tr><td><strong>' + (s.name || '-') + '</strong></td>'
+                        + '<td>' + (s.type || '-') + '</td>'
+                        + '<td><span class="badge ' + (s.status === 'Running' ? 'badge-success' : 'badge-neutral') + '">' + (s.status || '-') + '</span></td>'
+                        + '<td>' + (s.messages != null ? s.messages : '-') + '</td>'
+                        + '<td>' + (s.consumers != null ? s.consumers : '-') + '</td></tr>';
+                    });
+                    tbody.innerHTML = html;
+                  }).catch(function() {
+                    table.style.display = 'none';
+                    alert.textContent = 'Failed to load JMS servers.';
+                    alert.style.display = '';
+                  });
+                }
+
+                function loadJmsDestinations() {
+                  var alert = document.getElementById('jmsDestAlert');
+                  var table = document.getElementById('jmsDestTable');
+                  var tbody = document.getElementById('jmsDestTbody');
+                  alert.style.display = 'none';
+                  table.style.display = 'none';
+                  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);">Loading...</td></tr>';
+                  table.style.display = '';
+                  execCmd('list-jms-destinations').then(function(d) {
+                    var dests = d.data || d.result || [];
+                    if (!Array.isArray(dests) || dests.length === 0) {
+                      table.style.display = 'none';
+                      alert.textContent = 'No JMS destinations found.';
+                      alert.style.display = '';
+                      return;
+                    }
+                    var html = '';
+                    dests.forEach(function(dest) {
+                      html += '<tr><td><strong>' + (dest.name || '-') + '</strong></td>'
+                        + '<td>' + (dest.type || '-') + '</td>'
+                        + '<td>' + (dest.messagesPending != null ? dest.messagesPending : '-') + '</td>'
+                        + '<td>' + (dest.consumers != null ? dest.consumers : '-') + '</td>'
+                        + '<td><div class="btn-group">';
+                      if (dest.type === 'Queue' || dest.type === 'queue') {
+                        html += '<button class="btn btn-sm btn-danger" onclick="purgeJmsQueue(\\'' + (dest.name || '').replace(/'/g, "\\\\'") + '\\')">Purge</button>';
+                      }
+                      html += '</div></td></tr>';
+                    });
+                    tbody.innerHTML = html;
+                  }).catch(function() {
+                    table.style.display = 'none';
+                    alert.textContent = 'Failed to load JMS destinations.';
+                    alert.style.display = '';
+                  });
+                }
+
+                function purgeJmsQueue(name) {
+                  if (!confirm('Purge all messages from queue "' + name + '"?')) return;
+                  execCmd('purge-jms-queue ' + name).then(function(d) {
+                    showToast(d.message || 'Queue purged', d.success ? 'success' : 'error');
+                    loadJmsDestinations();
+                  }).catch(function() {
+                    showToast('Failed to purge queue', 'error');
+                  });
+                }
+
+                /* --- JNDI --- */
+                function loadJndiBindings() {
+                  var alert = document.getElementById('jndiAlert');
+                  var table = document.getElementById('jndiTable');
+                  var tbody = document.getElementById('jndiTbody');
+                  alert.style.display = 'none';
+                  table.style.display = 'none';
+                  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text2);">Loading...</td></tr>';
+                  table.style.display = '';
+                  execCmd('list-jndi-entries').then(function(d) {
+                    var bindings = d.data || d.result || [];
+                    if (!Array.isArray(bindings) || bindings.length === 0) {
+                      table.style.display = 'none';
+                      alert.style.display = '';
+                      return;
+                    }
+                    var html = '';
+                    bindings.forEach(function(b) {
+                      var safeName = (b.name || '').replace(/'/g, "\\\\'");
+                      html += '<tr><td><strong>' + (b.name || '-') + '</strong></td>'
+                        + '<td><code>' + (b.type || '-') + '</code></td>'
+                        + '<td>' + (b.boundObject || b.value || '-') + '</td>'
+                        + '<td><button class="btn btn-sm" onclick="verifyJndiRef(\\'' + safeName + '\\')">Verify Reference</button></td></tr>';
+                    });
+                    tbody.innerHTML = html;
+                  }).catch(function() {
+                    table.style.display = 'none';
+                    alert.textContent = 'Failed to load JNDI bindings.';
+                    alert.style.display = '';
+                  });
+                }
+
+                function verifyJndiRef(name) {
+                  execCmd('lookup-jndi ' + name).then(function(d) {
+                    showToast(d.message || ('JNDI lookup for "' + name + '": ' + (d.success ? 'OK' : 'Failed')), d.success ? 'success' : 'error');
+                  }).catch(function() {
+                    showToast('Failed to verify JNDI reference "' + name + '"', 'error');
+                  });
+                }
+
+                /* --- Connection Pools --- */
+                function loadConnPools() {
+                  var alert = document.getElementById('connpoolAlert');
+                  var table = document.getElementById('connpoolTable');
+                  var tbody = document.getElementById('connpoolTbody');
+                  alert.style.display = 'none';
+                  table.style.display = 'none';
+                  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text2);">Loading...</td></tr>';
+                  table.style.display = '';
+                  execCmd('list-jdbc-resources').then(function(d) {
+                    var pools = d.data || d.result || [];
+                    if (!Array.isArray(pools) || pools.length === 0) {
+                      table.style.display = 'none';
+                      alert.style.display = '';
+                      return;
+                    }
+                    var html = '';
+                    pools.forEach(function(p) {
+                      var active = p.active != null ? p.active : 0;
+                      var max = p.max != null ? p.max : 0;
+                      var leakWarning = (max > 0 && active >= max * 0.9)
+                        ? ' <span class="badge badge-warning" title="Possible connection leak: active connections near maximum">Leak Warning</span>'
+                        : '';
+                      var safeName = (p.name || '').replace(/'/g, "\\\\'");
+                      html += '<tr><td><strong>' + (p.name || '-') + '</strong></td>'
+                        + '<td>' + active + '</td>'
+                        + '<td>' + (p.idle != null ? p.idle : '-') + '</td>'
+                        + '<td>' + max + '</td>'
+                        + '<td>' + (p.waitCount != null ? p.waitCount : '-') + '</td>'
+                        + '<td>' + (p.avgWaitTime != null ? p.avgWaitTime + ' ms' : '-') + '</td>'
+                        + '<td>' + leakWarning + '</td>'
+                        + '<td><div class="btn-group">'
+                        + '<button class="btn btn-sm" onclick="resetConnPool(\\'' + safeName + '\\')">Reset</button>'
+                        + '<button class="btn btn-sm btn-danger" onclick="flushConnPool(\\'' + safeName + '\\')">Flush</button>'
+                        + '</div></td></tr>';
+                    });
+                    tbody.innerHTML = html;
+                  }).catch(function() {
+                    table.style.display = 'none';
+                    alert.textContent = 'Failed to load connection pools.';
+                    alert.style.display = '';
+                  });
+                }
+
+                function resetConnPool(name) {
+                  if (!confirm('Reset connection pool "' + name + '"?')) return;
+                  execCmd('reset-connection-pool ' + name).then(function(d) {
+                    showToast(d.message || 'Pool reset', d.success ? 'success' : 'error');
+                    loadConnPools();
+                  }).catch(function() {
+                    showToast('Failed to reset pool', 'error');
+                  });
+                }
+
+                function flushConnPool(name) {
+                  if (!confirm('Flush all connections in pool "' + name + '"? Active connections will be closed.')) return;
+                  execCmd('flush-connection-pool ' + name).then(function(d) {
+                    showToast(d.message || 'Pool flushed', d.success ? 'success' : 'error');
+                    loadConnPools();
+                  }).catch(function() {
+                    showToast('Failed to flush pool', 'error');
+                  });
+                }
+
+                /* --- DataSources --- */
                 var dataSources = JSON.parse(localStorage.getItem('velo-datasources') || '[]');
 
                 function renderDataSources() {
@@ -300,7 +562,13 @@ public class ResourcesPageServlet extends HttpServlet {
                 }
 
                 function testDs(i) {
-                  showToast('Testing connection to ' + dataSources[i].name + '... Connection test is not yet available (driver not loaded).', 'warning');
+                  var dsName = dataSources[i].name;
+                  showToast('Testing connection to ' + dsName + '...', 'info');
+                  execCmd('test-datasource ' + dsName).then(function(d) {
+                    showToast(d.message || ('Connection test for "' + dsName + '": ' + (d.success ? 'Success' : 'Failed')), d.success ? 'success' : 'error');
+                  }).catch(function() {
+                    showToast('Failed to test DataSource "' + dsName + '"', 'error');
+                  });
                 }
 
                 function removeDs(i) {
@@ -309,6 +577,92 @@ public class ResourcesPageServlet extends HttpServlet {
                   localStorage.setItem('velo-datasources', JSON.stringify(dataSources));
                   renderDataSources();
                   showToast('DataSource removed', 'success');
+                }
+
+                /* --- Cache --- */
+                function loadCaches() {
+                  var alert = document.getElementById('cacheAlert');
+                  var table = document.getElementById('cacheTable');
+                  var tbody = document.getElementById('cacheTbody');
+                  alert.style.display = 'none';
+                  table.style.display = 'none';
+                  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text2);">Loading...</td></tr>';
+                  table.style.display = '';
+                  execCmd('list-caches').then(function(d) {
+                    var caches = d.data || d.result || [];
+                    if (!Array.isArray(caches) || caches.length === 0) {
+                      table.style.display = 'none';
+                      alert.textContent = 'No caches configured. Cache will appear when applications use caching.';
+                      alert.style.display = '';
+                      document.getElementById('cacheTotalCount').textContent = '0';
+                      document.getElementById('cacheTotalEntries').textContent = '0';
+                      document.getElementById('cacheOverallHitRate').textContent = '-';
+                      document.getElementById('cacheMemUsed').textContent = '-';
+                      return;
+                    }
+                    var html = '';
+                    var totalEntries = 0, totalHits = 0, totalMisses = 0;
+                    caches.forEach(function(c) {
+                      var hits = c.hits || 0;
+                      var misses = c.misses || 0;
+                      var size = c.size || 0;
+                      var hitRate = (hits + misses) > 0 ? ((hits / (hits + misses)) * 100).toFixed(1) : '-';
+                      totalEntries += size;
+                      totalHits += hits;
+                      totalMisses += misses;
+                      var safeName = (c.name || '').replace(/'/g, "\\\\'");
+                      html += '<tr><td><strong>' + (c.name || '-') + '</strong></td>'
+                        + '<td>' + (c.type || 'Local') + '</td>'
+                        + '<td>' + size + (c.maxSize ? ' / ' + c.maxSize : '') + '</td>'
+                        + '<td>' + (hitRate !== '-' ? hitRate + '%%' : '-') + '</td>'
+                        + '<td>' + hits + ' / ' + misses + '</td>'
+                        + '<td>' + (c.evictions || 0) + '</td>'
+                        + '<td>' + (c.ttl ? c.ttl + 's' : 'N/A') + '</td>'
+                        + '<td><div class="btn-group">'
+                        + '<button class="btn btn-sm" onclick="cacheStats(\\'' + safeName + '\\')">Stats</button>'
+                        + '<button class="btn btn-sm btn-danger" onclick="clearCache(\\'' + safeName + '\\')">Clear</button>'
+                        + '</div></td></tr>';
+                    });
+                    tbody.innerHTML = html;
+                    document.getElementById('cacheTotalCount').textContent = caches.length;
+                    document.getElementById('cacheTotalEntries').textContent = totalEntries.toLocaleString();
+                    var overallRate = (totalHits + totalMisses) > 0 ? ((totalHits / (totalHits + totalMisses)) * 100).toFixed(1) + '%%' : '-';
+                    document.getElementById('cacheOverallHitRate').textContent = overallRate;
+                    document.getElementById('cacheMemUsed').textContent = d.memoryUsed || '-';
+                  }).catch(function() {
+                    table.style.display = 'none';
+                    alert.textContent = 'Failed to load cache information.';
+                    alert.style.display = '';
+                  });
+                }
+
+                function clearCache(name) {
+                  if (!confirm('Clear all entries from cache "' + name + '"?')) return;
+                  execCmd('clear-cache ' + name).then(function(d) {
+                    showToast(d.message || 'Cache cleared', d.success ? 'success' : 'error');
+                    loadCaches();
+                  }).catch(function() {
+                    showToast('Failed to clear cache', 'error');
+                  });
+                }
+
+                function clearAllCaches() {
+                  if (!confirm('Clear ALL caches? This will remove all cached data.')) return;
+                  execCmd('clear-all-caches').then(function(d) {
+                    showToast(d.message || 'All caches cleared', d.success ? 'success' : 'error');
+                    loadCaches();
+                  }).catch(function() {
+                    showToast('Failed to clear caches', 'error');
+                  });
+                }
+
+                function cacheStats(name) {
+                  execCmd('cache-stats ' + name).then(function(d) {
+                    var msg = d.message || JSON.stringify(d.data || d.result || {}, null, 2);
+                    showToast('Stats for "' + name + '": ' + msg, 'info');
+                  }).catch(function() {
+                    showToast('Failed to get cache stats', 'error');
+                  });
                 }
 
                 renderDataSources();

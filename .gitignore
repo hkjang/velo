@@ -10,6 +10,7 @@ deploy
 .claude/setting.local.json
 .claude/settings.json
 .claude/skills.json
+*.pid
 
 # BlueJ files
 *.ctxt

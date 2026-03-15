@@ -143,6 +143,49 @@ $ curl -s http://localhost:8080/test-app/info.jsp
 
 위와 같이 `No servlet mapping` 에러나 `500 Server Error` 없이 HTML 본문과 정상적인 200 상태 코드가 반환되면 모든 JSP 컴파일, 트랜스레이션 및 클래스로더 연동이 완벽하게 성공한 것입니다.
 
+---
+
+## 5. TCP 리스너 테스트 (Port 9090)
+
+Velo WAS는 웹 프로토콜 외에도 원원시 TCP 통신을 처리하기 위한 리스너를 지원합니다. `conf/server.yaml`에 정의된 `9090` 포트의 에코(Echo) 기능을 테스트합니다.
+
+### 5.1. 테스트용 파이썬 스크립트 (`test_tcp_echo.py`)
+
+TCP 리스너는 `LENGTH_FIELD` 프레이밍(4바이트 길이 헤더)을 사용하므로, 이를 준수하는 간단한 스크립트로 검증합니다.
+
+```python
+import socket
+import struct
+
+def test_echo(msg):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(('127.0.0.1', 9090))
+    
+    # [4바이트 길이] + [데이터] 전송
+    payload = msg.encode('utf-8')
+    s.sendall(struct.pack('>I', len(payload)) + payload)
+    
+    # 응답 수신
+    header = s.recv(4)
+    resp_len = struct.unpack('>I', header)[0]
+    data = s.recv(resp_len)
+    print("Received: " + data.decode('utf-8'))
+    s.close()
+
+test_echo("Hello Velo TCP!")
+```
+
+### 5.2. 실행 및 결과
+
+서버가 구동 중인 상태에서 위 스크립트를 실행하여 에코 응답을 확인합니다.
+
+```sh
+$ python test_tcp_echo.py
+Received: Hello Velo TCP!
+```
+
+응답 데이터가 전송한 메시지와 일치한다면 TCP 레이어의 프레임 디코딩 및 라우팅이 정상적으로 동작하고 있는 것입니다.
+
 ### 4.4. 추가 API 엔드포인트 검증
 
 `test-app`은 혼합 모드(JSP + 서블릿) 라우팅을 검증하기 위해 `WEB-INF/classes` 내부에 일반 서블릿들도 포함하고 있습니다. 해당 서블릿들이 정상 호출되는지 확인합니다.

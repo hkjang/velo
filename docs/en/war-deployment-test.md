@@ -143,6 +143,49 @@ $ curl -s http://localhost:8080/test-app/info.jsp
 
 If you receive normal 200 HTTP response codes and the HTML body correctly displays without any `No servlet mapping` or `500 Server Error` errors, it signifies that JSP compilation, translation, and classloader integration have completely succeeded.
 
+---
+
+## 5. TCP Listener Test (Port 9090)
+
+Velo WAS supports raw TCP listeners as well. We verify the echo functionality on port `9090` as defined in `conf/server.yaml`.
+
+### 5.1. Test Python Script (`test_tcp_echo.py`)
+
+The TCP listener uses `LENGTH_FIELD` framing (4-byte length header). Use the following script for validation:
+
+```python
+import socket
+import struct
+
+def test_echo(msg):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(('127.0.0.1', 9090))
+    
+    # Send [4-byte length] + [payload]
+    payload = msg.encode('utf-8')
+    s.sendall(struct.pack('>I', len(payload)) + payload)
+    
+    # Receive response
+    header = s.recv(4)
+    resp_len = struct.unpack('>I', header)[0]
+    data = s.recv(resp_len)
+    print("Received: " + data.decode('utf-8'))
+    s.close()
+
+test_echo("Hello Velo TCP!")
+```
+
+### 5.2. Execution & Results
+
+Run the script while the server is running to check the echo response.
+
+```sh
+$ python test_tcp_echo.py
+Received: Hello Velo TCP!
+```
+
+If the received message matches the sent one, it confirms that the TCP layer's frame decoding and routing are working correctly.
+
 ### 4.4. Additional API Endpoints Verification
 
 The `test-app` also includes standard Servlets in its `WEB-INF/classes` directory to verify mixed-mode (JSP + Servlet) routing capabilities.

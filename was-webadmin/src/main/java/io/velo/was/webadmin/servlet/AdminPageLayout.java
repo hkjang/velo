@@ -168,6 +168,49 @@ public final class AdminPageLayout {
                            border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none; }
             .form-hint { font-size: 11px; color: var(--text3); margin-top: 4px; }
 
+            /* Accessibility */
+            .skip-link { position:absolute;top:-40px;left:0;padding:8px;background:var(--primary);color:white;z-index:1000;font-size:13px;text-decoration:none;border-radius:0 0 8px 0; }
+            .skip-link:focus { top:0; }
+            *:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+            .btn:focus-visible, .form-input:focus-visible, .header-search:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+            [role="menuitem"]:focus { background: var(--surface2); outline: none; }
+            @media (prefers-reduced-motion: reduce) {
+              *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+            }
+
+            /* Notification Bell & Favorites */
+            .header-icon-btn { position:relative;background:none;border:1px solid var(--border);border-radius:8px;
+                               color:var(--text2);cursor:pointer;padding:6px 10px;font-size:16px;line-height:1;
+                               transition:all 0.15s; }
+            .header-icon-btn:hover { background:var(--surface2);color:var(--text); }
+            .notif-badge { position:absolute;top:-4px;right:-4px;background:var(--danger);color:white;
+                           font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;
+                           display:flex;align-items:center;justify-content:center;padding:0 4px; }
+            .dropdown-panel { display:none;position:absolute;top:calc(100%% + 8px);right:0;width:340px;
+                              background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+                              box-shadow:var(--shadow);z-index:150;overflow:hidden; }
+            .dropdown-panel.open { display:block; }
+            .dropdown-header { padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;
+                               font-weight:600;display:flex;justify-content:space-between;align-items:center; }
+            .dropdown-item { padding:10px 16px;font-size:13px;border-bottom:1px solid var(--border);
+                             cursor:pointer;transition:background 0.1s; }
+            .dropdown-item:hover { background:var(--surface2); }
+            .dropdown-item:last-child { border-bottom:none; }
+            .dropdown-item .item-time { font-size:11px;color:var(--text3);margin-top:2px; }
+            .dropdown-empty { padding:24px 16px;text-align:center;color:var(--text3);font-size:13px; }
+
+            /* Sidebar favorite star */
+            .sidebar a .fav-star { display:none;margin-left:auto;font-size:12px;color:var(--text3);cursor:pointer;padding:2px 4px; }
+            .sidebar a:hover .fav-star { display:inline; }
+            .sidebar a .fav-star.active { display:inline;color:var(--warning); }
+
+            /* Keyboard shortcuts section */
+            .sidebar-shortcuts { padding:12px 16px;border-top:1px solid var(--border);margin-top:auto; }
+            .sidebar-shortcuts .shortcut-row { display:flex;justify-content:space-between;align-items:center;
+                                               padding:3px 0;font-size:11px;color:var(--text3); }
+            .sidebar-shortcuts kbd { background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:10px;
+                                     font-family:inherit;border:1px solid var(--border); }
+
             /* Responsive */
             @media (max-width: 1024px) {
                 .sidebar { display: none; }
@@ -192,6 +235,7 @@ public final class AdminPageLayout {
                 </style>
                 </head>
                 <body>
+                <a href="#main-content" class="skip-link">Skip to content</a>
                 """.formatted(title, CSS);
     }
 
@@ -200,17 +244,40 @@ public final class AdminPageLayout {
      */
     public static String header(String serverName, String nodeId, String contextPath) {
         return """
-                <div class="header">
+                <div class="header" role="banner">
                   <div class="header-left">
                     <div class="logo">Velo<span> Web Admin</span></div>
-                    <div class="status-badge"><span class="status-dot"></span>Running</div>
+                    <div class="status-badge"><span class="status-dot"></span><span data-i18n="header.running">Running</span></div>
                   </div>
                   <div class="header-right">
                     <input class="header-search" type="text" placeholder="Search servers, apps, commands... (Ctrl+K)"
-                           id="globalSearch" autocomplete="off">
+                           id="globalSearch" autocomplete="off" aria-label="Search"
+                           data-i18n-placeholder="header.searchPlaceholder">
+                    <div style="position:relative;display:inline-block;">
+                      <button class="header-icon-btn" id="favoritesBtn" title="Favorites" aria-label="Favorites"
+                              aria-expanded="false" aria-haspopup="true" onclick="toggleFavorites()">&#9733;</button>
+                      <div class="dropdown-panel" id="favoritesDropdown" role="menu" aria-label="Favorites">
+                        <div class="dropdown-header"><span data-i18n="header.favorites">Favorites</span>
+                          <a href="#" onclick="manageFavorites();return false;" style="font-size:12px;" data-i18n="header.manage">Manage</a>
+                        </div>
+                        <div id="favoritesList"></div>
+                      </div>
+                    </div>
+                    <div style="position:relative;display:inline-block;">
+                      <button class="header-icon-btn" id="notifBtn" title="Notifications" aria-label="Notifications"
+                              aria-expanded="false" aria-haspopup="true" onclick="toggleNotifications()">&#128276;
+                        <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+                      </button>
+                      <div class="dropdown-panel" id="notifDropdown" role="menu" aria-label="Notifications">
+                        <div class="dropdown-header"><span data-i18n="header.notifications">Notifications</span>
+                          <a href="#" onclick="clearNotifications();return false;" style="font-size:12px;" data-i18n="header.clear">Clear</a>
+                        </div>
+                        <div id="notifList"></div>
+                      </div>
+                    </div>
                     <span>%s &middot; %s</span>
                     <a href="%s/logout" style="color:var(--text2);font-size:13px;padding:4px 8px;
-                       border:1px solid var(--border);border-radius:6px;">Logout</a>
+                       border:1px solid var(--border);border-radius:6px;" data-i18n="header.logout">Logout</a>
                   </div>
                 </div>
                 %s
@@ -224,28 +291,35 @@ public final class AdminPageLayout {
      */
     public static String sidebar(String contextPath, String activePage) {
         return """
-                <div class="sidebar">
-                  <div class="sidebar-section">Overview</div>
+                <div class="sidebar" role="navigation" aria-label="Main navigation">
+                  <div class="sidebar-section" data-i18n="nav.overview">Overview</div>
                   %s
-                  <div class="sidebar-section">Infrastructure</div>
-                  %s
-                  %s
-                  %s
-                  <div class="sidebar-section">Workloads</div>
-                  %s
-                  %s
-                  <div class="sidebar-section">Operations</div>
+                  <div class="sidebar-section" data-i18n="nav.infrastructure">Infrastructure</div>
                   %s
                   %s
                   %s
-                  <div class="sidebar-section">Tools</div>
+                  <div class="sidebar-section" data-i18n="nav.workloads">Workloads</div>
+                  %s
+                  %s
+                  <div class="sidebar-section" data-i18n="nav.operations">Operations</div>
                   %s
                   %s
                   %s
-                  <div class="sidebar-section">Administration</div>
+                  <div class="sidebar-section" data-i18n="nav.tools">Tools</div>
                   %s
                   %s
                   %s
+                  <div class="sidebar-section" data-i18n="nav.administration">Administration</div>
+                  %s
+                  %s
+                  %s
+                  <div class="sidebar-shortcuts">
+                    <div class="sidebar-section" style="padding-left:0;" data-i18n="nav.shortcuts">Shortcuts</div>
+                    <div class="shortcut-row"><span data-i18n="nav.shortcut.palette">Command Palette</span><kbd>Ctrl+K</kbd></div>
+                    <div class="shortcut-row"><span data-i18n="nav.shortcut.dashboard">Go to Dashboard</span><kbd>G</kbd> <kbd>D</kbd></div>
+                    <div class="shortcut-row"><span data-i18n="nav.shortcut.servers">Go to Servers</span><kbd>G</kbd> <kbd>S</kbd></div>
+                    <div class="shortcut-row"><span data-i18n="nav.shortcut.console">Go to Console</span><kbd>G</kbd> <kbd>C</kbd></div>
+                  </div>
                 </div>
                 """.formatted(
                 sidebarLink(contextPath, "/", "dashboard", activePage, "\u25A3", "Dashboard"),
@@ -267,8 +341,11 @@ public final class AdminPageLayout {
     }
 
     private static String sidebarLink(String ctx, String path, String page, String active, String icon, String label) {
-        String cls = page.equals(active) ? " class=\"active\"" : "";
-        return "<a href=\"%s%s\"%s><span class=\"sidebar-icon\">%s</span>%s</a>".formatted(ctx, path, cls, icon, label);
+        boolean isActive = page.equals(active);
+        String cls = isActive ? " class=\"active\"" : "";
+        String aria = isActive ? " aria-current=\"page\"" : "";
+        return "<a href=\"%s%s\"%s%s role=\"menuitem\"><span class=\"sidebar-icon\">%s</span><span data-i18n=\"nav.%s\">%s</span><span class=\"fav-star\" data-page=\"%s\" data-name=\"%s\" onclick=\"event.preventDefault();toggleFavoritePage(this);\">&#9733;</span></a>"
+                .formatted(ctx, path, cls, aria, icon, page, label, path, label);
     }
 
     /**
@@ -298,9 +375,266 @@ public final class AdminPageLayout {
                   if (t === 'light') {
                     var s = document.createElement('style');
                     s.id = 'light-theme-global';
-                    s.textContent = ':root { --bg: #f8f9fa; --bg2: #ffffff; --bg3: #e9ecef; --text: #1a1d27; --text2: #495057; --text3: #868e96; --border: #dee2e6; }';
+                    s.textContent = ':root { --bg: #f5f6f8; --surface: #ffffff; --surface2: #f0f1f3; --surface3: #e4e6ea; --border: #d1d5db; --text: #1a1d27; --text2: #495057; --text3: #868e96; --shadow: 0 1px 3px rgba(0,0,0,0.08); }';
                     document.head.appendChild(s);
                   }
+                })();
+
+                // --- Global I18N ---
+                var _GLOBAL_I18N = {
+                  en: {
+                    'header.running': 'Running',
+                    'header.searchPlaceholder': 'Search servers, apps, commands... (Ctrl+K)',
+                    'header.favorites': 'Favorites',
+                    'header.manage': 'Manage',
+                    'header.notifications': 'Notifications',
+                    'header.clear': 'Clear',
+                    'header.logout': 'Logout',
+                    'nav.overview': 'Overview',
+                    'nav.infrastructure': 'Infrastructure',
+                    'nav.workloads': 'Workloads',
+                    'nav.operations': 'Operations',
+                    'nav.tools': 'Tools',
+                    'nav.administration': 'Administration',
+                    'nav.shortcuts': 'Shortcuts',
+                    'nav.shortcut.palette': 'Command Palette',
+                    'nav.shortcut.dashboard': 'Go to Dashboard',
+                    'nav.shortcut.servers': 'Go to Servers',
+                    'nav.shortcut.console': 'Go to Console',
+                    'nav.dashboard': 'Dashboard',
+                    'nav.servers': 'Servers',
+                    'nav.clusters': 'Clusters',
+                    'nav.nodes': 'Nodes',
+                    'nav.applications': 'Applications',
+                    'nav.resources': 'Resources',
+                    'nav.monitoring': 'Monitoring',
+                    'nav.diagnostics': 'Diagnostics',
+                    'nav.history': 'History',
+                    'nav.console': 'Console',
+                    'nav.scripts': 'Scripts',
+                    'nav.domain': 'Domain',
+                    'nav.security': 'Security',
+                    'nav.settings': 'Settings',
+                    'nav.api-docs': 'API Docs',
+                    'page.dashboard': 'Dashboard',
+                    'page.servers': 'Servers',
+                    'page.clusters': 'Clusters',
+                    'page.nodes': 'Nodes',
+                    'page.applications': 'Applications',
+                    'page.resources': 'Resources',
+                    'page.monitoring': 'Monitoring',
+                    'page.diagnostics': 'Diagnostics',
+                    'page.history': 'History',
+                    'page.console': 'Console',
+                    'page.security': 'Security',
+                    'page.settings': 'Settings'
+                  },
+                  ko: {
+                    'header.running': '실행 중',
+                    'header.searchPlaceholder': '서버, 앱, 명령 검색... (Ctrl+K)',
+                    'header.favorites': '즐겨찾기',
+                    'header.manage': '관리',
+                    'header.notifications': '알림',
+                    'header.clear': '지우기',
+                    'header.logout': '로그아웃',
+                    'nav.overview': '개요',
+                    'nav.infrastructure': '인프라',
+                    'nav.workloads': '워크로드',
+                    'nav.operations': '운영',
+                    'nav.tools': '도구',
+                    'nav.administration': '관리',
+                    'nav.shortcuts': '단축키',
+                    'nav.shortcut.palette': '명령 팔레트',
+                    'nav.shortcut.dashboard': '대시보드 이동',
+                    'nav.shortcut.servers': '서버 이동',
+                    'nav.shortcut.console': '콘솔 이동',
+                    'nav.dashboard': '대시보드',
+                    'nav.servers': '서버',
+                    'nav.clusters': '클러스터',
+                    'nav.nodes': '노드',
+                    'nav.applications': '애플리케이션',
+                    'nav.resources': '리소스',
+                    'nav.monitoring': '모니터링',
+                    'nav.diagnostics': '진단',
+                    'nav.history': '변경 이력',
+                    'nav.console': '콘솔',
+                    'nav.scripts': '스크립트',
+                    'nav.domain': '도메인',
+                    'nav.security': '보안',
+                    'nav.settings': '설정',
+                    'nav.api-docs': 'API 문서',
+                    'page.dashboard': '대시보드',
+                    'page.servers': '서버 관리',
+                    'page.clusters': '클러스터 관리',
+                    'page.nodes': '노드 관리',
+                    'page.applications': '애플리케이션 관리',
+                    'page.resources': '리소스 관리',
+                    'page.monitoring': '모니터링',
+                    'page.diagnostics': '진단',
+                    'page.history': '변경 이력',
+                    'page.console': '콘솔',
+                    'page.security': '보안 관리',
+                    'page.settings': '설정'
+                  }
+                };
+                function _getGlobalLang() {
+                  return localStorage.getItem('velo-lang') || 'en';
+                }
+                function _gt(key) {
+                  var lang = _getGlobalLang();
+                  var dict = _GLOBAL_I18N[lang] || _GLOBAL_I18N['en'];
+                  return dict[key] || (_GLOBAL_I18N['en'] && _GLOBAL_I18N['en'][key]) || key;
+                }
+                function applyGlobalI18n() {
+                  var lang = _getGlobalLang();
+                  document.documentElement.lang = lang;
+                  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+                    var key = el.getAttribute('data-i18n');
+                    var val = _gt(key);
+                    if (val && val !== key) el.textContent = val;
+                  });
+                  document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+                    var key = el.getAttribute('data-i18n-placeholder');
+                    var val = _gt(key);
+                    if (val && val !== key) el.placeholder = val;
+                  });
+                  document.querySelectorAll('[data-i18n-title]').forEach(function(el) {
+                    var key = el.getAttribute('data-i18n-title');
+                    var val = _gt(key);
+                    if (val && val !== key) el.title = val;
+                  });
+                }
+                applyGlobalI18n();
+
+                // --- Favorites System ---
+                function getFavorites() {
+                  try { return JSON.parse(localStorage.getItem('velo-favorites') || '[]'); } catch(e){ return []; }
+                }
+                function saveFavorites(favs) { localStorage.setItem('velo-favorites', JSON.stringify(favs)); }
+                function renderFavorites() {
+                  var list = document.getElementById('favoritesList');
+                  if (!list) return;
+                  var favs = getFavorites();
+                  if (favs.length === 0) {
+                    list.innerHTML = '<div class="dropdown-empty">No favorites yet. Click the star next to a sidebar link to add one.</div>';
+                  } else {
+                    list.innerHTML = '';
+                    favs.forEach(function(f) {
+                      var div = document.createElement('div');
+                      div.className = 'dropdown-item';
+                      div.innerHTML = '<a href="' + f.path + '" style="color:var(--text);text-decoration:none;display:block;">' + f.name + '</a>';
+                      list.appendChild(div);
+                    });
+                  }
+                  // Update sidebar stars
+                  document.querySelectorAll('.fav-star').forEach(function(star) {
+                    var page = star.getAttribute('data-page');
+                    var isFav = favs.some(function(f){ return f.path.endsWith(page); });
+                    if (isFav) star.classList.add('active'); else star.classList.remove('active');
+                  });
+                }
+                function toggleFavorites() {
+                  var dd = document.getElementById('favoritesDropdown');
+                  var notifDd = document.getElementById('notifDropdown');
+                  if (notifDd) { notifDd.classList.remove('open'); document.getElementById('notifBtn').setAttribute('aria-expanded','false'); }
+                  dd.classList.toggle('open');
+                  document.getElementById('favoritesBtn').setAttribute('aria-expanded', dd.classList.contains('open') ? 'true' : 'false');
+                  if (dd.classList.contains('open')) renderFavorites();
+                }
+                function toggleFavoritePage(star) {
+                  var page = star.getAttribute('data-page');
+                  var name = star.getAttribute('data-name');
+                  var favs = getFavorites();
+                  var href = star.parentElement.getAttribute('href');
+                  var idx = favs.findIndex(function(f){ return f.path === href; });
+                  if (idx >= 0) { favs.splice(idx, 1); star.classList.remove('active'); }
+                  else { favs.push({name: name, path: href}); star.classList.add('active'); }
+                  saveFavorites(favs);
+                }
+                function manageFavorites() {
+                  var dd = document.getElementById('favoritesDropdown');
+                  dd.classList.remove('open');
+                  var favs = getFavorites();
+                  var msg = favs.length === 0 ? 'No favorites saved.' : 'Current favorites:\\n' + favs.map(function(f){return '- '+f.name;}).join('\\n') + '\\n\\nClear all favorites?';
+                  if (favs.length > 0 && confirm(msg)) { saveFavorites([]); renderFavorites(); }
+                }
+                renderFavorites();
+
+                // --- Notification Bell ---
+                var _notifEvents = [];
+                function fetchNotifications() {
+                  fetch(window.location.pathname.replace(/\\/[^\\/]*$/, '') + '/api/audit?limit=5')
+                    .then(function(r){ return r.ok ? r.json() : []; })
+                    .then(function(data){
+                      if (Array.isArray(data)) _notifEvents = data;
+                      else if (data && Array.isArray(data.events)) _notifEvents = data.events;
+                      else _notifEvents = [];
+                      var badge = document.getElementById('notifBadge');
+                      if (_notifEvents.length > 0) { badge.textContent = _notifEvents.length; badge.style.display = 'flex'; }
+                      else { badge.style.display = 'none'; }
+                    }).catch(function(){ _notifEvents = []; });
+                }
+                function renderNotifications() {
+                  var list = document.getElementById('notifList');
+                  if (!list) return;
+                  if (_notifEvents.length === 0) {
+                    list.innerHTML = '<div class="dropdown-empty">No recent events.</div>';
+                  } else {
+                    list.innerHTML = '';
+                    _notifEvents.forEach(function(evt) {
+                      var div = document.createElement('div');
+                      div.className = 'dropdown-item';
+                      var desc = evt.action || evt.command || evt.message || 'Event';
+                      var time = evt.timestamp || evt.time || '';
+                      div.innerHTML = '<div style="color:var(--text);font-size:13px;">' + desc + '</div>'
+                        + (time ? '<div class="item-time">' + time + '</div>' : '');
+                      list.appendChild(div);
+                    });
+                  }
+                }
+                function toggleNotifications() {
+                  var dd = document.getElementById('notifDropdown');
+                  var favDd = document.getElementById('favoritesDropdown');
+                  if (favDd) { favDd.classList.remove('open'); document.getElementById('favoritesBtn').setAttribute('aria-expanded','false'); }
+                  dd.classList.toggle('open');
+                  document.getElementById('notifBtn').setAttribute('aria-expanded', dd.classList.contains('open') ? 'true' : 'false');
+                  if (dd.classList.contains('open')) renderNotifications();
+                }
+                function clearNotifications() {
+                  _notifEvents = [];
+                  var badge = document.getElementById('notifBadge');
+                  if (badge) badge.style.display = 'none';
+                  renderNotifications();
+                }
+                fetchNotifications();
+                setInterval(fetchNotifications, 30000);
+
+                // Close dropdowns on outside click
+                document.addEventListener('click', function(e) {
+                  var favBtn = document.getElementById('favoritesBtn');
+                  var favDd = document.getElementById('favoritesDropdown');
+                  var notifBtn = document.getElementById('notifBtn');
+                  var notifDd = document.getElementById('notifDropdown');
+                  if (favDd && !favDd.contains(e.target) && e.target !== favBtn) favDd.classList.remove('open');
+                  if (notifDd && !notifDd.contains(e.target) && e.target !== notifBtn && !notifBtn.contains(e.target)) notifDd.classList.remove('open');
+                });
+
+                // --- Keyboard shortcuts: G then D/S/C ---
+                (function(){
+                  var gPressed = false, gTimer;
+                  var ctx = document.querySelector('.sidebar a') ? document.querySelector('.sidebar a').getAttribute('href').replace(/\\/[^\\/]*$/, '') : '';
+                  document.addEventListener('keydown', function(e) {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+                    if (e.key === 'g' || e.key === 'G') {
+                      if (!gPressed) { gPressed = true; clearTimeout(gTimer); gTimer = setTimeout(function(){ gPressed=false; }, 1000); return; }
+                    }
+                    if (gPressed) {
+                      gPressed = false; clearTimeout(gTimer);
+                      if (e.key === 'd' || e.key === 'D') { e.preventDefault(); window.location.href = ctx + '/'; }
+                      else if (e.key === 's' || e.key === 'S') { e.preventDefault(); window.location.href = ctx + '/servers'; }
+                      else if (e.key === 'c' || e.key === 'C') { e.preventDefault(); window.location.href = ctx + '/console'; }
+                    }
+                  });
                 })();
                 </script>
                 <style>
@@ -318,7 +652,7 @@ public final class AdminPageLayout {
         return head(title)
                 + header(serverName, nodeId, contextPath)
                 + sidebar(contextPath, activePage)
-                + "<div class=\"main\">\n" + bodyContent + "\n</div>\n"
+                + "<div class=\"main\" id=\"main-content\" role=\"main\" tabindex=\"-1\">\n" + bodyContent + "\n</div>\n"
                 + footer();
     }
 
@@ -347,22 +681,25 @@ public final class AdminPageLayout {
                   var input = document.getElementById('paletteInput');
                   var results = document.getElementById('paletteResults');
                   var ctx = '%s';
+                  function _pt(key,fallback) {
+                    return (typeof _gt === 'function') ? _gt(key) || fallback : fallback;
+                  }
                   var items = [
-                    {type:'page',name:'Dashboard',path:'/'},
-                    {type:'page',name:'Servers',path:'/servers'},
-                    {type:'page',name:'Clusters',path:'/clusters'},
-                    {type:'page',name:'Nodes',path:'/nodes'},
-                    {type:'page',name:'Applications',path:'/applications'},
-                    {type:'page',name:'Resources',path:'/resources'},
-                    {type:'page',name:'Monitoring',path:'/monitoring'},
-                    {type:'page',name:'Diagnostics',path:'/diagnostics'},
-                    {type:'page',name:'History',path:'/history'},
-                    {type:'page',name:'Console',path:'/console'},
-                    {type:'page',name:'Scripts',path:'/scripts'},
-                    {type:'page',name:'Domain',path:'/domain'},
-                    {type:'page',name:'Security',path:'/security'},
-                    {type:'page',name:'Settings',path:'/settings'},
-                    {type:'page',name:'API Docs',path:'/api-docs/ui'},
+                    {type:'page',name:_pt('nav.dashboard','Dashboard'),path:'/'},
+                    {type:'page',name:_pt('nav.servers','Servers'),path:'/servers'},
+                    {type:'page',name:_pt('nav.clusters','Clusters'),path:'/clusters'},
+                    {type:'page',name:_pt('nav.nodes','Nodes'),path:'/nodes'},
+                    {type:'page',name:_pt('nav.applications','Applications'),path:'/applications'},
+                    {type:'page',name:_pt('nav.resources','Resources'),path:'/resources'},
+                    {type:'page',name:_pt('nav.monitoring','Monitoring'),path:'/monitoring'},
+                    {type:'page',name:_pt('nav.diagnostics','Diagnostics'),path:'/diagnostics'},
+                    {type:'page',name:_pt('nav.history','History'),path:'/history'},
+                    {type:'page',name:_pt('nav.console','Console'),path:'/console'},
+                    {type:'page',name:_pt('nav.scripts','Scripts'),path:'/scripts'},
+                    {type:'page',name:_pt('nav.domain','Domain'),path:'/domain'},
+                    {type:'page',name:_pt('nav.security','Security'),path:'/security'},
+                    {type:'page',name:_pt('nav.settings','Settings'),path:'/settings'},
+                    {type:'page',name:_pt('nav.api-docs','API Docs'),path:'/api-docs/ui'},
                     {type:'cmd',name:'Server Status',cmd:'status'},
                     {type:'cmd',name:'List Servers',cmd:'listservers'},
                     {type:'cmd',name:'List Applications',cmd:'listapplications'},
@@ -376,8 +713,8 @@ public final class AdminPageLayout {
                     {type:'cmd',name:'List Thread Pools',cmd:'listthreadpools'},
                     {type:'cmd',name:'List Users',cmd:'listusers'},
                     {type:'cmd',name:'List Roles',cmd:'listroles'},
-                    {type:'action',name:'Logout',path:'/logout'},
-                    {type:'action',name:'Refresh Page',action:'reload'}
+                    {type:'action',name:_pt('header.logout','Logout'),path:'/logout'},
+                    {type:'action',name:_pt('palette.refresh','Refresh Page'),action:'reload'}
                   ];
                   var selected = 0;
 

@@ -36,6 +36,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
     private final SessionExpirationScheduler sessionScheduler;
     private final int defaultSessionTimeoutSeconds;
     private final Map<String, DeployedApplication> applications = new ConcurrentHashMap<>();
+    private final Map<String, Object> serverAttributes = new ConcurrentHashMap<>();
     private final ScheduledExecutorService asyncExecutor =
             Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors(),
                     Thread.ofVirtual().name("velo-async-", 0).factory());
@@ -75,6 +76,17 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 .toList();
     }
 
+    /**
+     * Sets a global server-level attribute accessible to all applications.
+     */
+    public void setServerAttribute(String name, Object value) {
+        if (value == null) {
+            serverAttributes.remove(name);
+        } else {
+            serverAttributes.put(name, value);
+        }
+    }
+
     /** Read-only info record for deployed applications. */
     public record DeployedAppInfo(String name, String contextPath, int servletCount, int filterCount) {}
 
@@ -91,6 +103,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 application.name(),
                 application.classLoader(),
                 application.initParameters(),
+                serverAttributes,
                 new ServletProxyFactory.RequestDispatcherResolver() {
                     @Override
                     public void forward(String path, jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response) throws Exception {

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         version="6.0">
+
+    <display-name>test-msg-app</display-name>
+
+    <listener>
+        <listener-class>io.velo.testmsg.TcpMsgIntegrationListener</listener-class>
+    </listener>
+
+</web-app>

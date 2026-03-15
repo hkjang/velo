@@ -167,6 +167,8 @@ public final class VeloWasApplication {
 
         // Start TCP listeners from configuration
         TcpListenerManager tcpManager = new TcpListenerManager();
+        servletContainer.setServerAttribute("io.velo.was.TcpListenerManager", tcpManager);
+
         List<ServerConfiguration.TcpListenerConfig> tcpConfigs = configuration.getServer().getTcpListeners();
         for (ServerConfiguration.TcpListenerConfig tcpConfig : tcpConfigs) {
             TcpMessageRouter tcpRouter = new TcpMessageRouter()

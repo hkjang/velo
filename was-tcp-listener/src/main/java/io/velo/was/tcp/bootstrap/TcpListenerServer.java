@@ -183,6 +183,7 @@ public class TcpListenerServer implements AutoCloseable {
     public String host() { return config.getHost(); }
     public int port() { return config.getPort(); }
     public boolean isRunning() { return running; }
+    public TcpMessageRouter router() { return router; }
     public TcpSessionManager sessionManager() { return sessionManager; }
     public TcpMetrics metrics() { return metrics; }
     public TcpListenerConfig config() { return config; }

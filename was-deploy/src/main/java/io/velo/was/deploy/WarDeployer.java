@@ -84,7 +84,8 @@ public class WarDeployer {
         WebAppClassLoader classLoader = WebAppClassLoader.create(appName, appRoot, getClass().getClassLoader());
 
         SimpleServletApplication.Builder appBuilder = SimpleServletApplication.builder(appName, normalizedContextPath)
-                .classLoader(classLoader);
+                .classLoader(classLoader)
+                .initParameter("io.velo.was.jsp.webAppRoot", appRoot.toAbsolutePath().toString());
 
         // Add context parameters
         for (Map.Entry<String, String> param : descriptor.contextParams().entrySet()) {
@@ -200,7 +201,7 @@ public class WarDeployer {
         if (pattern.isEmpty()) {
             return "/";
         }
-        if (!pattern.startsWith("/")) {
+        if (!pattern.startsWith("/") && !pattern.startsWith("*.")) {
             pattern = "/" + pattern;
         }
         return pattern;

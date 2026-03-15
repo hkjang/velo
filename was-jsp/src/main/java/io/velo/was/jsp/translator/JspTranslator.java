@@ -30,6 +30,11 @@ public class JspTranslator {
         sb.append("import java.io.IOException;\n");
         sb.append("import java.io.PrintWriter;\n\n");
 
+        for (String imp : document.imports()) {
+            sb.append("import ").append(imp).append(";\n");
+        }
+        sb.append("\n");
+
         // Collect declarations
         StringBuilder declarations = new StringBuilder();
         for (JspNode node : document.nodes()) {

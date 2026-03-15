@@ -45,8 +45,8 @@ server:
 
   deploy:
     directory: deploy
-    hotDeploy: false
-    scanIntervalSeconds: 5
+    hotDeploy: true
+    scanIntervalSeconds: 2
 
   jsp:
     scratchDir: work/jsp

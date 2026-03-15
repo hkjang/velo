@@ -6,6 +6,10 @@
 logs/
 
 .tools
+deploy
+.claude/setting.local.json
+.claude/settings.json
+.claude/skills.json
 
 # BlueJ files
 *.ctxt

@@ -161,7 +161,7 @@ public class SimpleServletApplication implements ServletApplication {
             if (path == null || path.isBlank() || "/".equals(path)) {
                 return "/";
             }
-            return path.startsWith("/") ? path : "/" + path;
+            return path.startsWith("/") || path.startsWith("*.") ? path : "/" + path;
         }
     }
 }

@@ -157,8 +157,12 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             return HttpResponses.notFound("No servlet mapping for " + exchange.path());
         }
 
-        String servletPath = runtime.mapping;
-        String pathInfo = resolvePathInfo(exchange.path(), application.contextPath, servletPath);
+        String applicationRelative = application.contextPath.isEmpty() ? exchange.path() : exchange.path().substring(application.contextPath.length());
+        if (applicationRelative.isEmpty()) {
+            applicationRelative = "/";
+        }
+        String servletPath = resolveServletPath(applicationRelative, runtime.mapping);
+        String pathInfo = resolvePathInfo(applicationRelative, runtime.mapping);
 
         SessionState initialSessionState = resolveSession(exchange);
         ServletRequestContext requestContext = new ServletRequestContext(
@@ -218,8 +222,12 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             sourceResponse.reset();
         }
 
-        String servletPath = runtime.mapping;
-        String pathInfo = resolvePathInfo(dispatchPath, application.contextPath, servletPath);
+        String applicationRelative = application.contextPath.isEmpty() ? dispatchPath : dispatchPath.substring(application.contextPath.length());
+        if (applicationRelative.isEmpty()) {
+            applicationRelative = "/";
+        }
+        String servletPath = resolveServletPath(applicationRelative, runtime.mapping);
+        String pathInfo = resolvePathInfo(applicationRelative, runtime.mapping);
         if (dispatcherType == DispatcherType.FORWARD) {
             applyForwardAttributes(sourceRequest);
         } else if (dispatcherType == DispatcherType.INCLUDE) {
@@ -266,8 +274,12 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             throw new jakarta.servlet.ServletException("No servlet for async dispatch path " + dispatchPath);
         }
 
-        String servletPath = runtime.mapping;
-        String pathInfo = resolvePathInfo(dispatchPath, application.contextPath, servletPath);
+        String applicationRelative = application.contextPath.isEmpty() ? dispatchPath : dispatchPath.substring(application.contextPath.length());
+        if (applicationRelative.isEmpty()) {
+            applicationRelative = "/";
+        }
+        String servletPath = resolveServletPath(applicationRelative, runtime.mapping);
+        String pathInfo = resolvePathInfo(applicationRelative, runtime.mapping);
 
         ServletRequestContext dispatchRequest = sourceRequest.forDispatch(
                 dispatchPath,
@@ -444,18 +456,21 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         return null;
     }
 
-    private String resolvePathInfo(String requestPath, String contextPath, String servletPath) {
-        String applicationRelative = contextPath.isEmpty() ? requestPath : requestPath.substring(contextPath.length());
-        if (applicationRelative.isEmpty()) {
-            applicationRelative = "/";
-        }
-        if ("/".equals(servletPath)) {
+    private String resolveServletPath(String applicationRelative, String mapping) {
+        if ("/".equals(mapping) || mapping.startsWith("*.")) {
             return applicationRelative;
         }
-        if (applicationRelative.equals(servletPath)) {
+        return mapping;
+    }
+
+    private String resolvePathInfo(String applicationRelative, String mapping) {
+        if ("/".equals(mapping) || mapping.startsWith("*.")) {
             return null;
         }
-        return applicationRelative.substring(servletPath.length());
+        if (applicationRelative.equals(mapping)) {
+            return null;
+        }
+        return applicationRelative.substring(mapping.length());
     }
 
     private record DeployedApplication(

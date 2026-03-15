@@ -23,7 +23,20 @@
       "Bash(JAVA_HOME=\"D:\\\\project\\\\velo\\\\.tools\\\\jdk\\\\jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" test:*)",
       "Bash(JAVA_HOME=\"D:\\\\project\\\\velo\\\\.tools\\\\jdk\\\\jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" clean test:*)",
       "Bash(SERVLET_JAR=\"/c/Users/gagag/.m2/repository/jakarta/servlet/jakarta.servlet-api/6.1.0/jakarta.servlet-api-6.1.0.jar\":*)",
-      "Bash(\"D:/project/velo/.tools/jdk/jdk-21.0.10+7/bin/javac\" -cp \"$SERVLET_JAR\" -d \"D:/project/velo/test-war/WEB-INF/classes\" D:/project/velo/test-war/WEB-INF/classes/io/velo/testwar/*.java)"
+      "Bash(\"D:/project/velo/.tools/jdk/jdk-21.0.10+7/bin/javac\" -cp \"$SERVLET_JAR\" -d \"D:/project/velo/test-war/WEB-INF/classes\" D:/project/velo/test-war/WEB-INF/classes/io/velo/testwar/*.java)",
+      "Bash(grep:*)",
+      "Bash(wc -l /d/project/velo/was-*/src/main/java/io/velo/was/*/*.java)",
+      "Bash(mvn compile:*)",
+      "Bash(export PATH=\"$JAVA_HOME/bin:D:/project/velo/.tools/maven/apache-maven-3.9.13/bin:$PATH\")",
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" -version)",
+      "Bash(export JAVA_HOME=\"D:\\\\project\\\\velo\\\\.tools\\\\jdk\\\\jdk-21.0.10+7\")",
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" compile:*)",
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh release:*)",
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" -f \"D:/project/velo/pom.xml\" clean package -DskipTests -q)"
     ]
   }
 }

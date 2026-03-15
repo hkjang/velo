@@ -65,6 +65,21 @@ public class JspDocument {
         return null;
     }
 
+    public List<String> imports() {
+        List<String> imports = new ArrayList<>();
+        for (PageDirective pd : pageDirectives) {
+            String imps = pd.attributes().get("import");
+            if (imps != null) {
+                for (String imp : imps.split(",")) {
+                    if (!imp.isBlank()) {
+                        imports.add(imp.trim());
+                    }
+                }
+            }
+        }
+        return imports;
+    }
+
     public boolean sessionEnabled() {
         for (PageDirective pd : pageDirectives) {
             String s = pd.attributes().get("session");

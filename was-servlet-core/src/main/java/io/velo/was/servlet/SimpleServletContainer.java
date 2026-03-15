@@ -32,21 +32,32 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public class SimpleServletContainer implements ServletContainer, AutoCloseable {
 
-    private final InMemoryHttpSessionStore sessionStore = new InMemoryHttpSessionStore();
+    private final InMemoryHttpSessionStore sessionStore;
     private final SessionExpirationScheduler sessionScheduler;
+    private final int defaultSessionTimeoutSeconds;
     private final Map<String, DeployedApplication> applications = new ConcurrentHashMap<>();
     private final ScheduledExecutorService asyncExecutor =
             Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors(),
                     Thread.ofVirtual().name("velo-async-", 0).factory());
 
     public SimpleServletContainer() {
-        this(60);
+        this(60, 1800);
     }
 
     /**
      * @param sessionPurgeIntervalSeconds interval between session expiration scans
      */
     public SimpleServletContainer(int sessionPurgeIntervalSeconds) {
+        this(sessionPurgeIntervalSeconds, 1800);
+    }
+
+    /**
+     * @param sessionPurgeIntervalSeconds interval between session expiration scans
+     * @param defaultSessionTimeoutSeconds default session timeout in seconds
+     */
+    public SimpleServletContainer(int sessionPurgeIntervalSeconds, int defaultSessionTimeoutSeconds) {
+        this.defaultSessionTimeoutSeconds = defaultSessionTimeoutSeconds;
+        this.sessionStore = new InMemoryHttpSessionStore(defaultSessionTimeoutSeconds);
         this.sessionScheduler = new SessionExpirationScheduler(sessionStore, sessionPurgeIntervalSeconds);
         this.sessionScheduler.start();
     }

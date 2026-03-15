@@ -165,6 +165,48 @@ Logback 설정으로 로그 파일 분리:
 </logger>
 ```
 
+## 메트릭 수집 (Metrics)
+
+`MetricsCollector`는 서버의 런타임 메트릭을 스레드 안전하게 수집하는 싱글턴 컴포넌트이다.
+`java.util.concurrent.atomic.LongAdder`를 사용하여 잠금 없이 높은 동시성 환경에서도 정확한 카운터를 유지한다.
+
+### 수집 항목
+
+| 메트릭 | 타입 | 설명 |
+|---|---|---|
+| `totalRequests` | `LongAdder` | 총 처리 요청 수 |
+| `activeRequests` | `LongAdder` | 현재 처리 중인 요청 수 |
+| `activeConnections` | `LongAdder` | 현재 활성 연결 수 |
+| `totalResponseTimeNanos` | `LongAdder` | 총 응답 시간 (나노초) |
+| `statusBuckets[1xx~5xx]` | `LongAdder[6]` | HTTP 상태 코드 분포 |
+
+### API
+
+```java
+MetricsCollector metrics = MetricsCollector.instance(); // 싱글턴
+
+metrics.requestStarted();                    // 요청 시작
+metrics.requestCompleted(durationNanos, 200); // 요청 완료 + 상태 코드
+metrics.connectionOpened();                   // 연결 열림
+metrics.connectionClosed();                   // 연결 닫힘
+
+MetricsSnapshot snapshot = metrics.snapshot(); // 스냅샷 조회
+String json = snapshot.toJson();               // JSON 직렬화
+```
+
+### 통합 지점
+
+- **`NettyHttpChannelHandler`**: `channelActive()`/`channelInactive()`에서 연결 카운터, `channelRead0()`에서 요청 카운터 및 응답 시간 측정
+- **`/metrics` 엔드포인트**: `HttpHandlerRegistry`에 등록되어 JSON 형식으로 스냅샷 반환
+
+### MetricsSnapshot
+
+스냅샷의 JSON 출력 예시:
+
+```json
+{"totalRequests":150,"activeRequests":2,"activeConnections":5,"averageResponseTimeMs":12.34,"status":{"1xx":0,"2xx":140,"3xx":3,"4xx":5,"5xx":2}}
+```
+
 ## 소스 구조
 
 ```
@@ -174,12 +216,14 @@ was-observability/src/main/java/io/velo/was/observability/
 ├── ErrorLog.java            에러 로그 정적 API
 ├── ErrorLogEntry.java       에러 로그 엔트리 record
 ├── AuditLog.java            감사 로그 정적 API
-└── AuditLogEntry.java       감사 로그 엔트리 record
+├── AuditLogEntry.java       감사 로그 엔트리 record
+├── MetricsCollector.java    메트릭 수집 싱글턴 (LongAdder)
+└── MetricsSnapshot.java     메트릭 스냅샷 record (toJson)
 ```
 
 ## 테스트
 
 ```bash
-# was-observability 테스트 (9개)
+# was-observability 테스트 (15개)
 mvn test -pl was-observability -am
 ```

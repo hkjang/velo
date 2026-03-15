@@ -155,6 +155,72 @@ Server ClassLoader (parent)
 - 앱 간 static 변수 등 상태 공유 없음
 - `getResource()` 도 동일한 위임 전략 적용
 
+## 배포 디렉토리 및 핫 디플로이
+
+### DeploymentRegistry
+
+배포된 애플리케이션의 라이프사이클을 관리하는 레지스트리. `WarDeployer`와 `SimpleServletContainer`를 연동하여 배포/언배포/재배포를 조율한다.
+
+```java
+DeploymentRegistry registry = new DeploymentRegistry(deployer, container);
+
+// WAR 파일 배포 (context path 자동 결정)
+registry.deploy(Paths.get("deploy/myapp.war"));   // → /myapp
+registry.deploy(Paths.get("deploy/ROOT.war"));     // → "" (루트)
+
+// 언배포
+registry.undeploy("myapp");
+
+// 재배포 (언배포 + 배포)
+registry.redeploy(Paths.get("deploy/myapp.war"));
+
+// 전체 언배포
+registry.undeployAll();
+```
+
+**Context path 결정 규칙:**
+
+| WAR 파일명 | Context Path |
+|---|---|
+| `myapp.war` | `/myapp` |
+| `ROOT.war` | `""` (루트) |
+| `api-v2.war` | `/api-v2` |
+
+### HotDeployWatcher
+
+`java.nio.file.WatchService`를 사용하여 배포 디렉토리를 감시하고, WAR 파일 변경을 감지하여 자동으로 배포/언배포/재배포를 수행한다.
+
+```java
+HotDeployWatcher watcher = new HotDeployWatcher(deployDir, registry, debounceSeconds);
+watcher.start();  // 데몬 스레드 시작
+// ...
+watcher.close();  // 감시 중지
+```
+
+**이벤트 매핑:**
+
+| 파일 시스템 이벤트 | 동작 |
+|---|---|
+| `ENTRY_CREATE` (.war) | `registry.deploy()` |
+| `ENTRY_DELETE` (.war) | `registry.undeploy()` |
+| `ENTRY_MODIFY` (.war) | `registry.redeploy()` |
+
+**디바운스:** `scanIntervalSeconds` 설정값만큼 대기 후 이벤트를 처리하여 파일 복사 완료를 보장한다.
+
+**서버 설정:**
+
+```yaml
+server:
+  deploy:
+    directory: deploy             # WAR 배포 디렉토리
+    hotDeploy: false              # 핫 디플로이 활성화
+    scanIntervalSeconds: 5        # 디렉토리 감시 디바운스
+```
+
+### 기동 시 자동 배포
+
+서버 기동 시 `VeloWasApplication`이 배포 디렉토리의 기존 `.war` 파일을 스캔하여 자동으로 배포한다. `hotDeploy`가 `true`이면 이후 파일 변경도 자동 감지한다.
+
 ## DeploymentResult
 
 배포 결과를 담는 불변 record.
@@ -177,7 +243,9 @@ was-deploy/src/main/java/io/velo/was/deploy/
 ├── WarExtractor.java          WAR 추출 유틸리티
 ├── WebXmlParser.java          web.xml DOM 파서
 ├── WebXmlDescriptor.java      파싱 결과 record
-└── DeploymentException.java   배포 예외
+├── DeploymentException.java   배포 예외
+├── DeploymentRegistry.java    배포 레지스트리 (배포/언배포/재배포 관리)
+└── HotDeployWatcher.java      핫 디플로이 감시 (WatchService)
 
 was-classloader/src/main/java/io/velo/was/classloader/
 └── WebAppClassLoader.java     격리 클래스로더
@@ -186,7 +254,7 @@ was-classloader/src/main/java/io/velo/was/classloader/
 ## 테스트
 
 ```bash
-# was-deploy 테스트 (7개)
+# was-deploy 테스트 (11개)
 mvn test -pl was-deploy -am
 
 # was-classloader 테스트 (6개)

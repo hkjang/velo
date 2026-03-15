@@ -78,11 +78,28 @@ server:
     tcpNoDelay: true
     keepAlive: true
     maxContentLength: 10485760      # 10 MB
+    idleTimeoutSeconds: 60          # 유휴 연결 타임아웃
+    maxHeaderSize: 8192             # HTTP 헤더 최대 크기
+    maxInitialLineLength: 4096      # HTTP 요청 라인 최대 길이
 
   threading:
     bossThreads: 1
     workerThreads: 0                # 0 = Netty 기본값
     businessThreads: 32
+
+  compression:
+    enabled: false                  # gzip 압축 활성화
+    minResponseSizeBytes: 1024      # 최소 압축 대상 크기
+    compressionLevel: 6             # zlib 압축 레벨 (1-9)
+
+  session:
+    timeoutSeconds: 1800            # 세션 타임아웃 (30분)
+    purgeIntervalSeconds: 60        # 만료 세션 정리 주기
+
+  deploy:
+    directory: deploy               # WAR 배포 디렉토리
+    hotDeploy: false                # 핫 디플로이 활성화
+    scanIntervalSeconds: 5          # 디렉토리 감시 디바운스
 
   tls:
     enabled: false
@@ -98,6 +115,7 @@ server:
 | 경로 | 메서드 | 설명 |
 |---|---|---|
 | `/health` | GET, HEAD | 서버 상태 확인 |
+| `/metrics` | GET | 서버 메트릭 (요청 수, 활성 연결, 응답 시간) |
 | `/info` | GET, HEAD | 서버 정보 조회 |
 | `/app/hello` | GET | 샘플 서블릿 (세션 기반 방문 횟수 추적) |
 
@@ -107,6 +125,10 @@ server:
 # Health check
 curl http://localhost:8080/health
 # {"status":"UP","name":"velo-was","nodeId":"node-1"}
+
+# Metrics
+curl http://localhost:8080/metrics
+# {"totalRequests":150,"activeRequests":2,"activeConnections":5,"averageResponseTimeMs":12.34,"status":{"1xx":0,"2xx":140,"3xx":3,"4xx":5,"5xx":2}}
 
 # Server info
 curl http://localhost:8080/info
@@ -119,26 +141,34 @@ curl http://localhost:8080/app/hello
 
 ## 현재 구현 범위
 
-- Maven 멀티모듈 프로젝트 레이아웃 (13개 모듈, 155+ 테스트)
+- Maven 멀티모듈 프로젝트 레이아웃 (13개 모듈, 170+ 테스트)
 - YAML 기반 서버 설정 로딩 및 검증
 - Netty HTTP/1.1 + **HTTP/2** 런타임 (graceful shutdown)
 - 네이티브 전송 자동 선택 (epoll/kqueue/nio)
 - TLS 부트스트랩 및 인증서 핫 리로드 (ALPN h2/h1.1 협상 포함)
 - **HTTP/2**: TLS ALPN + 클리어텍스트 h2c + 스트림 멀티플렉싱
 - **WebSocket**: 경로 기반 핸들러 레지스트리, 텍스트/바이너리 프레임
+- **Gzip 압축**: `HttpContentCompressor` 기반 응답 압축 (설정 가능)
+- **유휴 연결 타임아웃**: `IdleStateHandler` 기반 자동 연결 종료
+- **HTTP 코덱 제한**: 최대 헤더 크기, 최대 요청 라인 길이 설정
 - 서블릿 컨테이너
   - `HttpServlet` dispatch (context path + servlet path longest-match)
   - `Filter` chain 실행 (DispatcherType 기반 매칭)
   - `ServletContextListener`, `ServletRequestListener` lifecycle
   - `RequestDispatcher` forward/include (상대 경로 및 `..` 해석 포함)
-  - In-memory `JSESSIONID` 쿠키 세션 + **TTL 만료 스케줄러**
+  - In-memory `JSESSIONID` 쿠키 세션 + **TTL 만료 스케줄러** (타임아웃 설정 가능)
   - **AsyncContext**: dispatch, complete, timeout, listener
+  - **Multipart**: `multipart/form-data` 파싱, `Part` API 지원
   - 동적 프록시 기반 `HttpServletRequest`/`HttpServletResponse`/`ServletContext`/`HttpSession`
+  - TLS 감지 (`isSecure()`, `getScheme()`)
 - **WAR 배포**: web.xml 파싱, 클래스로더 격리 (parent-first/child-first)
+- **배포 디렉토리**: `deploy/` 디렉토리 기반 자동 WAR 배포
+- **핫 디플로이**: `WatchService` 기반 WAR 파일 변경 감지 및 자동 재배포
+- **메트릭 수집**: `LongAdder` 기반 요청 수, 활성 연결, 응답 시간, HTTP 상태 코드 분포
 - **구조화된 로깅**: 액세스/에러/감사 로그 (JSON 형식)
 - **JNDI / DataSource**: In-Memory 네이밍 컨텍스트, JDBC 커넥션 풀
 - **Admin CLI**: 14개 카테고리 73개 명령어, JLine 인터랙티브 셸, JMX 통합
-- 내장 health/info 엔드포인트
+- 내장 health/info/metrics 엔드포인트
 - 보안 헤더 기본 포함 (nosniff, DENY, no-store, no-referrer)
 
 ## 문서
@@ -148,10 +178,10 @@ curl http://localhost:8080/app/hello
 | [아키텍처 개요](docs/ko/architecture.md) | 모듈 구조, 요청 처리 흐름, 설계 결정 |
 | [아키텍처 상세](docs/ko/architecture-detail.md) | 내부 동작 심층 분석 |
 | [AsyncContext](docs/ko/async-context.md) | 비동기 서블릿 지원 |
-| [WAR 배포](docs/ko/war-deployment.md) | WAR 배포 + 클래스로더 격리 |
-| [구조화된 로깅](docs/ko/structured-logging.md) | 액세스/에러/감사 로그 (JSON) |
+| [WAR 배포](docs/ko/war-deployment.md) | WAR 배포 + 클래스로더 격리 + 핫 디플로이 |
+| [구조화된 로깅](docs/ko/structured-logging.md) | 액세스/에러/감사 로그 + 메트릭 (JSON) |
 | [HTTP/2 + WebSocket](docs/ko/http2-websocket.md) | ALPN, h2c, WebSocket 업그레이드 |
-| [세션 관리](docs/ko/session-management.md) | TTL 만료 + 이중 제거 전략 |
+| [세션 관리](docs/ko/session-management.md) | TTL 만료 + 이중 제거 전략 + 설정 연동 |
 | [JNDI / DataSource](docs/ko/jndi-datasource.md) | JNDI 네이밍 + 커넥션 풀 |
 | [Admin CLI](docs/ko/admin-cli.md) | 73개 관리 명령어 레퍼런스 |
 | [라이프사이클](docs/ko/lifecycle.md) | 서버/앱 생명주기 |
@@ -161,4 +191,4 @@ curl http://localhost:8080/app/hello
 1. **관리 API**: Admin REST 엔드포인트 (CLI의 RemoteAdminClient 연동)
 2. **JSP 엔진**: 컴파일 기반 JSP 지원
 3. **클러스터 세션**: 분산 세션 복제
-4. **메트릭 수집**: Micrometer / Prometheus 연동
+4. **Micrometer / Prometheus 연동**: 외부 메트릭 시스템 통합

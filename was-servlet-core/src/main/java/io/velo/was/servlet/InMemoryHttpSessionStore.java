@@ -16,6 +16,15 @@ public class InMemoryHttpSessionStore {
 
     private final Map<String, SessionState> sessions = new ConcurrentHashMap<>();
     private final List<Consumer<SessionState>> expirationListeners = new ArrayList<>();
+    private final int defaultMaxInactiveIntervalSeconds;
+
+    public InMemoryHttpSessionStore() {
+        this(1800);
+    }
+
+    public InMemoryHttpSessionStore(int defaultMaxInactiveIntervalSeconds) {
+        this.defaultMaxInactiveIntervalSeconds = defaultMaxInactiveIntervalSeconds;
+    }
 
     /**
      * Finds a session by ID. Returns {@code null} if the session does not exist
@@ -36,6 +45,7 @@ public class InMemoryHttpSessionStore {
     public SessionState create() {
         String sessionId = UUID.randomUUID().toString().replace("-", "");
         SessionState state = new SessionState(sessionId);
+        state.setMaxInactiveIntervalSeconds(defaultMaxInactiveIntervalSeconds);
         sessions.put(sessionId, state);
         return state;
     }

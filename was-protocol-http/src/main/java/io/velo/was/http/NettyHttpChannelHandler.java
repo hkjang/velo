@@ -11,9 +11,11 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
+import io.netty.handler.ssl.SslHandler;
 import io.velo.was.observability.AccessLog;
 import io.velo.was.observability.AccessLogEntry;
 import io.velo.was.observability.ErrorLog;
+import io.velo.was.observability.MetricsCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +38,18 @@ public class NettyHttpChannelHandler extends SimpleChannelInboundHandler<FullHtt
     }
 
     @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        MetricsCollector.instance().connectionOpened();
+        super.channelActive(ctx);
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        MetricsCollector.instance().connectionClosed();
+        super.channelInactive(ctx);
+    }
+
+    @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
         // ── WebSocket upgrade detection ──
         if (wsRegistry != null && isWebSocketUpgrade(request)) {
@@ -50,9 +64,12 @@ public class NettyHttpChannelHandler extends SimpleChannelInboundHandler<FullHtt
         // ── Normal HTTP processing ──
         boolean keepAlive = HttpUtil.isKeepAlive(request);
         long startTime = System.nanoTime();
+        MetricsCollector.instance().requestStarted();
 
         ResponseSink responseSink = response -> {
-            long durationMs = (System.nanoTime() - startTime) / 1_000_000;
+            long durationNanos = System.nanoTime() - startTime;
+            long durationMs = durationNanos / 1_000_000;
+            MetricsCollector.instance().requestCompleted(durationNanos, response.status().code());
 
             if (keepAlive) {
                 response.headers().set(HttpHeaderNames.CONNECTION, "keep-alive");
@@ -83,8 +100,9 @@ public class NettyHttpChannelHandler extends SimpleChannelInboundHandler<FullHtt
             if (!request.decoderResult().isSuccess()) {
                 response = HttpResponses.badRequest("Malformed HTTP request");
             } else {
+                boolean secure = ctx.pipeline().get(SslHandler.class) != null;
                 HttpExchange exchange = new HttpExchange(
-                        request, ctx.channel().remoteAddress(), ctx.channel().localAddress(), responseSink);
+                        request, ctx.channel().remoteAddress(), ctx.channel().localAddress(), responseSink, secure);
                 response = registry.resolve(exchange).handle(exchange);
             }
         } catch (Exception exception) {

@@ -5,11 +5,13 @@ import io.velo.was.http.HttpExchange;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.Part;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
@@ -245,6 +247,22 @@ class ServletRequestContext {
 
     public Locale locale() {
         return Locale.getDefault();
+    }
+
+    private volatile List<VeloPart> parsedParts;
+
+    public Collection<Part> getParts() {
+        if (parsedParts == null) {
+            parsedParts = MultipartParser.parse(body(), header("Content-Type"));
+        }
+        return Collections.unmodifiableList(parsedParts);
+    }
+
+    public Part getPart(String name) {
+        return getParts().stream()
+                .filter(p -> name.equals(p.getName()))
+                .findFirst()
+                .orElse(null);
     }
 
     public InetSocketAddress remoteAddress() {

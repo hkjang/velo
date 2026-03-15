@@ -1,8 +1,12 @@
 package io.velo.was.bootstrap;
 
 import io.velo.was.config.ServerConfiguration;
+import io.velo.was.deploy.DeploymentRegistry;
+import io.velo.was.deploy.HotDeployWatcher;
+import io.velo.was.deploy.WarDeployer;
 import io.velo.was.http.HttpHandlerRegistry;
 import io.velo.was.http.HttpResponses;
+import io.velo.was.observability.MetricsCollector;
 import io.velo.was.jsp.JspServlet;
 import io.velo.was.servlet.SimpleServletApplication;
 import io.velo.was.servlet.SimpleServletContainer;
@@ -12,8 +16,10 @@ import io.velo.was.transport.netty.NettyServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 public final class VeloWasApplication {
 
@@ -25,7 +31,12 @@ public final class VeloWasApplication {
     public static void main(String[] args) throws Exception {
         Path configPath = args.length > 0 ? Path.of(args[0]) : Path.of("conf", "server.yaml");
         ServerConfiguration configuration = ServerConfigurationLoader.load(configPath);
-        SimpleServletContainer servletContainer = new SimpleServletContainer();
+        ServerConfiguration.Session sessionConfig = configuration.getServer().getSession();
+        ServerConfiguration.Deploy deployConfig = configuration.getServer().getDeploy();
+
+        SimpleServletContainer servletContainer = new SimpleServletContainer(
+                sessionConfig.getPurgeIntervalSeconds(),
+                sessionConfig.getTimeoutSeconds());
 
         // Register JSP servlet for *.jsp handling
         SimpleServletApplication.Builder sampleAppBuilder = SimpleServletApplication.builder("sample-app", "/app")
@@ -39,6 +50,26 @@ public final class VeloWasApplication {
 
         servletContainer.deploy(sampleAppBuilder.build());
 
+        // Deploy WARs from deploy directory
+        Path deployDir = Path.of(deployConfig.getDirectory());
+        WarDeployer warDeployer = new WarDeployer(deployDir.resolve(".work"));
+        DeploymentRegistry deploymentRegistry = new DeploymentRegistry(warDeployer, servletContainer);
+
+        if (Files.exists(deployDir)) {
+            try (Stream<Path> warFiles = Files.list(deployDir)
+                    .filter(p -> p.toString().endsWith(".war"))) {
+                warFiles.forEach(deploymentRegistry::deploy);
+            }
+        }
+
+        // Hot deploy watcher
+        HotDeployWatcher hotDeployWatcher = null;
+        if (deployConfig.isHotDeploy()) {
+            hotDeployWatcher = new HotDeployWatcher(
+                    deployDir, deploymentRegistry, deployConfig.getScanIntervalSeconds());
+            hotDeployWatcher.start();
+        }
+
         HttpHandlerRegistry registry = new HttpHandlerRegistry()
                 .registerGet("/health", exchange -> {
                     if (!"GET".equals(exchange.request().method().name()) && !"HEAD".equals(exchange.request().method().name())) {
@@ -48,6 +79,8 @@ public final class VeloWasApplication {
                             {"status":"UP","name":"%s","nodeId":"%s"}
                             """.formatted(configuration.getServer().getName(), configuration.getServer().getNodeId()).trim());
                 })
+                .registerGet("/metrics", exchange ->
+                        HttpResponses.jsonOk(MetricsCollector.instance().snapshot().toJson()))
                 .registerGet("/info", exchange -> {
                     if (!"GET".equals(exchange.request().method().name()) && !"HEAD".equals(exchange.request().method().name())) {
                         return HttpResponses.methodNotAllowed("Only GET and HEAD are supported for /info");
@@ -73,8 +106,15 @@ public final class VeloWasApplication {
             tcpManager.register(tcpConfig, tcpRouter);
         }
 
+        final HotDeployWatcher watcher = hotDeployWatcher;
+        final DeploymentRegistry depRegistry = deploymentRegistry;
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (watcher != null) {
+                watcher.close();
+            }
+            depRegistry.undeployAll();
             tcpManager.close();
+            servletContainer.close();
             server.close();
         }, "velo-was-shutdown"));
 
@@ -86,7 +126,11 @@ public final class VeloWasApplication {
             server.blockUntilShutdown();
         } catch (Exception exception) {
             log.error("Server startup failed", exception);
+            if (watcher != null) {
+                watcher.close();
+            }
             tcpManager.close();
+            servletContainer.close();
             server.close();
             throw exception;
         }

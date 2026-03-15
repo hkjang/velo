@@ -32,6 +32,9 @@ public class ServerConfiguration {
         private Threading threading = new Threading();
         private Tls tls = new Tls();
         private Jsp jsp = new Jsp();
+        private Compression compression = new Compression();
+        private Session session = new Session();
+        private Deploy deploy = new Deploy();
         private List<TcpListenerConfig> tcpListeners = new ArrayList<>();
 
         public String getName() {
@@ -90,6 +93,30 @@ public class ServerConfiguration {
             this.jsp = jsp;
         }
 
+        public Compression getCompression() {
+            return compression;
+        }
+
+        public void setCompression(Compression compression) {
+            this.compression = compression;
+        }
+
+        public Session getSession() {
+            return session;
+        }
+
+        public void setSession(Session session) {
+            this.session = session;
+        }
+
+        public Deploy getDeploy() {
+            return deploy;
+        }
+
+        public void setDeploy(Deploy deploy) {
+            this.deploy = deploy;
+        }
+
         public List<TcpListenerConfig> getTcpListeners() {
             return tcpListeners;
         }
@@ -112,6 +139,15 @@ public class ServerConfiguration {
             if (jsp == null) {
                 jsp = new Jsp();
             }
+            if (compression == null) {
+                compression = new Compression();
+            }
+            if (session == null) {
+                session = new Session();
+            }
+            if (deploy == null) {
+                deploy = new Deploy();
+            }
             if (tcpListeners == null) {
                 tcpListeners = new ArrayList<>();
             }
@@ -129,6 +165,9 @@ public class ServerConfiguration {
         private boolean tcpNoDelay = true;
         private boolean keepAlive = true;
         private int maxContentLength = 10 * 1024 * 1024;
+        private int idleTimeoutSeconds = 60;
+        private int maxHeaderSize = 8192;
+        private int maxInitialLineLength = 4096;
 
         public String getHost() {
             return host;
@@ -184,6 +223,30 @@ public class ServerConfiguration {
 
         public void setMaxContentLength(int maxContentLength) {
             this.maxContentLength = maxContentLength;
+        }
+
+        public int getIdleTimeoutSeconds() {
+            return idleTimeoutSeconds;
+        }
+
+        public void setIdleTimeoutSeconds(int idleTimeoutSeconds) {
+            this.idleTimeoutSeconds = idleTimeoutSeconds;
+        }
+
+        public int getMaxHeaderSize() {
+            return maxHeaderSize;
+        }
+
+        public void setMaxHeaderSize(int maxHeaderSize) {
+            this.maxHeaderSize = maxHeaderSize;
+        }
+
+        public int getMaxInitialLineLength() {
+            return maxInitialLineLength;
+        }
+
+        public void setMaxInitialLineLength(int maxInitialLineLength) {
+            this.maxInitialLineLength = maxInitialLineLength;
         }
 
         public void validate() {
@@ -342,6 +405,47 @@ public class ServerConfiguration {
         public void setBufferSize(int bufferSize) { this.bufferSize = bufferSize; }
         public int getMaxLoadedJsps() { return maxLoadedJsps; }
         public void setMaxLoadedJsps(int maxLoadedJsps) { this.maxLoadedJsps = maxLoadedJsps; }
+    }
+
+    public static class Compression {
+        private boolean enabled = false;
+        private int minResponseSizeBytes = 1024;
+        private int compressionLevel = 6;
+        private List<String> mimeTypes = new ArrayList<>(List.of(
+                "text/html", "text/plain", "text/css",
+                "application/javascript", "application/json"));
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public int getMinResponseSizeBytes() { return minResponseSizeBytes; }
+        public void setMinResponseSizeBytes(int minResponseSizeBytes) { this.minResponseSizeBytes = minResponseSizeBytes; }
+        public int getCompressionLevel() { return compressionLevel; }
+        public void setCompressionLevel(int compressionLevel) { this.compressionLevel = compressionLevel; }
+        public List<String> getMimeTypes() { return mimeTypes; }
+        public void setMimeTypes(List<String> mimeTypes) { this.mimeTypes = mimeTypes; }
+    }
+
+    public static class Session {
+        private int timeoutSeconds = 1800;
+        private int purgeIntervalSeconds = 60;
+
+        public int getTimeoutSeconds() { return timeoutSeconds; }
+        public void setTimeoutSeconds(int timeoutSeconds) { this.timeoutSeconds = timeoutSeconds; }
+        public int getPurgeIntervalSeconds() { return purgeIntervalSeconds; }
+        public void setPurgeIntervalSeconds(int purgeIntervalSeconds) { this.purgeIntervalSeconds = purgeIntervalSeconds; }
+    }
+
+    public static class Deploy {
+        private String directory = "deploy";
+        private boolean hotDeploy = false;
+        private int scanIntervalSeconds = 5;
+
+        public String getDirectory() { return directory; }
+        public void setDirectory(String directory) { this.directory = directory; }
+        public boolean isHotDeploy() { return hotDeploy; }
+        public void setHotDeploy(boolean hotDeploy) { this.hotDeploy = hotDeploy; }
+        public int getScanIntervalSeconds() { return scanIntervalSeconds; }
+        public void setScanIntervalSeconds(int scanIntervalSeconds) { this.scanIntervalSeconds = scanIntervalSeconds; }
     }
 
     public static class TcpListenerConfig {

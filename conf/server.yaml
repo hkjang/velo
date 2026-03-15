@@ -11,6 +11,9 @@ server:
     tcpNoDelay: true
     keepAlive: true
     maxContentLength: 10485760
+    idleTimeoutSeconds: 60
+    maxHeaderSize: 8192
+    maxInitialLineLength: 4096
 
   threading:
     bossThreads: 1
@@ -30,6 +33,20 @@ server:
       - TLSv1.3
       - TLSv1.2
     reloadIntervalSeconds: 30
+
+  compression:
+    enabled: false
+    minResponseSizeBytes: 1024
+    compressionLevel: 6
+
+  session:
+    timeoutSeconds: 1800
+    purgeIntervalSeconds: 60
+
+  deploy:
+    directory: deploy
+    hotDeploy: false
+    scanIntervalSeconds: 5
 
   jsp:
     scratchDir: work/jsp

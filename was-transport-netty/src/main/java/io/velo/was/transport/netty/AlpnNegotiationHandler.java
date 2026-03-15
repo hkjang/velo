@@ -4,6 +4,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
@@ -12,11 +13,15 @@ import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.velo.was.config.ServerConfiguration;
 import io.velo.was.http.HttpHandlerRegistry;
 import io.velo.was.http.NettyHttpChannelHandler;
 import io.velo.was.http.WebSocketHandlerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * ALPN-based protocol negotiation handler.
@@ -27,16 +32,16 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
 
     private static final Logger log = LoggerFactory.getLogger(AlpnNegotiationHandler.class);
 
+    private final ServerConfiguration.Server serverConfig;
     private final HttpHandlerRegistry registry;
     private final WebSocketHandlerRegistry wsRegistry;
-    private final int maxContentLength;
 
-    AlpnNegotiationHandler(HttpHandlerRegistry registry, WebSocketHandlerRegistry wsRegistry,
-                           int maxContentLength) {
+    AlpnNegotiationHandler(ServerConfiguration.Server serverConfig,
+                           HttpHandlerRegistry registry, WebSocketHandlerRegistry wsRegistry) {
         super(ApplicationProtocolNames.HTTP_1_1);
+        this.serverConfig = serverConfig;
         this.registry = registry;
         this.wsRegistry = wsRegistry;
-        this.maxContentLength = maxContentLength;
     }
 
     @Override
@@ -55,13 +60,32 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
     private void configureHttp2(ChannelPipeline pipeline) {
         pipeline.addLast("h2Codec", Http2FrameCodecBuilder.forServer().build());
         pipeline.addLast("h2Multiplexer", new Http2MultiplexHandler(
-                new Http2StreamChannelInitializer(registry, wsRegistry, maxContentLength)));
+                new Http2StreamChannelInitializer(serverConfig, registry, wsRegistry)));
     }
 
     private void configureHttp1(ChannelPipeline pipeline) {
-        pipeline.addLast("httpCodec", new HttpServerCodec());
-        pipeline.addLast("httpAggregator", new HttpObjectAggregator(maxContentLength));
+        ServerConfiguration.Listener listener = serverConfig.getListener();
+        ServerConfiguration.Compression compression = serverConfig.getCompression();
+
+        pipeline.addLast("httpCodec", new HttpServerCodec(
+                listener.getMaxInitialLineLength(),
+                listener.getMaxHeaderSize(),
+                8192));
+        pipeline.addLast("httpAggregator", new HttpObjectAggregator(listener.getMaxContentLength()));
         pipeline.addLast("chunkedWriter", new ChunkedWriteHandler());
+
+        int idleTimeout = listener.getIdleTimeoutSeconds();
+        if (idleTimeout > 0) {
+            pipeline.addLast("idleHandler",
+                    new IdleStateHandler(idleTimeout, 0, 0, TimeUnit.SECONDS));
+            pipeline.addLast("idleEventHandler", new IdleChannelHandler());
+        }
+
+        if (compression.isEnabled()) {
+            pipeline.addLast("compressor",
+                    new HttpContentCompressor(compression.getCompressionLevel()));
+        }
+
         pipeline.addLast("httpHandler", new NettyHttpChannelHandler(registry, wsRegistry));
     }
 
@@ -72,22 +96,29 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
      */
     static class Http2StreamChannelInitializer extends ChannelInitializer<Channel> {
 
+        private final ServerConfiguration.Server serverConfig;
         private final HttpHandlerRegistry registry;
         private final WebSocketHandlerRegistry wsRegistry;
-        private final int maxContentLength;
 
-        Http2StreamChannelInitializer(HttpHandlerRegistry registry,
-                                      WebSocketHandlerRegistry wsRegistry,
-                                      int maxContentLength) {
+        Http2StreamChannelInitializer(ServerConfiguration.Server serverConfig,
+                                      HttpHandlerRegistry registry,
+                                      WebSocketHandlerRegistry wsRegistry) {
+            this.serverConfig = serverConfig;
             this.registry = registry;
             this.wsRegistry = wsRegistry;
-            this.maxContentLength = maxContentLength;
         }
 
         @Override
         protected void initChannel(Channel ch) {
+            int maxContentLength = serverConfig.getListener().getMaxContentLength();
             ch.pipeline().addLast("h2ToHttp", new Http2StreamFrameToHttpObjectCodec(true));
             ch.pipeline().addLast("httpAggregator", new HttpObjectAggregator(maxContentLength));
+
+            if (serverConfig.getCompression().isEnabled()) {
+                ch.pipeline().addLast("compressor",
+                        new HttpContentCompressor(serverConfig.getCompression().getCompressionLevel()));
+            }
+
             ch.pipeline().addLast("httpHandler", new NettyHttpChannelHandler(registry, wsRegistry));
         }
     }

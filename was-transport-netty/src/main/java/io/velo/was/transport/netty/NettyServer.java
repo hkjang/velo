@@ -7,6 +7,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
@@ -16,6 +17,7 @@ import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 import io.velo.was.config.ServerConfiguration;
 import io.velo.was.http.HttpHandlerRegistry;
@@ -60,8 +62,6 @@ public class NettyServer implements AutoCloseable {
             sslContextProvider = new ReloadingSslContextProvider(server.getTls());
         }
 
-        final int maxContentLength = listener.getMaxContentLength();
-
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)
                 .channel(NativeTransportSelector.serverChannelClass())
@@ -77,10 +77,10 @@ public class NettyServer implements AutoCloseable {
                             SslContext sslContext = sslContextProvider.current();
                             channel.pipeline().addLast("ssl", sslContext.newHandler(channel.alloc()));
                             channel.pipeline().addLast("alpn",
-                                    new AlpnNegotiationHandler(registry, wsRegistry, maxContentLength));
+                                    new AlpnNegotiationHandler(server, registry, wsRegistry));
                         } else {
                             // ── Cleartext: h2c upgrade + HTTP/1.1 ──
-                            configureCleartextPipeline(channel, maxContentLength);
+                            configureCleartextPipeline(channel);
                         }
                     }
                 });
@@ -105,8 +105,15 @@ public class NettyServer implements AutoCloseable {
      *   <li>Plain HTTP/1.1 (no upgrade)</li>
      * </ul>
      */
-    private void configureCleartextPipeline(SocketChannel channel, int maxContentLength) {
-        HttpServerCodec sourceCodec = new HttpServerCodec();
+    private void configureCleartextPipeline(SocketChannel channel) {
+        ServerConfiguration.Listener listener = server.getListener();
+        ServerConfiguration.Compression compression = server.getCompression();
+        int maxContentLength = listener.getMaxContentLength();
+
+        HttpServerCodec sourceCodec = new HttpServerCodec(
+                listener.getMaxInitialLineLength(),
+                listener.getMaxHeaderSize(),
+                8192);
 
         HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
             if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
@@ -114,7 +121,7 @@ public class NettyServer implements AutoCloseable {
                         Http2FrameCodecBuilder.forServer().build(),
                         new Http2MultiplexHandler(
                                 new AlpnNegotiationHandler.Http2StreamChannelInitializer(
-                                        registry, wsRegistry, maxContentLength)));
+                                        server, registry, wsRegistry)));
             }
             return null;
         };
@@ -132,7 +139,7 @@ public class NettyServer implements AutoCloseable {
                         ch.pipeline().addLast("h2Codec", Http2FrameCodecBuilder.forServer().build());
                         ch.pipeline().addLast("h2Multiplexer", new Http2MultiplexHandler(
                                 new AlpnNegotiationHandler.Http2StreamChannelInitializer(
-                                        registry, wsRegistry, maxContentLength)));
+                                        server, registry, wsRegistry)));
                     }
                 });
 
@@ -141,6 +148,21 @@ public class NettyServer implements AutoCloseable {
         // Fallback: if no HTTP/2 upgrade happens, these handlers process HTTP/1.1
         channel.pipeline().addLast("httpAggregator", new HttpObjectAggregator(maxContentLength));
         channel.pipeline().addLast("chunkedWriter", new ChunkedWriteHandler());
+
+        // Idle timeout
+        int idleTimeout = listener.getIdleTimeoutSeconds();
+        if (idleTimeout > 0) {
+            channel.pipeline().addLast("idleHandler",
+                    new IdleStateHandler(idleTimeout, 0, 0, TimeUnit.SECONDS));
+            channel.pipeline().addLast("idleEventHandler", new IdleChannelHandler());
+        }
+
+        // Gzip compression
+        if (compression.isEnabled()) {
+            channel.pipeline().addLast("compressor",
+                    new HttpContentCompressor(compression.getCompressionLevel()));
+        }
+
         channel.pipeline().addLast("httpHandler", new NettyHttpChannelHandler(registry, wsRegistry));
     }
 

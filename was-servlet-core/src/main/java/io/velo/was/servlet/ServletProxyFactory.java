@@ -138,7 +138,7 @@ final class ServletProxyFactory {
             case "getRequestURI" -> requestContext.requestUri();
             case "getRequestURL" -> new StringBuffer(buildRequestUrl(requestContext));
             case "getProtocol" -> requestContext.request().protocolVersion().text();
-            case "getScheme" -> requestContext.request().protocolVersion().text().startsWith("HTTPS") ? "https" : "http";
+            case "getScheme" -> requestContext.exchange().secure() ? "https" : "http";
             case "getServerName" -> requestContext.localAddress().getHostString();
             case "getServerPort" -> requestContext.localAddress().getPort();
             case "getRemoteAddr" -> requestContext.remoteAddress().getAddress().getHostAddress();
@@ -147,7 +147,7 @@ final class ServletProxyFactory {
             case "getLocalAddr" -> requestContext.localAddress().getAddress().getHostAddress();
             case "getLocalName" -> requestContext.localAddress().getHostString();
             case "getLocalPort" -> requestContext.localAddress().getPort();
-            case "isSecure" -> false;
+            case "isSecure" -> requestContext.exchange().secure();
             case "getContentType" -> requestContext.header("Content-Type");
             case "getContentLength" -> requestContext.body().length;
             case "getContentLengthLong" -> (long) requestContext.body().length;
@@ -210,6 +210,8 @@ final class ServletProxyFactory {
                 HttpSession session = sessionAccessor.session(false);
                 yield session == null ? null : session.getId();
             }
+            case "getParts" -> requestContext.getParts();
+            case "getPart" -> requestContext.getPart((String) args[0]);
             case "getAuthType", "getRemoteUser", "getUserPrincipal" -> null;
             case "isUserInRole", "authenticate" -> false;
             case "login", "logout" -> null;

@@ -10,10 +10,16 @@ public record HttpExchange(
         FullHttpRequest request,
         SocketAddress remoteAddress,
         SocketAddress localAddress,
-        ResponseSink responseSink
+        ResponseSink responseSink,
+        boolean secure
 ) {
+    public HttpExchange(FullHttpRequest request, SocketAddress remoteAddress, SocketAddress localAddress,
+                        ResponseSink responseSink) {
+        this(request, remoteAddress, localAddress, responseSink, false);
+    }
+
     public HttpExchange(FullHttpRequest request, SocketAddress remoteAddress, SocketAddress localAddress) {
-        this(request, remoteAddress, localAddress, null);
+        this(request, remoteAddress, localAddress, null, false);
     }
 
     public String uri() {

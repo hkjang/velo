@@ -69,7 +69,7 @@ $ curl -s http://localhost:8080/test/hello
 Hello from TestServlet! User-Agent: curl/8.x.x
 ```
 
-![TestServlet Output](file:///C:/Users/gagag/.gemini/antigravity/brain/6deb27fd-e433-4a40-86f5-0fcec54f353d/test_war_hello_1773540793132.png)
+![TestServlet Output](../images/test_war_hello.png)
 
 If the response is properly printed out, it means the Servlet mappings in `test.war` are functioning properly.
 
@@ -123,7 +123,7 @@ $ curl -s http://localhost:8080/test-app/index.jsp
 </html>
 ```
 
-![test-app Main Index Page](file:///C:/Users/gagag/.gemini/antigravity/brain/6deb27fd-e433-4a40-86f5-0fcec54f353d/test_app_index_1773540776457.png)
+![test-app Main Index Page](../images/test_app_index.png)
 
 ```sh
 # 2. Server Information Test (Referencing internal JVM objects)
@@ -139,6 +139,6 @@ $ curl -s http://localhost:8080/test-app/info.jsp
 </html>
 ```
 
-![test-app Server Information Page](file:///C:/Users/gagag/.gemini/antigravity/brain/6deb27fd-e433-4a40-86f5-0fcec54f353d/test_app_info_1773540769192.png)
+![test-app Server Information Page](../images/test_app_info.png)
 
 If you receive normal 200 HTTP response codes and the HTML body correctly displays without any `No servlet mapping` or `500 Server Error` errors, it signifies that JSP compilation, translation, and classloader integration have completely succeeded.

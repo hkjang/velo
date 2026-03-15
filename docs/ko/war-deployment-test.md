@@ -69,7 +69,7 @@ $ curl -s http://localhost:8080/test/hello
 Hello from TestServlet! User-Agent: curl/8.x.x
 ```
 
-![TestServlet 응답 화면](file:///C:/Users/gagag/.gemini/antigravity/brain/6deb27fd-e433-4a40-86f5-0fcec54f353d/test_war_hello_1773540793132.png)
+![TestServlet 응답 화면](../images/test_war_hello.png)
 
 응답이 올바르게 출력된다면 `test.war`의 Servlet 매핑이 성공적으로 동작하는 것입니다.
 
@@ -123,7 +123,7 @@ $ curl -s http://localhost:8080/test-app/index.jsp
 </html>
 ```
 
-![test-app 메인 페이지 화면](file:///C:/Users/gagag/.gemini/antigravity/brain/6deb27fd-e433-4a40-86f5-0fcec54f353d/test_app_index_1773540776457.png)
+![test-app 메인 페이지 화면](../images/test_app_index.png)
 
 ```sh
 # 2. 서버 정보 페이지 테스트 (내부 JVM 객체 참조)
@@ -139,6 +139,6 @@ $ curl -s http://localhost:8080/test-app/info.jsp
 </html>
 ```
 
-![test-app 서버 정보 페이지 화면](file:///C:/Users/gagag/.gemini/antigravity/brain/6deb27fd-e433-4a40-86f5-0fcec54f353d/test_app_info_1773540769192.png)
+![test-app 서버 정보 페이지 화면](../images/test_app_info.png)
 
 위와 같이 `No servlet mapping` 에러나 `500 Server Error` 없이 HTML 본문과 정상적인 200 상태 코드가 반환되면 모든 JSP 컴파일, 트랜스레이션 및 클래스로더 연동이 완벽하게 성공한 것입니다.

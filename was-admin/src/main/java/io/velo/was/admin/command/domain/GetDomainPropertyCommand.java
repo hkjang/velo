@@ -35,7 +35,7 @@ public class GetDomainPropertyCommand implements Command {
         try {
             String value = context.client().getDomainProperty(args[0], args[1]);
             return CommandResult.ok(args[1] + " = " + value);
-        } catch (UnsupportedOperationException e) {
+        } catch (UnsupportedOperationException | IllegalArgumentException e) {
             return CommandResult.error(e.getMessage());
         }
     }

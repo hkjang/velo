@@ -35,7 +35,7 @@ public class CreateDomainCommand implements Command {
         try {
             context.client().createDomain(args[0]);
             return CommandResult.ok("Domain '" + args[0] + "' created successfully.");
-        } catch (UnsupportedOperationException e) {
+        } catch (UnsupportedOperationException | IllegalArgumentException e) {
             return CommandResult.error(e.getMessage());
         }
     }

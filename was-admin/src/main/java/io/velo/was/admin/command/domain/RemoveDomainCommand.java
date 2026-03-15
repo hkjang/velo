@@ -35,7 +35,7 @@ public class RemoveDomainCommand implements Command {
         try {
             context.client().removeDomain(args[0]);
             return CommandResult.ok("Domain '" + args[0] + "' removed successfully.");
-        } catch (UnsupportedOperationException e) {
+        } catch (UnsupportedOperationException | IllegalArgumentException e) {
             return CommandResult.error(e.getMessage());
         }
     }

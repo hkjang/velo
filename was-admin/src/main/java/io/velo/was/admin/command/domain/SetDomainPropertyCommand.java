@@ -35,7 +35,7 @@ public class SetDomainPropertyCommand implements Command {
         try {
             context.client().setDomainProperty(args[0], args[1], args[2]);
             return CommandResult.ok("Property '" + args[1] + "' set to '" + args[2] + "' on domain '" + args[0] + "'.");
-        } catch (UnsupportedOperationException e) {
+        } catch (UnsupportedOperationException | IllegalArgumentException e) {
             return CommandResult.error(e.getMessage());
         }
     }

@@ -47,7 +47,7 @@ public class DomainInfoCommand implements Command {
                 }
             }
             return CommandResult.ok(sb.toString().stripTrailing());
-        } catch (UnsupportedOperationException e) {
+        } catch (UnsupportedOperationException | IllegalArgumentException e) {
             return CommandResult.error(e.getMessage());
         }
     }

@@ -203,10 +203,10 @@ class AllCommandsTest {
         }
 
         @Test
-        @DisplayName("create-domain - 로컬 모드 미지원")
+        @DisplayName("create-domain - 도메인 생성")
         void createDomain() {
             CommandResult r = exec("create-domain", "test-domain");
-            assertError(r);
+            assertSuccess(r);
         }
 
         @Test
@@ -218,17 +218,17 @@ class AllCommandsTest {
         }
 
         @Test
-        @DisplayName("remove-domain - 로컬 모드 미지원")
+        @DisplayName("remove-domain - 존재하지 않는 도메인")
         void removeDomain() {
-            CommandResult r = exec("remove-domain", "test-domain");
+            CommandResult r = exec("remove-domain", "nonexistent-domain");
             assertError(r);
         }
 
         @Test
-        @DisplayName("set-domain-property - 로컬 모드 미지원")
+        @DisplayName("set-domain-property - 속성 설정")
         void setDomainProperty() {
             CommandResult r = exec("set-domain-property", "default", "key", "value");
-            assertError(r);
+            assertSuccess(r);
         }
 
         @Test
@@ -240,9 +240,9 @@ class AllCommandsTest {
         }
 
         @Test
-        @DisplayName("get-domain-property - 로컬 모드 미지원")
+        @DisplayName("get-domain-property - 존재하지 않는 속성")
         void getDomainProperty() {
-            CommandResult r = exec("get-domain-property", "default", "key");
+            CommandResult r = exec("get-domain-property", "default", "nonexistent-key");
             assertError(r);
         }
     }

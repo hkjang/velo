@@ -597,4 +597,96 @@ class SimpleServletContainerTest {
         assertNotNull(store.find(session.getId()));
         assertEquals(0, store.purgeExpired());
     }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Welcome file tests
+    // ────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void welcomeFileResolvesRootToIndexJsp() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("welcome-app", "/app")
+                .servlet("*.jsp", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.setContentType("text/html");
+                        resp.getWriter().write("JSP:" + req.getServletPath());
+                    }
+                })
+                .welcomeFile("index.jsp")
+                .welcomeFile("index.html")
+                .build());
+
+        // Request to /app/ should resolve to /app/index.jsp via welcome file
+        FullHttpResponse resp = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/"),
+                null, null));
+        assertEquals(200, resp.status().code());
+        String body = resp.content().toString(StandardCharsets.UTF_8);
+        assertEquals("JSP:/index.jsp", body);
+    }
+
+    @Test
+    void welcomeFileResolvesRootContextToIndex() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("root-welcome-app", "/")
+                .servlet("*.jsp", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.setContentType("text/html");
+                        resp.getWriter().write("ROOT-JSP:" + req.getServletPath());
+                    }
+                })
+                .welcomeFile("index.jsp")
+                .build());
+
+        // Request to / should resolve to /index.jsp via welcome file
+        FullHttpResponse resp = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"),
+                null, null));
+        assertEquals(200, resp.status().code());
+        String body = resp.content().toString(StandardCharsets.UTF_8);
+        assertEquals("ROOT-JSP:/index.jsp", body);
+    }
+
+    @Test
+    void noWelcomeFileFallsBackToDefaultServlet() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("no-welcome-app", "/app")
+                .servlet("/", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("default-servlet");
+                    }
+                })
+                .build());
+
+        // No welcome files defined, "/" mapping should still work as default servlet
+        FullHttpResponse resp = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/"),
+                null, null));
+        assertEquals(200, resp.status().code());
+        assertEquals("default-servlet", resp.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void welcomeFileSkipsNonMatchingAndPicksFirst() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("multi-welcome-app", "/app")
+                .servlet("*.html", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("HTML:" + req.getServletPath());
+                    }
+                })
+                .welcomeFile("index.jsp")   // no *.jsp servlet → should be skipped
+                .welcomeFile("index.html")   // *.html servlet → should match
+                .build());
+
+        FullHttpResponse resp = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/"),
+                null, null));
+        assertEquals(200, resp.status().code());
+        assertEquals("HTML:/index.html", resp.content().toString(StandardCharsets.UTF_8));
+    }
 }

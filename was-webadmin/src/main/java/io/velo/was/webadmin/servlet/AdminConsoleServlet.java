@@ -61,14 +61,14 @@ public class AdminConsoleServlet extends HttpServlet {
                       <div class="card-title">Quick Commands</div>
                       <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px;">
                         <button class="btn btn-sm" onclick="exec('status')" style="justify-content:flex-start;">status</button>
-                        <button class="btn btn-sm" onclick="exec('listservers')" style="justify-content:flex-start;">listservers</button>
-                        <button class="btn btn-sm" onclick="exec('listapplications')" style="justify-content:flex-start;">listapplications</button>
-                        <button class="btn btn-sm" onclick="exec('memoryinfo')" style="justify-content:flex-start;">memoryinfo</button>
-                        <button class="btn btn-sm" onclick="exec('threadinfo')" style="justify-content:flex-start;">threadinfo</button>
-                        <button class="btn btn-sm" onclick="exec('jvminfo')" style="justify-content:flex-start;">jvminfo</button>
-                        <button class="btn btn-sm" onclick="exec('systeminfo')" style="justify-content:flex-start;">systeminfo</button>
-                        <button class="btn btn-sm" onclick="exec('listdatasources')" style="justify-content:flex-start;">listdatasources</button>
-                        <button class="btn btn-sm" onclick="exec('listthreadpools')" style="justify-content:flex-start;">listthreadpools</button>
+                        <button class="btn btn-sm" onclick="exec('list-servers')" style="justify-content:flex-start;">list-servers</button>
+                        <button class="btn btn-sm" onclick="exec('list-applications')" style="justify-content:flex-start;">list-applications</button>
+                        <button class="btn btn-sm" onclick="exec('memory-info')" style="justify-content:flex-start;">memory-info</button>
+                        <button class="btn btn-sm" onclick="exec('thread-info')" style="justify-content:flex-start;">thread-info</button>
+                        <button class="btn btn-sm" onclick="exec('jvm-info')" style="justify-content:flex-start;">jvm-info</button>
+                        <button class="btn btn-sm" onclick="exec('system-info')" style="justify-content:flex-start;">system-info</button>
+                        <button class="btn btn-sm" onclick="exec('list-datasources')" style="justify-content:flex-start;">list-datasources</button>
+                        <button class="btn btn-sm" onclick="exec('list-thread-pools')" style="justify-content:flex-start;">list-thread-pools</button>
                       </div>
                     </div>
                     <div class="card" style="flex:1;overflow-y:auto;">
@@ -87,11 +87,20 @@ public class AdminConsoleServlet extends HttpServlet {
                   var historyIdx = -1;
                   var apiBase = '%s/api';
 
-                  var COMMANDS = ['help','version','status','serverinfo','systeminfo','memoryinfo',
-                    'threadinfo','jvminfo','listservers','listapplications','listdatasources',
-                    'listthreadpools','startserver','stopserver','restartserver','suspendserver',
-                    'resumeserver','deploy','undeploy','redeploy','startapplication','stopapplication',
-                    'clear'];
+                  var COMMANDS = ['help','version','status','clear',
+                    'server-info','system-info','memory-info','thread-info','jvm-info','transaction-info',
+                    'list-servers','start-server','stop-server','restart-server','suspend-server','resume-server','kill-server',
+                    'list-applications','application-info','deploy','undeploy','redeploy','start-application','stop-application',
+                    'list-clusters','cluster-info','start-cluster','stop-cluster','restart-cluster','add-server-to-cluster','remove-server-from-cluster',
+                    'list-datasources','datasource-info','enable-datasource','disable-datasource','test-datasource',
+                    'list-jdbc-resources','jdbc-resource-info','reset-connection-pool','flush-connection-pool',
+                    'list-jms-servers','jms-server-info','list-jms-destinations','jms-destination-info','purge-jms-queue',
+                    'list-thread-pools','thread-pool-info','reset-thread-pool','resource-info',
+                    'list-loggers','logger-info','get-log-level','set-log-level',
+                    'list-mbeans','get-mbean-attribute','set-mbean-attribute','invoke-mbean-operation',
+                    'list-users','create-user','remove-user','change-password','list-roles',
+                    'domain-info','list-domains','create-domain','remove-domain','set-domain-property','get-domain-property',
+                    'run-script','record-script','stop-record'];
 
                   function appendLine(text, color) {
                     var div = document.createElement('div');

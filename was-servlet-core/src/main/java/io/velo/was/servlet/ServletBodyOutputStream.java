@@ -17,7 +17,16 @@ public class ServletBodyOutputStream extends ServletOutputStream {
 
     @Override
     public void setWriteListener(WriteListener writeListener) {
-        throw new UnsupportedOperationException("Async IO is not implemented yet");
+        if (writeListener == null) {
+            throw new NullPointerException("WriteListener must not be null");
+        }
+        // Since the output is buffered in memory, writing is always ready.
+        // Notify the listener immediately that it can write.
+        try {
+            writeListener.onWritePossible();
+        } catch (IOException e) {
+            writeListener.onError(e);
+        }
     }
 
     @Override

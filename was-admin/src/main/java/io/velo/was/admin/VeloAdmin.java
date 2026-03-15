@@ -73,6 +73,12 @@ public class VeloAdmin {
         registry.register(new HistoryCommand());
         registry.register(new VersionCommand(VERSION));
 
+        // ── Alias ──
+        registry.register(new io.velo.was.admin.command.server.ServerInfoCommand() {
+            @Override public String name() { return "status"; }
+            @Override public String description() { return "Show server status (alias for server-info)"; }
+        });
+
         // ── Domain ──
         registry.register(new DomainInfoCommand());
         registry.register(new ListDomainsCommand());

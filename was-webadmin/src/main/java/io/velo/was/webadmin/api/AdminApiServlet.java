@@ -185,19 +185,23 @@ public class AdminApiServlet extends HttpServlet {
                 escapeJson(configuration.getServer().getWebAdmin().getContextPath())));
         first = false;
 
-        // Add apps from AdminClient (WAR-deployed applications)
+        // Add apps from AdminClient (all deployed applications)
         try {
             List<AdminClient.AppSummary> apps = adminClient.listApplications();
             for (AdminClient.AppSummary app : apps) {
+                // Skip webadmin (already listed above as INTERNAL)
+                if ("velo-webadmin".equals(app.name())) continue;
+
                 sb.append(',');
+                String type = "sample-app".equals(app.name()) ? "INTERNAL" : "DEPLOYED";
                 try {
                     AdminClient.AppStatus info = adminClient.applicationInfo(app.name());
-                    sb.append("{\"name\":\"%s\",\"contextPath\":\"%s\",\"status\":\"%s\",\"type\":\"DEPLOYED\",\"servletCount\":%d,\"filterCount\":%d}".formatted(
+                    sb.append("{\"name\":\"%s\",\"contextPath\":\"%s\",\"status\":\"%s\",\"type\":\"%s\",\"servletCount\":%d,\"filterCount\":%d}".formatted(
                             escapeJson(info.name()), escapeJson(info.contextPath()), escapeJson(info.status()),
-                            info.servletCount(), info.filterCount()));
+                            type, info.servletCount(), info.filterCount()));
                 } catch (Exception e) {
-                    sb.append("{\"name\":\"%s\",\"contextPath\":\"%s\",\"status\":\"%s\",\"type\":\"DEPLOYED\"}".formatted(
-                            escapeJson(app.name()), escapeJson(app.contextPath()), escapeJson(app.status())));
+                    sb.append("{\"name\":\"%s\",\"contextPath\":\"%s\",\"status\":\"%s\",\"type\":\"%s\"}".formatted(
+                            escapeJson(app.name()), escapeJson(app.contextPath()), escapeJson(app.status()), type));
                 }
             }
         } catch (Exception ignored) {}

@@ -26,7 +26,19 @@ public class ServletBodyInputStream extends ServletInputStream {
 
     @Override
     public void setReadListener(ReadListener readListener) {
-        throw new UnsupportedOperationException("Async IO is not implemented yet");
+        if (readListener == null) {
+            throw new NullPointerException("ReadListener must not be null");
+        }
+        // Since the body is already fully buffered in memory, we can immediately
+        // notify the listener that data is available and reading is complete.
+        try {
+            readListener.onDataAvailable();
+            if (isFinished()) {
+                readListener.onAllDataRead();
+            }
+        } catch (IOException e) {
+            readListener.onError(e);
+        }
     }
 
     @Override

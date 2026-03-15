@@ -20,9 +20,33 @@ import javax.management.MBeanAttributeInfo;
 
 public class LocalAdminClient implements AdminClient {
 
+    /**
+     * Callback interface for application deployment operations.
+     * Set via {@link #setDeployHandler(DeployHandler)} from bootstrap to wire
+     * the real {@code DeploymentRegistry} without circular module dependencies.
+     */
+    public interface DeployHandler {
+        void deploy(String path, String contextPath);
+        void undeploy(String appName);
+        void redeploy(String appName);
+        void startApplication(String appName);
+        void stopApplication(String appName);
+        List<AppSummary> listApplications();
+    }
+
+    private static volatile DeployHandler deployHandler;
+
+    /**
+     * Sets the global deploy handler. Called once from bootstrap after DeploymentRegistry is created.
+     */
+    public static void setDeployHandler(DeployHandler handler) {
+        deployHandler = handler;
+    }
+
     private final ServerConfiguration configuration;
     private final Map<String, String> logLevels = new ConcurrentHashMap<>();
     private final Map<String, String> users = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, String>> domains = new ConcurrentHashMap<>();
     private final long startTimeMillis = System.currentTimeMillis();
 
     public LocalAdminClient(ServerConfiguration configuration) {
@@ -32,6 +56,11 @@ public class LocalAdminClient implements AdminClient {
         logLevels.put("io.velo.was.transport", "INFO");
         logLevels.put("io.velo.was.servlet", "INFO");
         users.put("admin", "admin");
+
+        Map<String, String> defaultProps = new ConcurrentHashMap<>();
+        defaultProps.put("admin.port", String.valueOf(configuration.getServer().getListener().getPort()));
+        defaultProps.put("server.name", configuration.getServer().getName());
+        domains.put("default", defaultProps);
     }
 
     @Override
@@ -49,35 +78,60 @@ public class LocalAdminClient implements AdminClient {
 
     @Override
     public List<DomainSummary> listDomains() {
-        return List.of(new DomainSummary("default", "RUNNING"));
+        return domains.keySet().stream()
+                .map(name -> new DomainSummary(name, "RUNNING"))
+                .toList();
     }
 
     @Override
     public DomainStatus domainInfo(String domainName) {
-        Map<String, String> props = new LinkedHashMap<>();
-        props.put("admin.port", String.valueOf(configuration.getServer().getListener().getPort()));
+        Map<String, String> domainProps = domains.get(domainName);
+        if (domainProps == null) {
+            throw new IllegalArgumentException("Domain not found: " + domainName);
+        }
+        Map<String, String> props = new LinkedHashMap<>(domainProps);
         return new DomainStatus(domainName, "RUNNING",
                 configuration.getServer().getName(), 1, props);
     }
 
     @Override
     public void createDomain(String domainName) {
-        throw new UnsupportedOperationException("Domain creation not supported in local mode");
+        if (domains.containsKey(domainName)) {
+            throw new IllegalArgumentException("Domain already exists: " + domainName);
+        }
+        domains.put(domainName, new ConcurrentHashMap<>());
     }
 
     @Override
     public void removeDomain(String domainName) {
-        throw new UnsupportedOperationException("Domain removal not supported in local mode");
+        if ("default".equals(domainName)) {
+            throw new IllegalArgumentException("Cannot remove the default domain");
+        }
+        if (domains.remove(domainName) == null) {
+            throw new IllegalArgumentException("Domain not found: " + domainName);
+        }
     }
 
     @Override
     public void setDomainProperty(String domainName, String key, String value) {
-        throw new UnsupportedOperationException("Domain property modification not supported in local mode");
+        Map<String, String> props = domains.get(domainName);
+        if (props == null) {
+            throw new IllegalArgumentException("Domain not found: " + domainName);
+        }
+        props.put(key, value);
     }
 
     @Override
     public String getDomainProperty(String domainName, String key) {
-        throw new UnsupportedOperationException("Domain property query not supported in local mode");
+        Map<String, String> props = domains.get(domainName);
+        if (props == null) {
+            throw new IllegalArgumentException("Domain not found: " + domainName);
+        }
+        String value = props.get(key);
+        if (value == null) {
+            throw new IllegalArgumentException("Property not found: " + key + " in domain: " + domainName);
+        }
+        return value;
     }
 
     // ── Server ──
@@ -176,37 +230,67 @@ public class LocalAdminClient implements AdminClient {
 
     @Override
     public List<AppSummary> listApplications() {
+        if (deployHandler != null) {
+            return deployHandler.listApplications();
+        }
         return List.of();
     }
 
     @Override
     public AppStatus applicationInfo(String appName) {
+        // Find from list
+        List<AppSummary> apps = listApplications();
+        for (AppSummary app : apps) {
+            if (app.name().equals(appName)) {
+                return new AppStatus(app.name(), app.contextPath(), app.status(), 0, 0);
+            }
+        }
         throw new UnsupportedOperationException("Application not found: " + appName);
     }
 
     @Override
     public void deploy(String path, String contextPath) {
-        throw new UnsupportedOperationException("Deploy not yet implemented");
+        if (deployHandler != null) {
+            deployHandler.deploy(path, contextPath);
+            return;
+        }
+        throw new UnsupportedOperationException("Deploy handler not configured. Server may need restart.");
     }
 
     @Override
     public void undeploy(String appName) {
-        throw new UnsupportedOperationException("Undeploy not yet implemented");
+        if (deployHandler != null) {
+            deployHandler.undeploy(appName);
+            return;
+        }
+        throw new UnsupportedOperationException("Deploy handler not configured. Server may need restart.");
     }
 
     @Override
     public void redeploy(String appName) {
-        throw new UnsupportedOperationException("Redeploy not yet implemented");
+        if (deployHandler != null) {
+            deployHandler.redeploy(appName);
+            return;
+        }
+        throw new UnsupportedOperationException("Deploy handler not configured. Server may need restart.");
     }
 
     @Override
     public void startApplication(String appName) {
-        throw new UnsupportedOperationException("Start application not yet implemented");
+        if (deployHandler != null) {
+            deployHandler.startApplication(appName);
+            return;
+        }
+        throw new UnsupportedOperationException("Deploy handler not configured. Server may need restart.");
     }
 
     @Override
     public void stopApplication(String appName) {
-        throw new UnsupportedOperationException("Stop application not yet implemented");
+        if (deployHandler != null) {
+            deployHandler.stopApplication(appName);
+            return;
+        }
+        throw new UnsupportedOperationException("Deploy handler not configured. Server may need restart.");
     }
 
     // ── Datasource ──

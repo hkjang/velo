@@ -1,5 +1,7 @@
 package io.velo.was.bootstrap;
 
+import io.velo.was.admin.client.AdminClient;
+import io.velo.was.admin.client.LocalAdminClient;
 import io.velo.was.config.ServerConfiguration;
 import io.velo.was.deploy.DeploymentRegistry;
 import io.velo.was.deploy.HotDeployWatcher;
@@ -65,6 +67,65 @@ public final class VeloWasApplication {
         Path deployDir = Path.of(deployConfig.getDirectory());
         WarDeployer warDeployer = new WarDeployer(deployDir.resolve(".work"));
         DeploymentRegistry deploymentRegistry = new DeploymentRegistry(warDeployer, servletContainer);
+
+        // Wire deploy handler so LocalAdminClient can delegate deploy operations
+        LocalAdminClient.setDeployHandler(new LocalAdminClient.DeployHandler() {
+            @Override
+            public void deploy(String path, String contextPath) {
+                Path warPath = Path.of(path);
+                if (!Files.exists(warPath)) {
+                    throw new UnsupportedOperationException("File not found: " + path);
+                }
+                if (contextPath != null && !contextPath.isBlank()) {
+                    // Deploy with custom context path via WarDeployer directly
+                    try {
+                        WarDeployer.DeploymentResult result = warDeployer.deploy(warPath, contextPath);
+                        servletContainer.deploy(result.application());
+                        log.info("Deployed via admin: {} -> {}", path, contextPath);
+                    } catch (Exception e) {
+                        throw new UnsupportedOperationException("Deploy failed: " + e.getMessage());
+                    }
+                } else {
+                    deploymentRegistry.deploy(warPath);
+                }
+            }
+
+            @Override
+            public void undeploy(String appName) {
+                deploymentRegistry.undeploy(appName);
+            }
+
+            @Override
+            public void redeploy(String appName) {
+                // Find WAR path from deploy directory
+                Path warFile = Path.of(deployConfig.getDirectory(), appName + ".war");
+                if (Files.exists(warFile)) {
+                    deploymentRegistry.redeploy(warFile);
+                } else {
+                    throw new UnsupportedOperationException("WAR file not found for redeploy: " + warFile);
+                }
+            }
+
+            @Override
+            public void startApplication(String appName) {
+                throw new UnsupportedOperationException("Start application not supported. Use redeploy.");
+            }
+
+            @Override
+            public void stopApplication(String appName) {
+                deploymentRegistry.undeploy(appName);
+            }
+
+            @Override
+            public java.util.List<AdminClient.AppSummary> listApplications() {
+                java.util.List<AdminClient.AppSummary> apps = new java.util.ArrayList<>();
+                for (SimpleServletContainer.DeployedAppInfo info : servletContainer.listDeployedApplications()) {
+                    apps.add(new AdminClient.AppSummary(info.name(), info.contextPath(), "RUNNING"));
+                }
+                return apps;
+            }
+        });
+        log.info("Deploy handler wired for admin operations");
 
         if (Files.exists(deployDir)) {
             try (Stream<Path> warFiles = Files.list(deployDir)

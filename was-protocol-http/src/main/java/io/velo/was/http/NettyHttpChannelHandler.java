@@ -120,7 +120,16 @@ public class NettyHttpChannelHandler extends SimpleChannelInboundHandler<FullHtt
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        ErrorLog.log(NettyHttpChannelHandler.class.getName(), "Netty pipeline error", cause);
+        // Connection reset by client (e.g. browser closed SSE, navigated away) — expected, not an error
+        if (cause instanceof java.io.IOException && !ctx.channel().isActive()) {
+            log.debug("Client disconnected: {} - {}", ctx.channel().remoteAddress(), cause.getMessage());
+        } else if (cause instanceof java.io.IOException
+                && cause.getMessage() != null
+                && (cause.getMessage().contains("reset") || cause.getMessage().contains("중단"))) {
+            log.debug("Connection reset by peer: {} - {}", ctx.channel().remoteAddress(), cause.getMessage());
+        } else {
+            ErrorLog.log(NettyHttpChannelHandler.class.getName(), "Netty pipeline error", cause);
+        }
         ctx.close();
     }
 

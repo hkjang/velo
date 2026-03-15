@@ -67,6 +67,17 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         return sessionStore;
     }
 
+    /** Returns summaries of all deployed applications (for admin/monitoring). */
+    public List<DeployedAppInfo> listDeployedApplications() {
+        return applications.values().stream()
+                .map(app -> new DeployedAppInfo(app.name(), app.contextPath(),
+                        app.servlets().size(), app.filters().size()))
+                .toList();
+    }
+
+    /** Read-only info record for deployed applications. */
+    public record DeployedAppInfo(String name, String contextPath, int servletCount, int filterCount) {}
+
     @Override
     public void close() {
         sessionScheduler.close();
@@ -460,12 +471,24 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         if ("/".equals(mapping) || mapping.startsWith("*.")) {
             return applicationRelative;
         }
+        // Path-prefix mapping: /path/* → servletPath = /path
+        if (mapping.endsWith("/*")) {
+            return mapping.substring(0, mapping.length() - 2);
+        }
         return mapping;
     }
 
     private String resolvePathInfo(String applicationRelative, String mapping) {
         if ("/".equals(mapping) || mapping.startsWith("*.")) {
             return null;
+        }
+        // Path-prefix mapping: /path/* → pathInfo = remainder after prefix
+        if (mapping.endsWith("/*")) {
+            String prefix = mapping.substring(0, mapping.length() - 2);
+            if (applicationRelative.equals(prefix)) {
+                return null;
+            }
+            return applicationRelative.substring(prefix.length());
         }
         if (applicationRelative.equals(mapping)) {
             return null;
@@ -533,6 +556,11 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             if (mapping.startsWith("*.")) {
                 String extension = mapping.substring(1); // ".jsp"
                 return applicationRelative.endsWith(extension);
+            }
+            // Path-prefix mapping: /path/*
+            if (mapping.endsWith("/*")) {
+                String prefix = mapping.substring(0, mapping.length() - 2);
+                return applicationRelative.equals(prefix) || applicationRelative.startsWith(prefix + "/");
             }
             return applicationRelative.equals(mapping) || applicationRelative.startsWith(mapping + "/");
         }

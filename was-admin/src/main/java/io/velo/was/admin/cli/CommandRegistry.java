@@ -17,7 +17,18 @@ public class CommandRegistry {
     }
 
     public Command find(String name) {
-        return commands.get(name);
+        Command command = commands.get(name);
+        if (command != null) {
+            return command;
+        }
+        // Fuzzy match: ignore hyphens (e.g. "listservers" matches "list-servers")
+        String normalized = name.replace("-", "").toLowerCase();
+        for (Map.Entry<String, Command> entry : commands.entrySet()) {
+            if (entry.getKey().replace("-", "").toLowerCase().equals(normalized)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     public List<Command> all() {

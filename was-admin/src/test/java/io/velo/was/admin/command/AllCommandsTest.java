@@ -69,7 +69,7 @@ class AllCommandsTest {
     @DisplayName("Registry에 67개 명령어가 등록되어 있어야 한다")
     void registryShouldContainAllCommands() {
         List<Command> all = registry.all();
-        assertEquals(73, all.size(), "Expected 73 commands, found: " + all.size());
+        assertEquals(74, all.size(), "Expected 74 commands, found: " + all.size());
     }
 
     @Test

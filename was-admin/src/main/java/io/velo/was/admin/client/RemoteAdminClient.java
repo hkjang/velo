@@ -381,6 +381,11 @@ public class RemoteAdminClient implements AdminClient {
     // ── Security ──
 
     @Override
+    public boolean authenticate(String username, String password) {
+        throw new UnsupportedOperationException("Remote authenticate not yet implemented. Admin REST API required.");
+    }
+
+    @Override
     public List<String> listUsers() {
         throw new UnsupportedOperationException("Remote list-users not yet implemented. Admin REST API required.");
     }

@@ -91,6 +91,7 @@ public interface AdminClient extends AutoCloseable {
     String invokeMBeanOperation(String mbeanName, String operation, String[] params);
 
     // ── Security ──
+    boolean authenticate(String username, String password);
     List<String> listUsers();
     void createUser(String username, String password);
     void removeUser(String username);

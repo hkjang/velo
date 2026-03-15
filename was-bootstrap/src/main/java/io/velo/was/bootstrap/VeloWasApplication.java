@@ -13,6 +13,7 @@ import io.velo.was.servlet.SimpleServletContainer;
 import io.velo.was.tcp.bootstrap.TcpListenerManager;
 import io.velo.was.tcp.router.TcpMessageRouter;
 import io.velo.was.transport.netty.NettyServer;
+import io.velo.was.webadmin.WebAdminApplication;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +38,16 @@ public final class VeloWasApplication {
         SimpleServletContainer servletContainer = new SimpleServletContainer(
                 sessionConfig.getPurgeIntervalSeconds(),
                 sessionConfig.getTimeoutSeconds());
+
+        // Deploy Web Admin application (before business apps for bootstrap priority)
+        ServerConfiguration.WebAdmin webAdminConfig = configuration.getServer().getWebAdmin();
+        if (webAdminConfig.isEnabled()) {
+            SimpleServletApplication webAdminApp = WebAdminApplication.create(configuration);
+            servletContainer.deploy(webAdminApp);
+            log.info("Web Admin deployed at context path: {}", webAdminConfig.getContextPath());
+        } else {
+            log.info("Web Admin is disabled");
+        }
 
         // Register JSP servlet for *.jsp handling
         SimpleServletApplication.Builder sampleAppBuilder = SimpleServletApplication.builder("sample-app", "/app")

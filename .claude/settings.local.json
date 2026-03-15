@@ -36,7 +36,27 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(gh release:*)",
-      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" -f \"D:/project/velo/pom.xml\" clean package -DskipTests -q)"
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" -f \"D:/project/velo/pom.xml\" clean package -DskipTests -q)",
+      "Bash(where mvn:*)",
+      "Bash(echo MAVEN_HOME=$MAVEN_HOME)",
+      "Bash(echo PATH=$PATH)",
+      "Read(//c/Program Files/Apache/maven/bin/**)",
+      "Read(//c/Program Files/Maven/bin/**)",
+      "Read(//c/Users/**)",
+      "Bash(cmd.exe /c \"where mvn\")",
+      "Bash(export PATH=\"D:/project/velo/.tools/jdk/jdk-21.0.10+7/bin:$PATH\")",
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" -f D:/project/velo/pom.xml compile -pl was-config,was-webadmin,was-bootstrap -am)",
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" -f D:/project/velo/pom.xml compile -pl was-webadmin,was-bootstrap -am -q)",
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" -f D:/project/velo/pom.xml test -pl was-config,was-webadmin -q)",
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" -f D:/project/velo/pom.xml test -pl was-config,was-webadmin -am -q)",
+      "Bash(JAVA_HOME=D:/project/velo/.tools/jdk/jdk-21.0.10+7 D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn compile -pl was-webadmin -am -q)",
+      "Bash(JAVA_HOME=D:/project/velo/.tools/jdk/jdk-21.0.10+7 D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn compile -pl was-bootstrap -am -q)",
+      "Bash(JAVA_HOME=D:/project/velo/.tools/jdk/jdk-21.0.10+7 D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn test -pl was-webadmin -am -q)",
+      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn compile -pl was-webadmin -am)",
+      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn clean compile -pl was-webadmin -am)",
+      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn test -pl was-webadmin -am)",
+      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn clean compile test -pl was-webadmin -am)",
+      "Bash(JAVA_HOME=\".tools/jdk/jdk-21.0.10+7\" .tools/maven/apache-maven-3.9.13/bin/mvn clean compile -pl was-webadmin -am -q)"
     ]
   }
 }

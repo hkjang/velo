@@ -35,6 +35,7 @@ public class ServerConfiguration {
         private Compression compression = new Compression();
         private Session session = new Session();
         private Deploy deploy = new Deploy();
+        private WebAdmin webAdmin = new WebAdmin();
         private List<TcpListenerConfig> tcpListeners = new ArrayList<>();
 
         public String getName() {
@@ -117,6 +118,14 @@ public class ServerConfiguration {
             this.deploy = deploy;
         }
 
+        public WebAdmin getWebAdmin() {
+            return webAdmin;
+        }
+
+        public void setWebAdmin(WebAdmin webAdmin) {
+            this.webAdmin = webAdmin;
+        }
+
         public List<TcpListenerConfig> getTcpListeners() {
             return tcpListeners;
         }
@@ -147,6 +156,9 @@ public class ServerConfiguration {
             }
             if (deploy == null) {
                 deploy = new Deploy();
+            }
+            if (webAdmin == null) {
+                webAdmin = new WebAdmin();
             }
             if (tcpListeners == null) {
                 tcpListeners = new ArrayList<>();
@@ -446,6 +458,16 @@ public class ServerConfiguration {
         public void setHotDeploy(boolean hotDeploy) { this.hotDeploy = hotDeploy; }
         public int getScanIntervalSeconds() { return scanIntervalSeconds; }
         public void setScanIntervalSeconds(int scanIntervalSeconds) { this.scanIntervalSeconds = scanIntervalSeconds; }
+    }
+
+    public static class WebAdmin {
+        private boolean enabled = true;
+        private String contextPath = "/admin";
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getContextPath() { return contextPath; }
+        public void setContextPath(String contextPath) { this.contextPath = contextPath; }
     }
 
     public static class TcpListenerConfig {

@@ -509,6 +509,13 @@ public class LocalAdminClient implements AdminClient {
     // ── Security ──
 
     @Override
+    public boolean authenticate(String username, String password) {
+        if (username == null || password == null) return false;
+        String stored = users.get(username);
+        return password.equals(stored);
+    }
+
+    @Override
     public List<String> listUsers() {
         return List.copyOf(users.keySet());
     }

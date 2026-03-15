@@ -74,7 +74,7 @@ class ServletRequestContext {
         this.dispatcherType = dispatcherType;
         this.sessionState = sessionState;
         this.attributes = attributes;
-        this.parameters = parseParameters(exchange.request().uri(), charset());
+        this.parameters = parseAllParameters(exchange, charset());
         if (this.sessionState != null) {
             this.sessionState.touch();
         }
@@ -271,6 +271,46 @@ class ServletRequestContext {
 
     public InetSocketAddress localAddress() {
         return (InetSocketAddress) exchange.localAddress();
+    }
+
+    private static Map<String, List<String>> parseAllParameters(HttpExchange exchange, Charset charset) {
+        Map<String, List<String>> params = new LinkedHashMap<>();
+
+        // 1. Parse query string parameters from URI
+        mergeQueryString(params, exchange.request().uri(), charset);
+
+        // 2. Parse POST body parameters (application/x-www-form-urlencoded)
+        FullHttpRequest request = exchange.request();
+        String method = request.method().name();
+        if (("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method))
+                && request.content().readableBytes() > 0) {
+            String contentType = request.headers().get("Content-Type");
+            if (contentType != null && contentType.toLowerCase(Locale.ROOT).contains("application/x-www-form-urlencoded")) {
+                String body = request.content().toString(charset);
+                for (String part : body.split("&")) {
+                    if (part.isBlank()) continue;
+                    String[] pair = part.split("=", 2);
+                    String key = java.net.URLDecoder.decode(pair[0], charset);
+                    String value = pair.length > 1 ? java.net.URLDecoder.decode(pair[1], charset) : "";
+                    params.computeIfAbsent(key, ignored -> new ArrayList<>()).add(value);
+                }
+            }
+        }
+
+        return params;
+    }
+
+    private static void mergeQueryString(Map<String, List<String>> params, String uri, Charset charset) {
+        int queryStart = uri.indexOf('?');
+        if (queryStart < 0 || queryStart == uri.length() - 1) return;
+        String query = uri.substring(queryStart + 1);
+        for (String part : query.split("&")) {
+            if (part.isBlank()) continue;
+            String[] pair = part.split("=", 2);
+            String key = java.net.URLDecoder.decode(pair[0], charset);
+            String value = pair.length > 1 ? java.net.URLDecoder.decode(pair[1], charset) : "";
+            params.computeIfAbsent(key, ignored -> new ArrayList<>()).add(value);
+        }
     }
 
     private static Map<String, List<String>> parseParameters(String uri, Charset charset) {

@@ -34,6 +34,10 @@ server:
       - TLSv1.2
     reloadIntervalSeconds: 30
 
+  webAdmin:
+    enabled: true
+    contextPath: /admin
+
   compression:
     enabled: false
     minResponseSizeBytes: 1024

@@ -24,6 +24,7 @@
         <module>was-admin</module>
         <module>was-jsp</module>
         <module>was-tcp-listener</module>
+        <module>was-webadmin</module>
         <module>was-bootstrap</module>
     </modules>
 

@@ -1,0 +1,75 @@
+server:
+  name: velo-was
+  nodeId: node-2
+  gracefulShutdownMillis: 30000
+
+  listener:
+    host: 0.0.0.0
+    port: 8180
+    soBacklog: 2048
+    reuseAddress: true
+    tcpNoDelay: true
+    keepAlive: true
+    maxContentLength: 10485760
+    idleTimeoutSeconds: 60
+    maxHeaderSize: 8192
+    maxInitialLineLength: 4096
+
+  threading:
+    bossThreads: 1
+    workerThreads: 0
+    businessThreads: 32
+
+  tls:
+    enabled: false
+    mode: PEM
+    certChainFile: ""
+    privateKeyFile: ""
+    privateKeyPassword: ""
+    keyStoreFile: ""
+    keyStorePassword: ""
+    keyStoreType: PKCS12
+    protocols:
+      - TLSv1.3
+      - TLSv1.2
+    reloadIntervalSeconds: 30
+
+  webAdmin:
+    enabled: true
+    contextPath: /admin
+    apiDocsEnabled: true
+
+  compression:
+    enabled: false
+    minResponseSizeBytes: 1024
+    compressionLevel: 6
+
+  session:
+    timeoutSeconds: 1800
+    purgeIntervalSeconds: 60
+
+  deploy:
+    directory: deploy
+    hotDeploy: true
+    scanIntervalSeconds: 2
+
+  jsp:
+    scratchDir: work/jsp-node2
+    developmentMode: true
+    precompile: false
+    reloadIntervalSeconds: 5
+    pageEncoding: UTF-8
+    bufferSize: 8192
+
+  tcpListeners:
+    - name: raw-tcp
+      host: 0.0.0.0
+      port: 9190
+      framing: LENGTH_FIELD
+      framingConfig:
+        lengthFieldOffset: 0
+        lengthFieldLength: 4
+        maxFrameLength: 1048576
+      idleTimeoutSeconds: 300
+      maxConnections: 10000
+      businessThreads: 16

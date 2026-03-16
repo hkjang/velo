@@ -18,7 +18,6 @@ export PATH="$JAVA_HOME/bin:$PATH"
 # ── Defaults ─────────────────────────────────────────────────
 FAT_JAR="$PROJECT_ROOT/was-bootstrap/target/was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar"
 CONFIG_FILE="${VELO_CONFIG:-$PROJECT_ROOT/conf/server.yaml}"
-PID_FILE="$PROJECT_ROOT/velo-was.pid"
 LOG_DIR="$PROJECT_ROOT/logs"
 DAEMON=false
 JVM_OPTS="${VELO_JVM_OPTS:--Xms256m -Xmx1g -XX:+UseZGC}"
@@ -42,10 +41,10 @@ Environment Variables:
   VELO_JVM_OPTS         JVM options (alternative to -j)
 
 Examples:
-  ./bin/start.sh                          # Foreground start
-  ./bin/start.sh -d                       # Daemon mode
-  ./bin/start.sh -c conf/prod.yaml -d     # Custom config, daemon
-  VELO_JVM_OPTS="-Xmx2g" ./bin/start.sh   # Custom JVM options
+  ./bin/start.sh                          # Foreground start (node-1)
+  ./bin/start.sh -d                       # Daemon mode (node-1)
+  ./bin/start.sh -c conf/server-node2.yaml -d   # Start node-2 as daemon
+  VELO_JVM_OPTS="-Xmx2g" ./bin/start.sh         # Custom JVM options
 EOF
 }
 
@@ -80,6 +79,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# ── Derive node-specific PID / log file names ───────────────
+# e.g. conf/server.yaml      -> velo-was.pid / velo-was.out
+#      conf/server-node2.yaml -> velo-was-node2.pid / velo-was-node2.out
+CONFIG_BASENAME="$(basename "$CONFIG_FILE" .yaml)"
+CONFIG_BASENAME="$(basename "$CONFIG_BASENAME" .yml)"
+if [[ "$CONFIG_BASENAME" == "server" ]]; then
+    NODE_SUFFIX=""
+else
+    NODE_SUFFIX="${CONFIG_BASENAME#server}"   # e.g. "-node2"
+fi
+PID_FILE="$PROJECT_ROOT/velo-was${NODE_SUFFIX}.pid"
+LOG_FILE="$LOG_DIR/velo-was${NODE_SUFFIX}.out"
+
 # ── Pre-checks ───────────────────────────────────────────────
 check_jar
 check_already_running
@@ -103,18 +115,18 @@ if $DAEMON; then
         -Dvelo.config="$CONFIG_FILE" \
         -Dvelo.home="$PROJECT_ROOT" \
         -jar "$FAT_JAR" \
-        > "$LOG_DIR/velo-was.out" 2>&1 &
+        > "$LOG_FILE" 2>&1 &
     PID=$!
     echo "$PID" > "$PID_FILE"
     echo "✓ Velo WAS started in daemon mode (PID: $PID)"
-    echo "  Log: $LOG_DIR/velo-was.out"
+    echo "  Log: $LOG_FILE"
     echo "  PID file: $PID_FILE"
 
     # Wait briefly and check if still alive
     sleep 2
     if ! kill -0 "$PID" 2>/dev/null; then
         echo "[ERROR] Server failed to start. Check logs:" >&2
-        tail -20 "$LOG_DIR/velo-was.out"
+        tail -20 "$LOG_FILE"
         rm -f "$PID_FILE"
         exit 1
     fi

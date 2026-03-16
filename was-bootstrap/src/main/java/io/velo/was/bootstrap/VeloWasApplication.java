@@ -32,7 +32,10 @@ public final class VeloWasApplication {
     }
 
     public static void main(String[] args) throws Exception {
-        Path configPath = args.length > 0 ? Path.of(args[0]) : Path.of("conf", "server.yaml");
+        String configProperty = System.getProperty("velo.config");
+        Path configPath = configProperty != null ? Path.of(configProperty)
+                : args.length > 0 ? Path.of(args[0])
+                : Path.of("conf", "server.yaml");
         ServerConfiguration configuration = ServerConfigurationLoader.load(configPath);
         ServerConfiguration.Session sessionConfig = configuration.getServer().getSession();
         ServerConfiguration.Deploy deployConfig = configuration.getServer().getDeploy();

@@ -93,7 +93,13 @@
       "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" -f \"D:/project/velo/pom.xml\" compile -q)",
       "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" -f \"D:/project/velo/pom.xml\" test -Dtest='!WarDeploymentIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false -q)",
       "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" -f \"D:/project/velo/was-servlet-core/pom.xml\" test -Dtest=SimpleServletContainerTest -q)",
-      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" -f \"D:/project/velo/pom.xml\" install -DskipTests -q)"
+      "Bash(\"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn.cmd\" -f \"D:/project/velo/pom.xml\" install -DskipTests -q)",
+      "Bash(tasklist)",
+      "Bash(taskkill /PID 1019488 /F)",
+      "Bash(cmd.exe /c \"taskkill /PID 1019488 /F\")",
+      "Bash(JAVA_HOME=\"D:/project/velo/.tools/jdk/jdk-21.0.10+7\" \".tools/maven/apache-maven-3.9.9/bin/mvn\" -pl was-tcp-listener -am package -q -DskipTests)",
+      "Bash(JAVA_HOME=\"D:/project/velo/.tools/jdk/jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" -pl was-tcp-listener -am package -q -DskipTests)",
+      "Bash(JAVA_HOME=\"D:/project/velo/.tools/jdk/jdk-21.0.10+7\" \"D:/project/velo/.tools/maven/apache-maven-3.9.13/bin/mvn\" -pl was-bootstrap -am package -q -DskipTests)"
     ]
   }
 }

@@ -39,7 +39,7 @@ public class TcpListenerServer implements AutoCloseable {
     private final TcpMessageRouter router;
     private final TcpSessionManager sessionManager;
     private final TcpMetrics metrics;
-    private MessageCodec messageCodec;
+    private java.util.function.Supplier<MessageCodec> codecFactory;
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
@@ -57,8 +57,12 @@ public class TcpListenerServer implements AutoCloseable {
     /**
      * Sets a custom message codec. If not set, DefaultMessageCodec is used.
      */
-    public TcpListenerServer messageCodec(MessageCodec codec) {
-        this.messageCodec = codec;
+    /**
+     * Sets a custom message codec factory. A new codec instance is created per channel.
+     * If not set, DefaultMessageCodec is used.
+     */
+    public TcpListenerServer messageCodec(java.util.function.Supplier<MessageCodec> factory) {
+        this.codecFactory = factory;
         return this;
     }
 
@@ -96,7 +100,8 @@ public class TcpListenerServer implements AutoCloseable {
         }
         final SslContext finalSslContext = sslContext;
 
-        MessageCodec codec = messageCodec != null ? messageCodec : new DefaultMessageCodec();
+        java.util.function.Supplier<MessageCodec> factory =
+                codecFactory != null ? codecFactory : DefaultMessageCodec::new;
 
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)
@@ -135,8 +140,8 @@ public class TcpListenerServer implements AutoCloseable {
                             pipeline.addLast("frameDecoder", frameDecoder);
                         }
 
-                        // Message codec
-                        pipeline.addLast("messageCodec", codec);
+                        // Message codec (new instance per channel — not @Sharable)
+                        pipeline.addLast("messageCodec", factory.get());
 
                         // Business handler
                         pipeline.addLast("handler", new TcpChannelHandler(

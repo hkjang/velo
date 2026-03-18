@@ -114,7 +114,7 @@ class VeloAsyncContext implements AsyncContext {
         if (responseSink != null && !responseContext.isCommitted()) {
             FullHttpResponse nettyResponse = responseContext.toNettyResponse(
                     "HEAD".equals(httpMethod),
-                    sessionHolder.created(),
+                    sessionHolder.shouldSetCookie(),
                     sessionHolder.sessionId());
             responseSink.send(nettyResponse);
         }
@@ -216,7 +216,7 @@ class VeloAsyncContext implements AsyncContext {
     }
 
     interface SessionHolder {
-        boolean created();
+        boolean shouldSetCookie();
         String sessionId();
     }
 }

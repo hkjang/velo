@@ -2,9 +2,13 @@ package io.velo.was.servlet;
 
 import jakarta.servlet.Servlet;
 import jakarta.servlet.Filter;
+import jakarta.servlet.ServletContextAttributeListener;
 import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.ServletRequestListener;
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpSessionAttributeListener;
+import jakarta.servlet.http.HttpSessionIdListener;
+import jakarta.servlet.http.HttpSessionListener;
 
 import java.util.LinkedHashMap;
 import java.util.ArrayList;
@@ -20,7 +24,11 @@ public class SimpleServletApplication implements ServletApplication {
     private final Map<String, Servlet> servlets;
     private final List<FilterRegistrationSpec> filters;
     private final List<ServletContextListener> servletContextListeners;
+    private final List<ServletContextAttributeListener> servletContextAttributeListeners;
     private final List<ServletRequestListener> servletRequestListeners;
+    private final List<HttpSessionListener> httpSessionListeners;
+    private final List<HttpSessionAttributeListener> httpSessionAttributeListeners;
+    private final List<HttpSessionIdListener> httpSessionIdListeners;
     private final Map<String, String> initParameters;
     private final List<String> welcomeFiles;
 
@@ -30,9 +38,15 @@ public class SimpleServletApplication implements ServletApplication {
                                     Map<String, Servlet> servlets,
                                     List<FilterRegistrationSpec> filters,
                                     List<ServletContextListener> servletContextListeners,
+                                    List<ServletContextAttributeListener> servletContextAttributeListeners,
                                     List<ServletRequestListener> servletRequestListeners,
+                                    List<HttpSessionListener> httpSessionListeners,
+                                    List<HttpSessionAttributeListener> httpSessionAttributeListeners,
+                                    List<HttpSessionIdListener> httpSessionIdListeners,
                                     Map<String, String> initParameters) {
-        this(name, contextPath, classLoader, servlets, filters, servletContextListeners, servletRequestListeners, initParameters, List.of());
+        this(name, contextPath, classLoader, servlets, filters, servletContextListeners,
+                servletContextAttributeListeners, servletRequestListeners, httpSessionListeners,
+                httpSessionAttributeListeners, httpSessionIdListeners, initParameters, List.of());
     }
 
     public SimpleServletApplication(String name,
@@ -41,7 +55,11 @@ public class SimpleServletApplication implements ServletApplication {
                                     Map<String, Servlet> servlets,
                                     List<FilterRegistrationSpec> filters,
                                     List<ServletContextListener> servletContextListeners,
+                                    List<ServletContextAttributeListener> servletContextAttributeListeners,
                                     List<ServletRequestListener> servletRequestListeners,
+                                    List<HttpSessionListener> httpSessionListeners,
+                                    List<HttpSessionAttributeListener> httpSessionAttributeListeners,
+                                    List<HttpSessionIdListener> httpSessionIdListeners,
                                     Map<String, String> initParameters,
                                     List<String> welcomeFiles) {
         this.name = name;
@@ -50,7 +68,11 @@ public class SimpleServletApplication implements ServletApplication {
         this.servlets = new LinkedHashMap<>(servlets);
         this.filters = new ArrayList<>(filters);
         this.servletContextListeners = new ArrayList<>(servletContextListeners);
+        this.servletContextAttributeListeners = new ArrayList<>(servletContextAttributeListeners);
         this.servletRequestListeners = new ArrayList<>(servletRequestListeners);
+        this.httpSessionListeners = new ArrayList<>(httpSessionListeners);
+        this.httpSessionAttributeListeners = new ArrayList<>(httpSessionAttributeListeners);
+        this.httpSessionIdListeners = new ArrayList<>(httpSessionIdListeners);
         this.initParameters = new LinkedHashMap<>(initParameters);
         this.welcomeFiles = new ArrayList<>(welcomeFiles);
     }
@@ -90,8 +112,28 @@ public class SimpleServletApplication implements ServletApplication {
     }
 
     @Override
+    public List<ServletContextAttributeListener> servletContextAttributeListeners() {
+        return List.copyOf(servletContextAttributeListeners);
+    }
+
+    @Override
     public List<ServletRequestListener> servletRequestListeners() {
         return List.copyOf(servletRequestListeners);
+    }
+
+    @Override
+    public List<HttpSessionListener> httpSessionListeners() {
+        return List.copyOf(httpSessionListeners);
+    }
+
+    @Override
+    public List<HttpSessionAttributeListener> httpSessionAttributeListeners() {
+        return List.copyOf(httpSessionAttributeListeners);
+    }
+
+    @Override
+    public List<HttpSessionIdListener> httpSessionIdListeners() {
+        return List.copyOf(httpSessionIdListeners);
     }
 
     @Override
@@ -118,7 +160,11 @@ public class SimpleServletApplication implements ServletApplication {
         private final Map<String, Servlet> servlets = new LinkedHashMap<>();
         private final List<FilterRegistrationSpec> filters = new ArrayList<>();
         private final List<ServletContextListener> servletContextListeners = new ArrayList<>();
+        private final List<ServletContextAttributeListener> servletContextAttributeListeners = new ArrayList<>();
         private final List<ServletRequestListener> servletRequestListeners = new ArrayList<>();
+        private final List<HttpSessionListener> httpSessionListeners = new ArrayList<>();
+        private final List<HttpSessionAttributeListener> httpSessionAttributeListeners = new ArrayList<>();
+        private final List<HttpSessionIdListener> httpSessionIdListeners = new ArrayList<>();
         private final Map<String, String> initParameters = new LinkedHashMap<>();
         private final List<String> welcomeFiles = new ArrayList<>();
 
@@ -160,8 +206,28 @@ public class SimpleServletApplication implements ServletApplication {
             return this;
         }
 
+        public Builder servletContextAttributeListener(ServletContextAttributeListener listener) {
+            servletContextAttributeListeners.add(listener);
+            return this;
+        }
+
         public Builder servletRequestListener(ServletRequestListener listener) {
             servletRequestListeners.add(listener);
+            return this;
+        }
+
+        public Builder httpSessionListener(HttpSessionListener listener) {
+            httpSessionListeners.add(listener);
+            return this;
+        }
+
+        public Builder httpSessionAttributeListener(HttpSessionAttributeListener listener) {
+            httpSessionAttributeListeners.add(listener);
+            return this;
+        }
+
+        public Builder httpSessionIdListener(HttpSessionIdListener listener) {
+            httpSessionIdListeners.add(listener);
             return this;
         }
 
@@ -183,7 +249,11 @@ public class SimpleServletApplication implements ServletApplication {
                     servlets,
                     filters,
                     servletContextListeners,
+                    servletContextAttributeListeners,
                     servletRequestListeners,
+                    httpSessionListeners,
+                    httpSessionAttributeListeners,
+                    httpSessionIdListeners,
                     initParameters,
                     welcomeFiles);
         }

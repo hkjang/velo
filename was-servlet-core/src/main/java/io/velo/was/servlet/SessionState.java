@@ -2,18 +2,23 @@ package io.velo.was.servlet;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SessionState {
 
-    private final String id;
-    private final long creationTime = System.currentTimeMillis();
-    private volatile long lastAccessedTime = creationTime;
+    private volatile String id;
+    private final long creationTime;
+    private volatile long lastAccessedTime;
     private volatile boolean valid = true;
     private volatile int maxInactiveIntervalSeconds = 1800; // 30 minutes default
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
+    private volatile SessionNotifier notifier = SessionNotifier.NO_OP;
+    private final AtomicBoolean destroyedEventFired = new AtomicBoolean(false);
 
     public SessionState(String id) {
         this.id = id;
+        this.creationTime = System.currentTimeMillis();
+        this.lastAccessedTime = creationTime;
     }
 
     public String getId() {
@@ -70,5 +75,61 @@ public class SessionState {
     public Map<String, Object> attributes() {
         return attributes;
     }
-}
 
+    void setId(String id) {
+        this.id = id;
+    }
+
+    void setNotifier(SessionNotifier notifier) {
+        this.notifier = notifier == null ? SessionNotifier.NO_OP : notifier;
+    }
+
+    void fireSessionCreated() {
+        notifier.sessionCreated(this);
+    }
+
+    void fireSessionDestroyed() {
+        if (destroyedEventFired.compareAndSet(false, true)) {
+            notifier.sessionDestroyed(this);
+        }
+    }
+
+    void fireSessionIdChanged(String oldSessionId) {
+        notifier.sessionIdChanged(this, oldSessionId);
+    }
+
+    void fireAttributeAdded(String name, Object value) {
+        notifier.attributeAdded(this, name, value);
+    }
+
+    void fireAttributeRemoved(String name, Object value) {
+        notifier.attributeRemoved(this, name, value);
+    }
+
+    void fireAttributeReplaced(String name, Object oldValue) {
+        notifier.attributeReplaced(this, name, oldValue);
+    }
+
+    interface SessionNotifier {
+        SessionNotifier NO_OP = new SessionNotifier() {
+        };
+
+        default void sessionCreated(SessionState state) {
+        }
+
+        default void sessionDestroyed(SessionState state) {
+        }
+
+        default void sessionIdChanged(SessionState state, String oldSessionId) {
+        }
+
+        default void attributeAdded(SessionState state, String name, Object value) {
+        }
+
+        default void attributeRemoved(SessionState state, String name, Object value) {
+        }
+
+        default void attributeReplaced(SessionState state, String name, Object oldValue) {
+        }
+    }
+}

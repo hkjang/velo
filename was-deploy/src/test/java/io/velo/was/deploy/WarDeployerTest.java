@@ -35,6 +35,11 @@ class WarDeployerTest {
         assertTrue(app.servlets().containsKey("/hello"));
         assertEquals(1, app.filters().size());
         assertEquals("world", app.initParameters().get("greeting"));
+        assertEquals(1, app.servletContextListeners().size());
+        assertEquals(1, app.servletContextAttributeListeners().size());
+        assertEquals(1, app.httpSessionListeners().size());
+        assertEquals(1, app.httpSessionAttributeListeners().size());
+        assertEquals(1, app.httpSessionIdListeners().size());
     }
 
     @Test
@@ -143,9 +148,20 @@ class WarDeployerTest {
         String listenerSource = """
                 package test;
                 import jakarta.servlet.*;
-                public class TestListener implements ServletContextListener {
+                import jakarta.servlet.http.*;
+                public class TestListener implements ServletContextListener, ServletContextAttributeListener,
+                        HttpSessionListener, HttpSessionAttributeListener, HttpSessionIdListener {
                     public void contextInitialized(ServletContextEvent sce) {}
                     public void contextDestroyed(ServletContextEvent sce) {}
+                    public void attributeAdded(ServletContextAttributeEvent event) {}
+                    public void attributeRemoved(ServletContextAttributeEvent event) {}
+                    public void attributeReplaced(ServletContextAttributeEvent event) {}
+                    public void sessionCreated(HttpSessionEvent se) {}
+                    public void sessionDestroyed(HttpSessionEvent se) {}
+                    public void attributeAdded(HttpSessionBindingEvent event) {}
+                    public void attributeRemoved(HttpSessionBindingEvent event) {}
+                    public void attributeReplaced(HttpSessionBindingEvent event) {}
+                    public void sessionIdChanged(HttpSessionEvent event, String oldSessionId) {}
                 }
                 """;
         compileAndPlaceClass(classes, "test.TestListener", listenerSource);

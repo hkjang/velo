@@ -43,11 +43,23 @@ public class InMemoryHttpSessionStore {
     }
 
     public SessionState create() {
-        String sessionId = UUID.randomUUID().toString().replace("-", "");
+        String sessionId = nextSessionId();
         SessionState state = new SessionState(sessionId);
         state.setMaxInactiveIntervalSeconds(defaultMaxInactiveIntervalSeconds);
         sessions.put(sessionId, state);
         return state;
+    }
+
+    public String changeSessionId(SessionState state) {
+        if (state == null) {
+            throw new IllegalArgumentException("Session state is required");
+        }
+        String oldId = state.getId();
+        String newId = nextSessionId();
+        sessions.remove(oldId, state);
+        state.setId(newId);
+        sessions.put(newId, state);
+        return newId;
     }
 
     public void invalidate(String sessionId) {
@@ -55,6 +67,7 @@ public class InMemoryHttpSessionStore {
             SessionState removed = sessions.remove(sessionId);
             if (removed != null) {
                 removed.invalidate();
+                removed.fireSessionDestroyed();
             }
         }
     }
@@ -91,8 +104,9 @@ public class InMemoryHttpSessionStore {
     }
 
     private void expire(String sessionId, SessionState state) {
-        sessions.remove(sessionId);
+        sessions.remove(sessionId, state);
         state.invalidate();
+        state.fireSessionDestroyed();
         for (Consumer<SessionState> listener : expirationListeners) {
             try {
                 listener.accept(state);
@@ -100,5 +114,9 @@ public class InMemoryHttpSessionStore {
                 log.warn("Session expiration listener error for session={}", sessionId, e);
             }
         }
+    }
+
+    private String nextSessionId() {
+        return UUID.randomUUID().toString().replace("-", "");
     }
 }

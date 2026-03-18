@@ -98,7 +98,7 @@ class ServletResponseContext {
         return committed;
     }
 
-    public FullHttpResponse toNettyResponse(boolean headRequest, boolean newSession, String sessionId) {
+    public FullHttpResponse toNettyResponse(boolean headRequest, boolean setSessionCookie, String sessionId) {
         writer.flush();
         byte[] body = outputStream.toByteArray();
         FullHttpResponse response = new DefaultFullHttpResponse(
@@ -116,7 +116,7 @@ class ServletResponseContext {
         for (Cookie cookie : cookies) {
             response.headers().add(HttpHeaderNames.SET_COOKIE, cookie.getName() + "=" + cookie.getValue() + "; Path=/; HttpOnly");
         }
-        if (newSession && sessionId != null) {
+        if (setSessionCookie && sessionId != null) {
             response.headers().add(HttpHeaderNames.SET_COOKIE, "JSESSIONID=" + sessionId + "; Path=/; HttpOnly");
         }
         committed = true;

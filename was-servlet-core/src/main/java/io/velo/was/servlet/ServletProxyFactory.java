@@ -5,6 +5,8 @@ import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterConfig;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContextAttributeEvent;
+import jakarta.servlet.ServletContextAttributeListener;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
@@ -34,8 +36,10 @@ final class ServletProxyFactory {
                                                ClassLoader classLoader,
                                                Map<String, String> initParameters,
                                                Map<String, Object> serverAttributes,
+                                               java.util.List<ServletContextAttributeListener> attributeListeners,
                                                RequestDispatcherResolver dispatcherResolver) {
         Map<String, Object> attributes = new LinkedHashMap<>();
+        final ServletContext[] contextRef = new ServletContext[1];
 
         InvocationHandler handler = (proxy, method, args) -> switch (method.getName()) {
             case "getContextPath" -> contextPath;
@@ -49,15 +53,29 @@ final class ServletProxyFactory {
                 yield value != null ? value : serverAttributes.get((String) args[0]);
             }
             case "setAttribute" -> {
-                if (args[1] == null) {
-                    attributes.remove((String) args[0]);
+                String name = (String) args[0];
+                Object value = args[1];
+                if (value == null) {
+                    Object removed = attributes.remove(name);
+                    if (removed != null) {
+                        fireContextAttributeRemoved(contextRef[0], attributeListeners, name, removed);
+                    }
                 } else {
-                    attributes.put((String) args[0], args[1]);
+                    Object previous = attributes.put(name, value);
+                    if (previous == null) {
+                        fireContextAttributeAdded(contextRef[0], attributeListeners, name, value);
+                    } else {
+                        fireContextAttributeReplaced(contextRef[0], attributeListeners, name, previous);
+                    }
                 }
                 yield null;
             }
             case "removeAttribute" -> {
-                attributes.remove((String) args[0]);
+                String name = (String) args[0];
+                Object removed = attributes.remove(name);
+                if (removed != null) {
+                    fireContextAttributeRemoved(contextRef[0], attributeListeners, name, removed);
+                }
                 yield null;
             }
             case "getAttributeNames" -> Collections.enumeration(attributes.keySet());
@@ -89,10 +107,12 @@ final class ServletProxyFactory {
             default -> defaultValue(proxy, method, args);
         };
 
-        return (ServletContext) Proxy.newProxyInstance(
+        ServletContext context = (ServletContext) Proxy.newProxyInstance(
                 classLoader,
                 new Class<?>[]{ServletContext.class},
                 handler);
+        contextRef[0] = context;
+        return context;
     }
 
     static ServletConfig createServletConfig(String servletName,
@@ -204,8 +224,7 @@ final class ServletProxyFactory {
                 yield sessionAccessor.session(create);
             }
             case "changeSessionId" -> {
-                HttpSession session = sessionAccessor.session(false);
-                yield session == null ? null : session.getId();
+                yield sessionAccessor.changeSessionId();
             }
             case "isRequestedSessionIdValid" -> sessionAccessor.session(false) != null;
             case "isRequestedSessionIdFromCookie" -> sessionAccessor.session(false) != null;
@@ -333,15 +352,25 @@ final class ServletProxyFactory {
             case "getAttributeNames" -> Collections.enumeration(sessionState.attributes().keySet());
             case "getValueNames" -> sessionState.attributes().keySet().toArray(String[]::new);
             case "setAttribute", "putValue" -> {
-                sessionState.attributes().put((String) args[0], args[1]);
+                String name = (String) args[0];
+                Object newValue = args[1];
+                Object previous = sessionState.attributes().put(name, newValue);
+                if (previous == null) {
+                    sessionState.fireAttributeAdded(name, newValue);
+                } else {
+                    sessionState.fireAttributeReplaced(name, previous);
+                }
                 yield null;
             }
             case "removeAttribute", "removeValue" -> {
-                sessionState.attributes().remove((String) args[0]);
+                String name = (String) args[0];
+                Object removed = sessionState.attributes().remove(name);
+                if (removed != null) {
+                    sessionState.fireAttributeRemoved(name, removed);
+                }
                 yield null;
             }
             case "invalidate" -> {
-                sessionState.invalidate();
                 sessionStore.invalidate(sessionState.getId());
                 yield null;
             }
@@ -401,6 +430,7 @@ final class ServletProxyFactory {
 
     interface SessionAccessor {
         HttpSession session(boolean create);
+        String changeSessionId();
     }
 
     interface RequestDispatcherResolver {
@@ -432,6 +462,36 @@ final class ServletProxyFactory {
                 RequestDispatcher.class.getClassLoader(),
                 new Class<?>[]{RequestDispatcher.class},
                 handler);
+    }
+
+    private static void fireContextAttributeAdded(ServletContext servletContext,
+                                                  java.util.List<ServletContextAttributeListener> listeners,
+                                                  String name,
+                                                  Object value) {
+        ServletContextAttributeEvent event = new ServletContextAttributeEvent(servletContext, name, value);
+        for (ServletContextAttributeListener listener : listeners) {
+            listener.attributeAdded(event);
+        }
+    }
+
+    private static void fireContextAttributeRemoved(ServletContext servletContext,
+                                                    java.util.List<ServletContextAttributeListener> listeners,
+                                                    String name,
+                                                    Object value) {
+        ServletContextAttributeEvent event = new ServletContextAttributeEvent(servletContext, name, value);
+        for (ServletContextAttributeListener listener : listeners) {
+            listener.attributeRemoved(event);
+        }
+    }
+
+    private static void fireContextAttributeReplaced(ServletContext servletContext,
+                                                     java.util.List<ServletContextAttributeListener> listeners,
+                                                     String name,
+                                                     Object previousValue) {
+        ServletContextAttributeEvent event = new ServletContextAttributeEvent(servletContext, name, previousValue);
+        for (ServletContextAttributeListener listener : listeners) {
+            listener.attributeReplaced(event);
+        }
     }
 
     private static String resolveDispatcherPath(ServletRequestContext requestContext, String path) {

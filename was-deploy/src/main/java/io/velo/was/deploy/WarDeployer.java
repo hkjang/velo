@@ -7,8 +7,12 @@ import io.velo.was.servlet.SimpleServletApplication;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.Servlet;
+import jakarta.servlet.ServletContextAttributeListener;
 import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.ServletRequestListener;
+import jakarta.servlet.http.HttpSessionAttributeListener;
+import jakarta.servlet.http.HttpSessionIdListener;
+import jakarta.servlet.http.HttpSessionListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,8 +142,20 @@ public class WarDeployer {
             if (listener instanceof ServletContextListener scl) {
                 appBuilder.servletContextListener(scl);
             }
+            if (listener instanceof ServletContextAttributeListener scal) {
+                appBuilder.servletContextAttributeListener(scal);
+            }
             if (listener instanceof ServletRequestListener srl) {
                 appBuilder.servletRequestListener(srl);
+            }
+            if (listener instanceof HttpSessionListener hsl) {
+                appBuilder.httpSessionListener(hsl);
+            }
+            if (listener instanceof HttpSessionAttributeListener hsal) {
+                appBuilder.httpSessionAttributeListener(hsal);
+            }
+            if (listener instanceof HttpSessionIdListener hsil) {
+                appBuilder.httpSessionIdListener(hsil);
             }
             log.debug("app={} registered listener {}", appName, listenerClass);
         }

@@ -185,10 +185,13 @@ curl http://localhost:8080/app/hello
 | [JNDI / DataSource](docs/ko/jndi-datasource.md) | JNDI 네이밍 + 커넥션 풀 |
 | [Admin CLI](docs/ko/admin-cli.md) | 73개 관리 명령어 레퍼런스 |
 | [라이프사이클](docs/ko/lifecycle.md) | 서버/앱 생명주기 |
+| [제품화 로드맵](docs/ko/roadmap.md) | 우선순위 재정렬 + 6주 실행 계획 |
 
 ## 향후 계획
 
-1. **관리 API**: Admin REST 엔드포인트 (CLI의 RemoteAdminClient 연동)
-2. **JSP 엔진**: 컴파일 기반 JSP 지원
-3. **클러스터 세션**: 분산 세션 복제
-4. **Micrometer / Prometheus 연동**: 외부 메트릭 시스템 통합
+상세 우선순위와 단계별 실행 계획은 [`docs/ko/roadmap.md`](docs/ko/roadmap.md)를 참고한다.
+
+1. **서블릿 스펙 완성도 강화**: `web.xml`, 에러 디스패치, 리스너, 세션 보안 보강
+2. **운영 기능 실데이터화**: CLI/Web Admin이 실제 런타임 상태를 직접 노출
+3. **테스트 자산 확대**: 재배포, 느린 클라이언트, HTTP/2, WebSocket 회귀 테스트
+4. **관측성 표준화**: Prometheus, request id, slow request log, 앱별 메트릭 태깅

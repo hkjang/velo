@@ -11,6 +11,7 @@ import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Servlet;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletContextAttributeListener;
 import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.RequestDispatcher;
@@ -18,6 +19,12 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletRequestEvent;
 import jakarta.servlet.ServletRequestListener;
 import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpSessionAttributeListener;
+import jakarta.servlet.http.HttpSessionBindingEvent;
+import jakarta.servlet.http.HttpSessionEvent;
+import jakarta.servlet.http.HttpSessionIdListener;
+import jakarta.servlet.http.HttpSessionListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -98,12 +105,15 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
 
     @Override
     public void deploy(ServletApplication application) throws Exception {
+        List<ServletContextAttributeListener> servletContextAttributeListeners =
+                List.copyOf(application.servletContextAttributeListeners());
         ServletContext servletContext = ServletProxyFactory.createServletContext(
                 application.contextPath(),
                 application.name(),
                 application.classLoader(),
                 application.initParameters(),
                 serverAttributes,
+                servletContextAttributeListeners,
                 new ServletProxyFactory.RequestDispatcherResolver() {
                     @Override
                     public void forward(String path, jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response) throws Exception {
@@ -137,6 +147,11 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         }
 
         List<ServletContextListener> servletContextListeners = List.copyOf(application.servletContextListeners());
+        List<ServletRequestListener> servletRequestListeners = List.copyOf(application.servletRequestListeners());
+        List<HttpSessionListener> httpSessionListeners = List.copyOf(application.httpSessionListeners());
+        List<HttpSessionAttributeListener> httpSessionAttributeListeners =
+                List.copyOf(application.httpSessionAttributeListeners());
+        List<HttpSessionIdListener> httpSessionIdListeners = List.copyOf(application.httpSessionIdListeners());
         for (ServletContextListener listener : servletContextListeners) {
             listener.contextInitialized(servletContextEvent);
         }
@@ -148,7 +163,11 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 servletRuntimes,
                 filterRuntimes,
                 servletContextListeners,
-                List.copyOf(application.servletRequestListeners()),
+                servletContextAttributeListeners,
+                servletRequestListeners,
+                httpSessionListeners,
+                httpSessionAttributeListeners,
+                httpSessionIdListeners,
                 List.copyOf(application.welcomeFiles())));
     }
 
@@ -217,7 +236,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                     runtime,
                     requestContext,
                     responseContext,
-                    new SessionHolder(requestContext, application.servletContext),
+                    new SessionHolder(application, requestContext, application.servletContext),
                     exchange.request().method().name(),
                     exchange.responseSink(),
                     true);
@@ -226,7 +245,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             }
             return responseContext.toNettyResponse(
                     "HEAD".equals(exchange.request().method().name()),
-                    dispatchResult.sessionHolder.created(),
+                    dispatchResult.sessionHolder.shouldSetCookie(),
                     dispatchResult.sessionHolder.sessionId());
         } catch (Exception exception) {
             return HttpResponses.serverError("Servlet execution failed: " + exception.getMessage());
@@ -284,7 +303,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 runtime,
                 dispatchRequest,
                 sourceResponse,
-                new SessionHolder(dispatchRequest, application.servletContext, sourceRequest.sessionState()),
+                new SessionHolder(application, dispatchRequest, application.servletContext, sourceRequest.sessionState()),
                 sourceRequest.request().method().name(),
                 null,
                 false);
@@ -328,7 +347,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 runtime,
                 dispatchRequest,
                 sourceResponse,
-                new SessionHolder(dispatchRequest, application.servletContext, sourceRequest.sessionState()),
+                new SessionHolder(application, dispatchRequest, application.servletContext, sourceRequest.sessionState()),
                 sourceRequest.request().method().name(),
                 null,
                 false);
@@ -348,7 +367,17 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
 
         HttpServletRequest request = ServletProxyFactory.createRequest(
                 requestContext,
-                sessionHolder::session,
+                new ServletProxyFactory.SessionAccessor() {
+                    @Override
+                    public HttpSession session(boolean create) {
+                        return sessionHolder.session(create);
+                    }
+
+                    @Override
+                    public String changeSessionId() {
+                        return sessionHolder.changeSessionId();
+                    }
+                },
                 new ServletProxyFactory.RequestDispatcherResolver() {
                     @Override
                     public void forward(String path, jakarta.servlet.ServletRequest servletRequest, jakarta.servlet.ServletResponse servletResponse) throws Exception {
@@ -365,8 +394,8 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                     public AsyncContext startAsync(ServletRequest req, ServletResponse res) {
                         VeloAsyncContext.SessionHolder asyncSessionHolder = new VeloAsyncContext.SessionHolder() {
                             @Override
-                            public boolean created() {
-                                return sessionHolder.created();
+                            public boolean shouldSetCookie() {
+                                return sessionHolder.shouldSetCookie();
                             }
 
                             @Override
@@ -553,7 +582,11 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             Map<String, ServletRuntime> servlets,
             List<FilterRuntime> filters,
             List<ServletContextListener> servletContextListeners,
+            List<ServletContextAttributeListener> servletContextAttributeListeners,
             List<ServletRequestListener> servletRequestListeners,
+            List<HttpSessionListener> httpSessionListeners,
+            List<HttpSessionAttributeListener> httpSessionAttributeListeners,
+            List<HttpSessionIdListener> httpSessionIdListeners,
             List<String> welcomeFiles
     ) {
         private boolean matches(String requestPath) {
@@ -669,19 +702,26 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
     }
 
     private final class SessionHolder {
+        private final DeployedApplication application;
         private final ServletRequestContext requestContext;
         private final ServletContext servletContext;
-        private jakarta.servlet.http.HttpSession session;
+        private HttpSession session;
         private boolean created;
+        private boolean sessionCookieUpdated;
 
-        private SessionHolder(ServletRequestContext requestContext, ServletContext servletContext) {
-            this(requestContext, servletContext, requestContext.sessionState());
+        private SessionHolder(DeployedApplication application, ServletRequestContext requestContext, ServletContext servletContext) {
+            this(application, requestContext, servletContext, requestContext.sessionState());
         }
 
-        private SessionHolder(ServletRequestContext requestContext, ServletContext servletContext, SessionState existingSessionState) {
+        private SessionHolder(DeployedApplication application,
+                              ServletRequestContext requestContext,
+                              ServletContext servletContext,
+                              SessionState existingSessionState) {
+            this.application = application;
             this.requestContext = requestContext;
             this.servletContext = servletContext;
             if (existingSessionState != null) {
+                existingSessionState.setNotifier(sessionNotifier());
                 this.session = ServletProxyFactory.createSessionProxy(
                         existingSessionState,
                         sessionStore,
@@ -699,17 +739,88 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             }
             SessionState sessionState = sessionStore.create();
             requestContext.sessionState(sessionState, true);
+            sessionState.setNotifier(sessionNotifier());
             session = ServletProxyFactory.createSessionProxy(sessionState, sessionStore, servletContext, true);
             created = true;
+            sessionState.fireSessionCreated();
             return session;
         }
 
-        private boolean created() {
-            return created;
+        private String changeSessionId() {
+            SessionState sessionState = requestContext.sessionState();
+            if (sessionState == null || !sessionState.isValid()) {
+                throw new IllegalStateException("No session associated with the current request");
+            }
+            String oldSessionId = sessionState.getId();
+            String newSessionId = sessionStore.changeSessionId(sessionState);
+            requestContext.sessionState(sessionState, false);
+            sessionCookieUpdated = true;
+            sessionState.fireSessionIdChanged(oldSessionId);
+            return newSessionId;
+        }
+
+        private boolean shouldSetCookie() {
+            return created || sessionCookieUpdated;
         }
 
         private String sessionId() {
             return session == null ? null : session.getId();
+        }
+
+        private SessionState.SessionNotifier sessionNotifier() {
+            return new SessionState.SessionNotifier() {
+                @Override
+                public void sessionCreated(SessionState state) {
+                    HttpSessionEvent event = new HttpSessionEvent(asSession(state, true));
+                    for (HttpSessionListener listener : application.httpSessionListeners) {
+                        listener.sessionCreated(event);
+                    }
+                }
+
+                @Override
+                public void sessionDestroyed(SessionState state) {
+                    HttpSessionEvent event = new HttpSessionEvent(asSession(state, false));
+                    for (int index = application.httpSessionListeners.size() - 1; index >= 0; index--) {
+                        application.httpSessionListeners.get(index).sessionDestroyed(event);
+                    }
+                }
+
+                @Override
+                public void sessionIdChanged(SessionState state, String oldSessionId) {
+                    HttpSessionEvent event = new HttpSessionEvent(asSession(state, false));
+                    for (HttpSessionIdListener listener : application.httpSessionIdListeners) {
+                        listener.sessionIdChanged(event, oldSessionId);
+                    }
+                }
+
+                @Override
+                public void attributeAdded(SessionState state, String name, Object value) {
+                    HttpSessionBindingEvent event = new HttpSessionBindingEvent(asSession(state, false), name, value);
+                    for (HttpSessionAttributeListener listener : application.httpSessionAttributeListeners) {
+                        listener.attributeAdded(event);
+                    }
+                }
+
+                @Override
+                public void attributeRemoved(SessionState state, String name, Object value) {
+                    HttpSessionBindingEvent event = new HttpSessionBindingEvent(asSession(state, false), name, value);
+                    for (HttpSessionAttributeListener listener : application.httpSessionAttributeListeners) {
+                        listener.attributeRemoved(event);
+                    }
+                }
+
+                @Override
+                public void attributeReplaced(SessionState state, String name, Object oldValue) {
+                    HttpSessionBindingEvent event = new HttpSessionBindingEvent(asSession(state, false), name, oldValue);
+                    for (HttpSessionAttributeListener listener : application.httpSessionAttributeListeners) {
+                        listener.attributeReplaced(event);
+                    }
+                }
+            };
+        }
+
+        private HttpSession asSession(SessionState state, boolean isNew) {
+            return ServletProxyFactory.createSessionProxy(state, sessionStore, servletContext, isNew);
         }
     }
 }

@@ -14,6 +14,8 @@ import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletContextAttributeEvent;
+import jakarta.servlet.ServletContextAttributeListener;
 import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.ServletException;
@@ -24,6 +26,11 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSessionAttributeListener;
+import jakarta.servlet.http.HttpSessionBindingEvent;
+import jakarta.servlet.http.HttpSessionEvent;
+import jakarta.servlet.http.HttpSessionIdListener;
+import jakarta.servlet.http.HttpSessionListener;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -36,6 +43,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -480,6 +489,133 @@ class SimpleServletContainerTest {
 
         completeLatch.await(5, TimeUnit.SECONDS);
         future.get(5, TimeUnit.SECONDS);
+    }
+
+    @Test
+    void firesContextAndSessionListenerEventsAndRotatesSessionId() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        List<String> events = new ArrayList<>();
+
+        container.deploy(SimpleServletApplication.builder("listener-app", "/app")
+                .servletContextListener(new ServletContextListener() {
+                    @Override
+                    public void contextInitialized(ServletContextEvent sce) {
+                        sce.getServletContext().setAttribute("boot", "ready");
+                    }
+                })
+                .servletContextAttributeListener(new ServletContextAttributeListener() {
+                    @Override
+                    public void attributeAdded(ServletContextAttributeEvent event) {
+                        events.add("context-added:" + event.getName() + "=" + event.getValue());
+                    }
+
+                    @Override
+                    public void attributeRemoved(ServletContextAttributeEvent event) {
+                        events.add("context-removed:" + event.getName() + "=" + event.getValue());
+                    }
+
+                    @Override
+                    public void attributeReplaced(ServletContextAttributeEvent event) {
+                        events.add("context-replaced:" + event.getName() + "=" + event.getValue());
+                    }
+                })
+                .httpSessionListener(new HttpSessionListener() {
+                    @Override
+                    public void sessionCreated(HttpSessionEvent se) {
+                        events.add("session-created:" + se.getSession().getId());
+                    }
+
+                    @Override
+                    public void sessionDestroyed(HttpSessionEvent se) {
+                        events.add("session-destroyed:" + se.getSession().getId());
+                    }
+                })
+                .httpSessionAttributeListener(new HttpSessionAttributeListener() {
+                    @Override
+                    public void attributeAdded(HttpSessionBindingEvent event) {
+                        events.add("session-attr-added:" + event.getName() + "=" + event.getValue());
+                    }
+
+                    @Override
+                    public void attributeRemoved(HttpSessionBindingEvent event) {
+                        events.add("session-attr-removed:" + event.getName() + "=" + event.getValue());
+                    }
+
+                    @Override
+                    public void attributeReplaced(HttpSessionBindingEvent event) {
+                        events.add("session-attr-replaced:" + event.getName() + "=" + event.getValue());
+                    }
+                })
+                .httpSessionIdListener((event, oldSessionId) ->
+                        events.add("session-id-changed:" + oldSessionId + "->" + event.getSession().getId()))
+                .servlet("/lifecycle", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        req.getServletContext().setAttribute("mode", "initial");
+                        req.getServletContext().setAttribute("mode", "live");
+                        req.getServletContext().removeAttribute("mode");
+
+                        var session = req.getSession(true);
+                        session.setAttribute("user", "alice");
+                        session.setAttribute("role", "guest");
+                        session.setAttribute("role", "admin");
+                        session.removeAttribute("role");
+
+                        String oldId = session.getId();
+                        String newId = req.changeSessionId();
+                        resp.getWriter().write(oldId + "->" + newId + "|user=" + req.getSession(false).getAttribute("user"));
+                    }
+                })
+                .servlet("/invalidate", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        req.getSession(false).invalidate();
+                        resp.getWriter().write("invalidated");
+                    }
+                })
+                .build());
+
+        FullHttpResponse lifecycleResp = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/lifecycle"),
+                null, null));
+
+        assertEquals(200, lifecycleResp.status().code());
+        String lifecycleBody = lifecycleResp.content().toString(StandardCharsets.UTF_8);
+        String[] parts = lifecycleBody.split("\\|", 2);
+        String[] ids = parts[0].split("->", 2);
+        String oldSessionId = ids[0];
+        String newSessionId = ids[1];
+
+        assertNotEquals(oldSessionId, newSessionId);
+        assertTrue(parts[1].contains("user=alice"));
+        assertEquals(1, container.sessionStore().size());
+        assertNull(container.sessionStore().find(oldSessionId));
+        assertNotNull(container.sessionStore().find(newSessionId));
+
+        String rotatedCookie = lifecycleResp.headers().get(HttpHeaderNames.SET_COOKIE).split(";", 2)[0];
+        assertEquals("JSESSIONID=" + newSessionId, rotatedCookie);
+
+        DefaultFullHttpRequest invalidateReq =
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/invalidate");
+        invalidateReq.headers().set(HttpHeaderNames.COOKIE, rotatedCookie);
+        FullHttpResponse invalidateResp = container.handle(new HttpExchange(invalidateReq, null, null));
+
+        assertEquals(200, invalidateResp.status().code());
+        assertEquals("invalidated", invalidateResp.content().toString(StandardCharsets.UTF_8));
+        assertFalse(events.isEmpty());
+        assertEquals(List.of(
+                        "context-added:boot=ready",
+                        "context-added:mode=initial",
+                        "context-replaced:mode=initial",
+                        "context-removed:mode=live",
+                        "session-created:" + oldSessionId,
+                        "session-attr-added:user=alice",
+                        "session-attr-added:role=guest",
+                        "session-attr-replaced:role=guest",
+                        "session-attr-removed:role=admin",
+                        "session-id-changed:" + oldSessionId + "->" + newSessionId,
+                        "session-destroyed:" + newSessionId),
+                events);
     }
 
     // ────────────────────────────────────────────────────────────────────────

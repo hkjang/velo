@@ -16,7 +16,7 @@ fi
 export PATH="$JAVA_HOME/bin:$PATH"
 
 # ── Defaults ─────────────────────────────────────────────────
-FAT_JAR="$PROJECT_ROOT/was-bootstrap/target/was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar"
+FAT_JAR=""
 CONFIG_FILE="${VELO_CONFIG:-$PROJECT_ROOT/conf/server.yaml}"
 LOG_DIR="$PROJECT_ROOT/logs"
 DAEMON=false
@@ -48,10 +48,24 @@ Examples:
 EOF
 }
 
+find_fat_jar() {
+    local candidates=("$PROJECT_ROOT"/was-bootstrap/target/was-bootstrap-*-jar-with-dependencies.jar)
+    if [[ ${#candidates[@]} -eq 1 && ! -f "${candidates[0]}" ]]; then
+        return 1
+    fi
+    ls -t "${candidates[@]}" 2>/dev/null | head -n 1
+}
+
 check_jar() {
-    if [[ ! -f "$FAT_JAR" ]]; then
+    FAT_JAR="$(find_fat_jar || true)"
+    if [[ -z "$FAT_JAR" || ! -f "$FAT_JAR" ]]; then
         echo "[WARN] Fat jar not found. Building..."
         "$SCRIPT_DIR/build.sh" -p -q
+        FAT_JAR="$(find_fat_jar || true)"
+    fi
+    if [[ -z "$FAT_JAR" || ! -f "$FAT_JAR" ]]; then
+        echo "[ERROR] Fat jar not found under was-bootstrap/target." >&2
+        exit 1
     fi
 }
 
@@ -103,6 +117,7 @@ MAIN_CLASS="io.velo.was.bootstrap.VeloWasApplication"
 echo "════════════════════════════════════════════════════════"
 echo "  Velo WAS - Starting"
 echo "  JAVA_HOME : $JAVA_HOME"
+echo "  Fat Jar   : $FAT_JAR"
 echo "  Config    : $CONFIG_FILE"
 echo "  JVM Opts  : $JVM_OPTS"
 echo "  Mode      : $(if $DAEMON; then echo 'Daemon'; else echo 'Foreground'; fi)"

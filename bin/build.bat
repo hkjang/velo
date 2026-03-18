@@ -27,6 +27,7 @@ if exist "%PROJECT_ROOT%\.tools\maven\apache-maven-3.9.13\bin\mvn.cmd" (
 )
 
 set "PATH=%JAVA_HOME%\bin;%PATH%"
+set "FAT_JAR="
 
 REM ── Default values ───────────────────────────────────────
 set "GOAL=compile"
@@ -85,10 +86,17 @@ echo.
 echo Build completed successfully.
 
 if "%GOAL%"=="package" (
-    set "FAT_JAR=%PROJECT_ROOT%\was-bootstrap\target\was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar"
+    call :find_fat_jar
     if exist "!FAT_JAR!" (
         echo   Artifact: !FAT_JAR!
     )
+)
+exit /b 0
+
+:find_fat_jar
+set "FAT_JAR="
+for /f "delims=" %%F in ('dir /b /a-d /o:-d "%PROJECT_ROOT%\was-bootstrap\target\was-bootstrap-*-jar-with-dependencies.jar" 2^>nul') do (
+    if not defined FAT_JAR set "FAT_JAR=%PROJECT_ROOT%\was-bootstrap\target\%%F"
 )
 exit /b 0
 

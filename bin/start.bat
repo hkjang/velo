@@ -16,7 +16,7 @@ if exist "%PROJECT_ROOT%\.tools\jdk\jdk-21.0.10+7" (
 )
 set "PATH=%JAVA_HOME%\bin;%PATH%"
 
-set "FAT_JAR=%PROJECT_ROOT%\was-bootstrap\target\was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar"
+set "FAT_JAR="
 set "CONFIG_FILE=%PROJECT_ROOT%\conf\server.yaml"
 set "PID_FILE=%PROJECT_ROOT%\velo-was.pid"
 set "LOG_DIR=%PROJECT_ROOT%\logs"
@@ -42,10 +42,16 @@ goto :start_usage
 
 :do_start
 REM Check fat jar
-if not exist "%FAT_JAR%" (
+call :find_fat_jar
+if not defined FAT_JAR (
     echo [WARN] Fat jar not found. Building...
     call "%SCRIPT_DIR%build.bat" -p -q
     if errorlevel 1 exit /b 1
+    call :find_fat_jar
+)
+if not defined FAT_JAR (
+    echo [ERROR] Fat jar not found under was-bootstrap\target.
+    exit /b 1
 )
 
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
@@ -53,6 +59,7 @@ if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 echo ════════════════════════════════════════════════════════
 echo   Velo WAS - Starting
 echo   JAVA_HOME : %JAVA_HOME%
+echo   Fat Jar   : %FAT_JAR%
 echo   Config    : %CONFIG_FILE%
 echo   JVM Opts  : %JVM_OPTS%
 echo   Mode      : %DAEMON%
@@ -64,6 +71,13 @@ if "%DAEMON%"=="true" (
     echo   Log: %LOG_DIR%\velo-was.out
 ) else (
     "%JAVA_HOME%\bin\java.exe" %JVM_OPTS% -Dvelo.config="%CONFIG_FILE%" -Dvelo.home="%PROJECT_ROOT%" -jar "%FAT_JAR%"
+)
+exit /b 0
+
+:find_fat_jar
+set "FAT_JAR="
+for /f "delims=" %%F in ('dir /b /a-d /o:-d "%PROJECT_ROOT%\was-bootstrap\target\was-bootstrap-*-jar-with-dependencies.jar" 2^>nul') do (
+    if not defined FAT_JAR set "FAT_JAR=%PROJECT_ROOT%\was-bootstrap\target\%%F"
 )
 exit /b 0
 

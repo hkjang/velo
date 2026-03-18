@@ -12,6 +12,13 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 
+function Get-BootstrapFatJar {
+    $targetDir = Join-Path $ProjectRoot "was-bootstrap\target"
+    Get-ChildItem -Path $targetDir -Filter "was-bootstrap-*-jar-with-dependencies.jar" -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime, Name -Descending |
+        Select-Object -First 1
+}
+
 if ($Help) {
     Write-Host @"
 Usage: .\bin\start.ps1 [-Config <path>] [-Daemon] [-JvmOpts <opts>]
@@ -41,17 +48,23 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 $Java = Join-Path $env:JAVA_HOME "bin\java.exe"
 
 # ── Config ──
-$FatJar = Join-Path $ProjectRoot "was-bootstrap\target\was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar"
+$fatJarItem = Get-BootstrapFatJar
 if (-not $Config)  { $Config = Join-Path $ProjectRoot "conf\server.yaml" }
 if (-not $JvmOpts) { $JvmOpts = if ($env:VELO_JVM_OPTS) { $env:VELO_JVM_OPTS } else { "-Xms256m -Xmx1g -XX:+UseZGC" } }
 $LogDir = Join-Path $ProjectRoot "logs"
 $PidFile = Join-Path $ProjectRoot "velo-was.pid"
 
 # ── Pre-check ──
-if (-not (Test-Path $FatJar)) {
+if (-not $fatJarItem) {
     Write-Host "[WARN] Fat jar not found. Building..." -ForegroundColor Yellow
     & "$ScriptDir\build.ps1" -Package -Quiet
+    $fatJarItem = Get-BootstrapFatJar
 }
+
+if (-not $fatJarItem) {
+    throw "Fat jar not found under was-bootstrap\\target"
+}
+$FatJar = $fatJarItem.FullName
 
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out-Null }
 
@@ -67,6 +80,7 @@ if (Test-Path $PidFile) {
 Write-Host "════════════════════════════════════════════════════════"
 Write-Host "  Velo WAS - Starting"
 Write-Host "  JAVA_HOME : $env:JAVA_HOME"
+Write-Host "  Fat Jar   : $FatJar"
 Write-Host "  Config    : $Config"
 Write-Host "  JVM Opts  : $JvmOpts"
 Write-Host "  Mode      : $(if ($Daemon) {'Daemon'} else {'Foreground'})"

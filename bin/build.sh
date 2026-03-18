@@ -28,6 +28,14 @@ fi
 
 export PATH="$JAVA_HOME/bin:$PATH"
 
+find_fat_jar() {
+    local candidates=("$PROJECT_ROOT"/was-bootstrap/target/was-bootstrap-*-jar-with-dependencies.jar)
+    if [[ ${#candidates[@]} -eq 1 && ! -f "${candidates[0]}" ]]; then
+        return 1
+    fi
+    ls -t "${candidates[@]}" 2>/dev/null | head -n 1
+}
+
 # ── Module list ──────────────────────────────────────────────
 ALL_MODULES=(
     was-config was-observability was-protocol-http was-transport-netty
@@ -120,8 +128,8 @@ echo "✓ Build completed successfully."
 
 # If packaging, show artifact location
 if [[ "$GOAL" == "package" ]]; then
-    FAT_JAR="$PROJECT_ROOT/was-bootstrap/target/was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar"
-    if [[ -f "$FAT_JAR" ]]; then
+    FAT_JAR="$(find_fat_jar || true)"
+    if [[ -n "$FAT_JAR" && -f "$FAT_JAR" ]]; then
         echo "  Artifact: $FAT_JAR"
         echo "  Size    : $(du -h "$FAT_JAR" | cut -f1)"
     fi

@@ -28,40 +28,42 @@ Write-Host "══════════════════════�
 Write-Host "  Velo WAS - Stopping"
 Write-Host "════════════════════════════════════════════════════════"
 
-$pid = $null
+$serverPid = $null
 
 # Try PID file first
 if (Test-Path $PidFile) {
-    $pid = [int](Get-Content $PidFile -ErrorAction SilentlyContinue)
-    if ($pid -and -not (Get-Process -Id $pid -ErrorAction SilentlyContinue)) {
-        Write-Host "[INFO] PID $pid from file is not running."
+    $serverPid = [int](Get-Content $PidFile -ErrorAction SilentlyContinue)
+    if ($serverPid -and -not (Get-Process -Id $serverPid -ErrorAction SilentlyContinue)) {
+        Write-Host "[INFO] PID $serverPid from file is not running."
         Remove-Item $PidFile -ErrorAction SilentlyContinue
-        $pid = $null
+        $serverPid = $null
     }
 }
 
 # Fallback: search by command line
-if (-not $pid) {
-    $proc = Get-WmiObject Win32_Process -Filter "CommandLine LIKE '%was-bootstrap%jar-with-dependencies%'" -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($proc) { $pid = $proc.ProcessId }
+if (-not $serverPid) {
+    $proc = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -like '*was-bootstrap*jar-with-dependencies.jar*' } |
+        Select-Object -First 1
+    if ($proc) { $serverPid = $proc.ProcessId }
 }
 
-if (-not $pid) {
+if (-not $serverPid) {
     Write-Host "[INFO] No Velo WAS process found."
     return
 }
 
-Write-Host "  Found PID: $pid"
+Write-Host "  Found PID: $serverPid"
 
 if ($Force) {
     Write-Host "  Force killing..."
-    Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+    Stop-Process -Id $serverPid -Force -ErrorAction SilentlyContinue
 } else {
     Write-Host "  Graceful shutdown (timeout: ${Timeout}s)..."
-    Stop-Process -Id $pid -ErrorAction SilentlyContinue
+    Stop-Process -Id $serverPid -ErrorAction SilentlyContinue
 
     $elapsed = 0
-    while ((Get-Process -Id $pid -ErrorAction SilentlyContinue) -and $elapsed -lt $Timeout) {
+    while ((Get-Process -Id $serverPid -ErrorAction SilentlyContinue) -and $elapsed -lt $Timeout) {
         Start-Sleep -Seconds 1
         $elapsed++
         if ($elapsed % 5 -eq 0) {
@@ -69,9 +71,9 @@ if ($Force) {
         }
     }
 
-    if (Get-Process -Id $pid -ErrorAction SilentlyContinue) {
+    if (Get-Process -Id $serverPid -ErrorAction SilentlyContinue) {
         Write-Host "  Timeout. Force killing..."
-        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+        Stop-Process -Id $serverPid -Force -ErrorAction SilentlyContinue
     }
 }
 

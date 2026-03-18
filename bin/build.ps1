@@ -16,6 +16,13 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 
+function Get-BootstrapFatJar {
+    $targetDir = Join-Path $ProjectRoot "was-bootstrap\target"
+    Get-ChildItem -Path $targetDir -Filter "was-bootstrap-*-jar-with-dependencies.jar" -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime, Name -Descending |
+        Select-Object -First 1
+}
+
 if ($Help) {
     Write-Host @"
 Usage: .\bin\build.ps1 [-Clean] [-Test] [-Package] [-Quiet] [modules...]
@@ -97,10 +104,10 @@ Write-Host ""
 Write-Host "Build completed successfully." -ForegroundColor Green
 
 if ($Package) {
-    $fatJar = Join-Path $ProjectRoot "was-bootstrap\target\was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar"
-    if (Test-Path $fatJar) {
-        $size = (Get-Item $fatJar).Length / 1MB
-        Write-Host "  Artifact: $fatJar"
+    $fatJar = Get-BootstrapFatJar
+    if ($fatJar) {
+        $size = $fatJar.Length / 1MB
+        Write-Host "  Artifact: $($fatJar.FullName)"
         Write-Host ("  Size    : {0:N1} MB" -f $size)
     }
 }

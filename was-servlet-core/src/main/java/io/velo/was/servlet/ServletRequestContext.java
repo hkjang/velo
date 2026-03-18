@@ -75,9 +75,6 @@ class ServletRequestContext {
         this.sessionState = sessionState;
         this.attributes = attributes;
         this.parameters = parseAllParameters(exchange, charset());
-        if (this.sessionState != null) {
-            this.sessionState.touch();
-        }
     }
 
     public HttpExchange exchange() {

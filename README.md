@@ -54,7 +54,7 @@ mvn test
 ## 실행
 
 ```bash
-java -jar was-bootstrap/target/was-bootstrap-0.5.1-jar-with-dependencies.jar [config-path]
+java -jar was-bootstrap/target/was-bootstrap-0.5.2-jar-with-dependencies.jar [config-path]
 ```
 
 - `config-path` 미지정 시 `conf/server.yaml` 사용
@@ -185,6 +185,7 @@ curl http://localhost:8080/app/hello
 | [구조화된 로깅](docs/ko/structured-logging.md) | 액세스/에러/감사 로그 + 메트릭 (JSON) |
 | [HTTP/2 + WebSocket](docs/ko/http2-websocket.md) | ALPN, h2c, WebSocket 업그레이드 |
 | [세션 관리](docs/ko/session-management.md) | TTL 만료 + 이중 제거 전략 + 설정 연동 |
+| [클러스터 세션 가이드](docs/ko/cluster-session-guide.md) | 저장소 SPI, sticky session, 비동기 복제, TTL/충돌 일관성 |
 | [JNDI / DataSource](docs/ko/jndi-datasource.md) | JNDI 네이밍 + 커넥션 풀 |
 | [Admin CLI](docs/ko/admin-cli.md) | 73개 관리 명령어 레퍼런스 |
 | [라이프사이클](docs/ko/lifecycle.md) | 서버/앱 생명주기 |

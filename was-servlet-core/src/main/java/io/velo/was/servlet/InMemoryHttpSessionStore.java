@@ -10,7 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-public class InMemoryHttpSessionStore {
+public class InMemoryHttpSessionStore implements HttpSessionStore {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryHttpSessionStore.class);
 
@@ -30,6 +30,7 @@ public class InMemoryHttpSessionStore {
      * Finds a session by ID. Returns {@code null} if the session does not exist
      * or has expired. Expired sessions are automatically removed.
      */
+    @Override
     public SessionState find(String sessionId) {
         if (sessionId == null || sessionId.isBlank()) {
             return null;
@@ -42,6 +43,7 @@ public class InMemoryHttpSessionStore {
         return state;
     }
 
+    @Override
     public SessionState create() {
         String sessionId = nextSessionId();
         SessionState state = new SessionState(sessionId);
@@ -50,6 +52,7 @@ public class InMemoryHttpSessionStore {
         return state;
     }
 
+    @Override
     public String changeSessionId(SessionState state) {
         if (state == null) {
             throw new IllegalArgumentException("Session state is required");
@@ -57,16 +60,18 @@ public class InMemoryHttpSessionStore {
         String oldId = state.getId();
         String newId = nextSessionId();
         sessions.remove(oldId, state);
-        state.setId(newId);
+        state.renameFromStore(newId, state.getOwnerNodeId(), state.getStickyRoute());
         sessions.put(newId, state);
         return newId;
     }
 
+    @Override
     public void invalidate(String sessionId) {
         if (sessionId != null) {
             SessionState removed = sessions.remove(sessionId);
             if (removed != null) {
-                removed.invalidate();
+                removed.setChangeListener(SessionState.ChangeListener.NO_OP);
+                removed.invalidateFromStore();
                 removed.fireSessionDestroyed();
             }
         }
@@ -76,6 +81,7 @@ public class InMemoryHttpSessionStore {
      * Registers a listener that is called when a session expires (TTL exceeded).
      * Used to fire {@code HttpSessionListener.sessionDestroyed} events.
      */
+    @Override
     public void addExpirationListener(Consumer<SessionState> listener) {
         expirationListeners.add(listener);
     }
@@ -84,6 +90,7 @@ public class InMemoryHttpSessionStore {
      * Scans all sessions and removes those that have expired.
      * Returns the number of sessions removed.
      */
+    @Override
     public int purgeExpired() {
         int count = 0;
         for (Map.Entry<String, SessionState> entry : sessions.entrySet()) {
@@ -99,13 +106,15 @@ public class InMemoryHttpSessionStore {
     }
 
     /** Current number of active (non-expired) sessions. */
+    @Override
     public int size() {
         return sessions.size();
     }
 
     private void expire(String sessionId, SessionState state) {
         sessions.remove(sessionId, state);
-        state.invalidate();
+        state.setChangeListener(SessionState.ChangeListener.NO_OP);
+        state.invalidateFromStore();
         state.fireSessionDestroyed();
         for (Consumer<SessionState> listener : expirationListeners) {
             try {

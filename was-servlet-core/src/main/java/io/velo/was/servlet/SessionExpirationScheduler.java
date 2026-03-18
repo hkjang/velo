@@ -15,15 +15,15 @@ public class SessionExpirationScheduler implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(SessionExpirationScheduler.class);
 
-    private final InMemoryHttpSessionStore sessionStore;
+    private final HttpSessionStore sessionStore;
     private final ScheduledExecutorService scheduler;
     private final long intervalSeconds;
 
-    public SessionExpirationScheduler(InMemoryHttpSessionStore sessionStore) {
+    public SessionExpirationScheduler(HttpSessionStore sessionStore) {
         this(sessionStore, 60);
     }
 
-    public SessionExpirationScheduler(InMemoryHttpSessionStore sessionStore, long intervalSeconds) {
+    public SessionExpirationScheduler(HttpSessionStore sessionStore, long intervalSeconds) {
         this.sessionStore = sessionStore;
         this.intervalSeconds = intervalSeconds;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {

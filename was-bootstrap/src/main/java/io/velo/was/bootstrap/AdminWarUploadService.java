@@ -3,8 +3,8 @@ package io.velo.was.bootstrap;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import io.velo.was.servlet.HttpSessionStore;
 import io.velo.was.config.ServerConfiguration;
-import io.velo.was.servlet.InMemoryHttpSessionStore;
 import io.velo.was.servlet.SessionState;
 
 import java.nio.file.Files;
@@ -21,11 +21,11 @@ final class AdminWarUploadService {
 
     private final String uploadPath;
     private final ServerConfiguration configuration;
-    private final InMemoryHttpSessionStore sessionStore;
+    private final HttpSessionStore sessionStore;
     private final UploadDeployer uploadDeployer;
 
     AdminWarUploadService(ServerConfiguration configuration,
-                          InMemoryHttpSessionStore sessionStore,
+                          HttpSessionStore sessionStore,
                           UploadDeployer uploadDeployer) {
         this.configuration = configuration;
         this.sessionStore = sessionStore;

@@ -33,7 +33,7 @@ mvn clean package -DskipTests
 Start the Velo WAS server in the background or in a new terminal window with the following command:
 
 ```sh
-java -jar was-bootstrap/target/was-bootstrap-0.5.1-jar-with-dependencies.jar
+java -jar was-bootstrap/target/was-bootstrap-0.5.2-jar-with-dependencies.jar
 ```
 
 When the `Hot deploy watcher started` message appears in the server startup logs, the server is successfully monitoring the `deploy` directory for automatic deployments.
@@ -54,7 +54,7 @@ cd test-war
 mvn clean package
 
 # Copy the artifact to the Velo WAS deploy directory
-cp target/test-war-0.5.1.war ../deploy/test.war
+cp target/test-war-0.5.2.war ../deploy/test.war
 ```
 
 Since `hotDeploy` is enabled, a successful deployment message will appear in the server logs almost immediately (within ~2 seconds).

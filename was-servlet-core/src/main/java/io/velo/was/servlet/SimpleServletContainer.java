@@ -33,15 +33,15 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 public class SimpleServletContainer implements ServletContainer, AutoCloseable {
 
-    private final InMemoryHttpSessionStore sessionStore;
+    private final HttpSessionStore sessionStore;
     private final SessionExpirationScheduler sessionScheduler;
-    private final int defaultSessionTimeoutSeconds;
     private final Map<String, DeployedApplication> applications = new ConcurrentHashMap<>();
     private final Map<String, Object> serverAttributes = new ConcurrentHashMap<>();
     private final ScheduledExecutorService asyncExecutor =
@@ -64,14 +64,21 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
      * @param defaultSessionTimeoutSeconds default session timeout in seconds
      */
     public SimpleServletContainer(int sessionPurgeIntervalSeconds, int defaultSessionTimeoutSeconds) {
-        this.defaultSessionTimeoutSeconds = defaultSessionTimeoutSeconds;
-        this.sessionStore = new InMemoryHttpSessionStore(defaultSessionTimeoutSeconds);
-        this.sessionScheduler = new SessionExpirationScheduler(sessionStore, sessionPurgeIntervalSeconds);
+        this(new InMemoryHttpSessionStore(defaultSessionTimeoutSeconds), sessionPurgeIntervalSeconds);
+    }
+
+    public SimpleServletContainer(HttpSessionStore sessionStore) {
+        this(sessionStore, 60);
+    }
+
+    public SimpleServletContainer(HttpSessionStore sessionStore, int sessionPurgeIntervalSeconds) {
+        this.sessionStore = Objects.requireNonNull(sessionStore, "sessionStore");
+        this.sessionScheduler = new SessionExpirationScheduler(this.sessionStore, sessionPurgeIntervalSeconds);
         this.sessionScheduler.start();
     }
 
     /** Returns the session store (for testing and monitoring). */
-    public InMemoryHttpSessionStore sessionStore() {
+    public HttpSessionStore sessionStore() {
         return sessionStore;
     }
 
@@ -100,6 +107,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
     @Override
     public void close() {
         sessionScheduler.close();
+        sessionStore.close();
         asyncExecutor.shutdown();
     }
 

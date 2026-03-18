@@ -358,7 +358,7 @@ final class ServletProxyFactory {
     }
 
     static HttpSession createSessionProxy(SessionState sessionState,
-                                          InMemoryHttpSessionStore sessionStore,
+                                          HttpSessionStore sessionStore,
                                           ServletContext servletContext,
                                           boolean isNew) {
         InvocationHandler handler = (proxy, method, args) -> switch (method.getName()) {
@@ -371,13 +371,13 @@ final class ServletProxyFactory {
                 yield null;
             }
             case "getMaxInactiveInterval" -> sessionState.getMaxInactiveIntervalSeconds();
-            case "getAttribute", "getValue" -> sessionState.attributes().get((String) args[0]);
+            case "getAttribute", "getValue" -> sessionState.getAttribute((String) args[0]);
             case "getAttributeNames" -> Collections.enumeration(sessionState.attributes().keySet());
             case "getValueNames" -> sessionState.attributes().keySet().toArray(String[]::new);
             case "setAttribute", "putValue" -> {
                 String name = (String) args[0];
                 Object newValue = args[1];
-                Object previous = sessionState.attributes().put(name, newValue);
+                Object previous = sessionState.putAttribute(name, newValue);
                 if (previous == null) {
                     sessionState.fireAttributeAdded(name, newValue);
                 } else {
@@ -387,7 +387,7 @@ final class ServletProxyFactory {
             }
             case "removeAttribute", "removeValue" -> {
                 String name = (String) args[0];
-                Object removed = sessionState.attributes().remove(name);
+                Object removed = sessionState.removeAttribute(name);
                 if (removed != null) {
                     sessionState.fireAttributeRemoved(name, removed);
                 }

@@ -110,5 +110,5 @@ curl http://localhost:8180/health
 - **포트 충돌**: 각 노드의 HTTP 포트와 TCP 포트가 겹치지 않도록 설정해야 합니다.
 - **JSP 작업 디렉토리**: 노드별로 별도의 `scratchDir`을 지정하여 JSP 컴파일 충돌을 방지합니다.
 - **배포 디렉토리**: 기본적으로 모든 노드가 동일한 `deploy/` 디렉토리를 공유합니다. 노드별 독립 배포가 필요한 경우 `server.deploy.directory`를 변경하세요.
-- **세션 비공유**: 현재 세션은 인메모리 방식으로 노드 간 공유되지 않습니다. 로드밸런서 사용 시 sticky session 설정이 필요합니다.
+- **세션 공유 방식 선택**: 기본 부트스트랩은 여전히 인메모리 세션을 사용합니다. 클러스터 세션을 사용하려면 `ClusteredHttpSessionStore`를 직접 주입해야 합니다. 상세 내용은 [클러스터 세션 사용 및 설정 가이드](cluster-session-guide.md)를 참고하세요.
 - **로그 분리**: 각 노드는 별도의 로그 파일(`logs/velo-was-nodeN.out`)에 출력됩니다.

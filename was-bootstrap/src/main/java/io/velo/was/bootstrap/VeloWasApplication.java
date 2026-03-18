@@ -70,26 +70,21 @@ public final class VeloWasApplication {
         Path deployDir = Path.of(deployConfig.getDirectory());
         WarDeployer warDeployer = new WarDeployer(deployDir.resolve(".work"));
         DeploymentRegistry deploymentRegistry = new DeploymentRegistry(warDeployer, servletContainer);
+        AdminWarUploadService.UploadDeployer uploadDeployer =
+                (warPath, contextPath) -> deployApplication(warDeployer, deploymentRegistry, servletContainer,
+                        configuration, warPath, contextPath);
+        AdminWarUploadService warUploadService =
+                new AdminWarUploadService(configuration, servletContainer.sessionStore(), uploadDeployer);
 
         // Wire deploy handler so LocalAdminClient can delegate deploy operations
         LocalAdminClient.setDeployHandler(new LocalAdminClient.DeployHandler() {
             @Override
             public void deploy(String path, String contextPath) {
-                Path warPath = Path.of(path);
-                if (!Files.exists(warPath)) {
-                    throw new UnsupportedOperationException("File not found: " + path);
-                }
-                if (contextPath != null && !contextPath.isBlank()) {
-                    // Deploy with custom context path via WarDeployer directly
-                    try {
-                        WarDeployer.DeploymentResult result = warDeployer.deploy(warPath, contextPath);
-                        servletContainer.deploy(result.application());
-                        log.info("Deployed via admin: {} -> {}", path, contextPath);
-                    } catch (Exception e) {
-                        throw new UnsupportedOperationException("Deploy failed: " + e.getMessage());
-                    }
-                } else {
-                    deploymentRegistry.deploy(warPath);
+                try {
+                    deployApplication(warDeployer, deploymentRegistry, servletContainer, configuration,
+                            Path.of(path), contextPath);
+                } catch (Exception e) {
+                    throw new UnsupportedOperationException("Deploy failed: " + e.getMessage());
                 }
             }
 
@@ -166,7 +161,11 @@ public final class VeloWasApplication {
                 })
                 .fallback(servletContainer::handle);
 
-        NettyServer server = new NettyServer(configuration.getServer(), registry);
+        NettyServer server = new NettyServer(
+                configuration.getServer(),
+                registry,
+                null,
+                () -> new AdminWarUploadChannelHandler(warUploadService, deployDir.resolve(".upload-staging")));
 
         // Start TCP listeners from configuration
         TcpListenerManager tcpManager = new TcpListenerManager();
@@ -210,6 +209,27 @@ public final class VeloWasApplication {
             servletContainer.close();
             server.close();
             throw exception;
+        }
+    }
+
+    private static void deployApplication(WarDeployer warDeployer,
+                                          DeploymentRegistry deploymentRegistry,
+                                          SimpleServletContainer servletContainer,
+                                          ServerConfiguration configuration,
+                                          Path warPath,
+                                          String contextPath) throws Exception {
+        if (!Files.exists(warPath)) {
+            throw new IllegalArgumentException("File not found: " + warPath);
+        }
+        if (contextPath != null && !contextPath.isBlank()) {
+            WarDeployer.DeploymentResult result = warDeployer.deploy(warPath, contextPath);
+            servletContainer.deploy(result.application());
+            log.info("Deployed via admin: {} -> {}", warPath, contextPath);
+            return;
+        }
+        deploymentRegistry.deploy(warPath);
+        if (!configuration.getServer().getDeploy().isHotDeploy()) {
+            log.info("Deployed via upload without hot deploy: {}", warPath);
         }
     }
 }

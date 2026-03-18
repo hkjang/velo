@@ -2,6 +2,7 @@ package io.velo.was.transport.netty;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -27,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 public class NettyServer implements AutoCloseable {
 
@@ -35,20 +37,28 @@ public class NettyServer implements AutoCloseable {
     private final ServerConfiguration.Server server;
     private final HttpHandlerRegistry registry;
     private final WebSocketHandlerRegistry wsRegistry;
+    private final Supplier<ChannelHandler> httpPipelineHandlerFactory;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
     private ReloadingSslContextProvider sslContextProvider;
 
     public NettyServer(ServerConfiguration.Server server, HttpHandlerRegistry registry) {
-        this(server, registry, null);
+        this(server, registry, null, null);
     }
 
     public NettyServer(ServerConfiguration.Server server, HttpHandlerRegistry registry,
                        WebSocketHandlerRegistry wsRegistry) {
+        this(server, registry, wsRegistry, null);
+    }
+
+    public NettyServer(ServerConfiguration.Server server, HttpHandlerRegistry registry,
+                       WebSocketHandlerRegistry wsRegistry,
+                       Supplier<ChannelHandler> httpPipelineHandlerFactory) {
         this.server = server;
         this.registry = registry;
         this.wsRegistry = wsRegistry;
+        this.httpPipelineHandlerFactory = httpPipelineHandlerFactory;
     }
 
     public void start() throws Exception {
@@ -77,7 +87,7 @@ public class NettyServer implements AutoCloseable {
                             SslContext sslContext = sslContextProvider.current();
                             channel.pipeline().addLast("ssl", sslContext.newHandler(channel.alloc()));
                             channel.pipeline().addLast("alpn",
-                                    new AlpnNegotiationHandler(server, registry, wsRegistry));
+                                    new AlpnNegotiationHandler(server, registry, wsRegistry, httpPipelineHandlerFactory));
                         } else {
                             // ── Cleartext: h2c upgrade + HTTP/1.1 ──
                             configureCleartextPipeline(channel);
@@ -117,14 +127,14 @@ public class NettyServer implements AutoCloseable {
 
         HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
             if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
-                return new Http2ServerUpgradeCodec(
-                        Http2FrameCodecBuilder.forServer().build(),
-                        new Http2MultiplexHandler(
-                                new AlpnNegotiationHandler.Http2StreamChannelInitializer(
-                                        server, registry, wsRegistry)));
-            }
-            return null;
-        };
+                                return new Http2ServerUpgradeCodec(
+                                        Http2FrameCodecBuilder.forServer().build(),
+                                        new Http2MultiplexHandler(
+                                                new AlpnNegotiationHandler.Http2StreamChannelInitializer(
+                                                        server, registry, wsRegistry, httpPipelineHandlerFactory)));
+                            }
+                            return null;
+                        };
 
         HttpServerUpgradeHandler upgradeHandler =
                 new HttpServerUpgradeHandler(sourceCodec, upgradeCodecFactory, maxContentLength);
@@ -139,11 +149,14 @@ public class NettyServer implements AutoCloseable {
                         ch.pipeline().addLast("h2Codec", Http2FrameCodecBuilder.forServer().build());
                         ch.pipeline().addLast("h2Multiplexer", new Http2MultiplexHandler(
                                 new AlpnNegotiationHandler.Http2StreamChannelInitializer(
-                                        server, registry, wsRegistry)));
+                                        server, registry, wsRegistry, httpPipelineHandlerFactory)));
                     }
                 });
 
         channel.pipeline().addLast("h2cUpgrade", h2cHandler);
+        if (httpPipelineHandlerFactory != null) {
+            channel.pipeline().addLast("httpPipelineHandler", httpPipelineHandlerFactory.get());
+        }
 
         // Fallback: if no HTTP/2 upgrade happens, these handlers process HTTP/1.1
         channel.pipeline().addLast("httpAggregator", new HttpObjectAggregator(maxContentLength));

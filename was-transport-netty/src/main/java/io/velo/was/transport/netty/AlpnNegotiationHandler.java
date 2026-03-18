@@ -1,6 +1,7 @@
 package io.velo.was.transport.netty;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -22,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * ALPN-based protocol negotiation handler.
@@ -35,13 +37,17 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
     private final ServerConfiguration.Server serverConfig;
     private final HttpHandlerRegistry registry;
     private final WebSocketHandlerRegistry wsRegistry;
+    private final Supplier<ChannelHandler> httpPipelineHandlerFactory;
 
     AlpnNegotiationHandler(ServerConfiguration.Server serverConfig,
-                           HttpHandlerRegistry registry, WebSocketHandlerRegistry wsRegistry) {
+                           HttpHandlerRegistry registry,
+                           WebSocketHandlerRegistry wsRegistry,
+                           Supplier<ChannelHandler> httpPipelineHandlerFactory) {
         super(ApplicationProtocolNames.HTTP_1_1);
         this.serverConfig = serverConfig;
         this.registry = registry;
         this.wsRegistry = wsRegistry;
+        this.httpPipelineHandlerFactory = httpPipelineHandlerFactory;
     }
 
     @Override
@@ -60,7 +66,7 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
     private void configureHttp2(ChannelPipeline pipeline) {
         pipeline.addLast("h2Codec", Http2FrameCodecBuilder.forServer().build());
         pipeline.addLast("h2Multiplexer", new Http2MultiplexHandler(
-                new Http2StreamChannelInitializer(serverConfig, registry, wsRegistry)));
+                new Http2StreamChannelInitializer(serverConfig, registry, wsRegistry, httpPipelineHandlerFactory)));
     }
 
     private void configureHttp1(ChannelPipeline pipeline) {
@@ -71,6 +77,9 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
                 listener.getMaxInitialLineLength(),
                 listener.getMaxHeaderSize(),
                 8192));
+        if (httpPipelineHandlerFactory != null) {
+            pipeline.addLast("httpPipelineHandler", httpPipelineHandlerFactory.get());
+        }
         pipeline.addLast("httpAggregator", new HttpObjectAggregator(listener.getMaxContentLength()));
         pipeline.addLast("chunkedWriter", new ChunkedWriteHandler());
 
@@ -99,19 +108,25 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
         private final ServerConfiguration.Server serverConfig;
         private final HttpHandlerRegistry registry;
         private final WebSocketHandlerRegistry wsRegistry;
+        private final Supplier<ChannelHandler> httpPipelineHandlerFactory;
 
         Http2StreamChannelInitializer(ServerConfiguration.Server serverConfig,
                                       HttpHandlerRegistry registry,
-                                      WebSocketHandlerRegistry wsRegistry) {
+                                      WebSocketHandlerRegistry wsRegistry,
+                                      Supplier<ChannelHandler> httpPipelineHandlerFactory) {
             this.serverConfig = serverConfig;
             this.registry = registry;
             this.wsRegistry = wsRegistry;
+            this.httpPipelineHandlerFactory = httpPipelineHandlerFactory;
         }
 
         @Override
         protected void initChannel(Channel ch) {
             int maxContentLength = serverConfig.getListener().getMaxContentLength();
             ch.pipeline().addLast("h2ToHttp", new Http2StreamFrameToHttpObjectCodec(true));
+            if (httpPipelineHandlerFactory != null) {
+                ch.pipeline().addLast("httpPipelineHandler", httpPipelineHandlerFactory.get());
+            }
             ch.pipeline().addLast("httpAggregator", new HttpObjectAggregator(maxContentLength));
 
             if (serverConfig.getCompression().isEnabled()) {

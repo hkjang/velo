@@ -7,10 +7,9 @@
     <parent>
         <groupId>io.velo.was</groupId>
         <artifactId>velo-was</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.5.1</version>
     </parent>
 
     <artifactId>was-config</artifactId>
     <name>was-config</name>
 </project>
-

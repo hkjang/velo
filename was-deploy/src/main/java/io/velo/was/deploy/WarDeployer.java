@@ -1,6 +1,7 @@
 package io.velo.was.deploy;
 
 import io.velo.was.classloader.WebAppClassLoader;
+import io.velo.was.servlet.ErrorPageSpec;
 import io.velo.was.servlet.FilterRegistrationSpec;
 import io.velo.was.servlet.ServletApplication;
 import io.velo.was.servlet.SimpleServletApplication;
@@ -62,6 +63,7 @@ public class WarDeployer {
      * @throws Exception if deployment fails
      */
     public DeploymentResult deploy(Path source, String contextPath) throws Exception {
+        String normalizedContextPath = normalizeContextPath(contextPath);
         Path appRoot;
         boolean extracted = false;
 
@@ -72,7 +74,7 @@ public class WarDeployer {
             appRoot = source;
         } else if (source.getFileName().toString().endsWith(".war")) {
             String appName = deriveAppName(source);
-            appRoot = workDirectory.resolve(appName);
+            appRoot = workDirectory.resolve(deriveExtractionDirectoryName(appName, normalizedContextPath));
             WarExtractor.extract(source, appRoot);
             extracted = true;
         } else {
@@ -83,12 +85,12 @@ public class WarDeployer {
         WebXmlDescriptor descriptor = WebXmlParser.parse(webXmlPath);
 
         String appName = descriptor.displayName() != null ? descriptor.displayName() : deriveAppName(source);
-        String normalizedContextPath = normalizeContextPath(contextPath);
 
         WebAppClassLoader classLoader = WebAppClassLoader.create(appName, appRoot, getClass().getClassLoader());
 
         SimpleServletApplication.Builder appBuilder = SimpleServletApplication.builder(appName, normalizedContextPath)
                 .classLoader(classLoader)
+                .initParameter("io.velo.was.webAppRoot", appRoot.toAbsolutePath().toString())
                 .initParameter("io.velo.was.jsp.webAppRoot", appRoot.toAbsolutePath().toString());
 
         // Add context parameters
@@ -108,8 +110,12 @@ public class WarDeployer {
             if (servlet == null) {
                 throw new DeploymentException("Servlet mapping references unknown servlet: " + mapping.servletName());
             }
+            WebXmlDescriptor.ServletDef servletDef = descriptor.servletByName(mapping.servletName());
+            if (servletDef == null) {
+                throw new DeploymentException("Missing servlet definition for mapping: " + mapping.servletName());
+            }
             String urlPattern = normalizeUrlPattern(mapping.urlPattern());
-            appBuilder.servlet(urlPattern, servlet);
+            appBuilder.servlet(urlPattern, mapping.servletName(), servlet, servletDef.initParams());
             log.debug("app={} mapped servlet {} -> {}", appName, mapping.servletName(), urlPattern);
         }
 
@@ -134,6 +140,16 @@ public class WarDeployer {
         if (!descriptor.welcomeFiles().isEmpty()) {
             appBuilder.welcomeFiles(descriptor.welcomeFiles());
             log.debug("app={} welcome files: {}", appName, descriptor.welcomeFiles());
+        }
+
+        for (WebXmlDescriptor.ErrorPageDef errorPage : descriptor.errorPages()) {
+            if (errorPage.errorCode() != null) {
+                appBuilder.errorPage(errorPage.errorCode(), errorPage.location());
+            } else if (errorPage.exceptionType() != null) {
+                Class<? extends Throwable> exceptionType =
+                        instantiateExceptionType(classLoader, errorPage.exceptionType());
+                appBuilder.errorPage(exceptionType, errorPage.location());
+            }
         }
 
         // Instantiate and register listeners
@@ -229,6 +245,13 @@ public class WarDeployer {
         return pattern;
     }
 
+    private static String deriveExtractionDirectoryName(String appName, String contextPath) {
+        String suffix = contextPath == null || contextPath.isBlank() || "/".equals(contextPath)
+                ? "ROOT"
+                : contextPath.replace('/', '_');
+        return appName + "__" + suffix;
+    }
+
     private static EnumSet<DispatcherType> parseDispatcherTypes(List<String> dispatchers) {
         EnumSet<DispatcherType> types = EnumSet.noneOf(DispatcherType.class);
         for (String d : dispatchers) {
@@ -268,6 +291,22 @@ public class WarDeployer {
                     // best effort
                 }
             });
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Class<? extends Throwable> instantiateExceptionType(ClassLoader classLoader, String className)
+            throws DeploymentException {
+        try {
+            Class<?> clazz = classLoader.loadClass(className);
+            if (!Throwable.class.isAssignableFrom(clazz)) {
+                throw new DeploymentException(className + " is not a Throwable type");
+            }
+            return (Class<? extends Throwable>) clazz;
+        } catch (DeploymentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new DeploymentException("Failed to resolve exception type " + className + ": " + e.getMessage(), e);
         }
     }
 

@@ -16,17 +16,28 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 final class ServletProxyFactory {
+
+    private static final String WEB_APP_ROOT_ATTRIBUTE = "io.velo.was.webAppRoot";
+    private static final String JSP_WEB_APP_ROOT_ATTRIBUTE = "io.velo.was.jsp.webAppRoot";
+    private static final String TEMP_DIR_ATTRIBUTE = "jakarta.servlet.context.tempdir";
 
     private ServletProxyFactory() {
     }
@@ -39,6 +50,15 @@ final class ServletProxyFactory {
                                                java.util.List<ServletContextAttributeListener> attributeListeners,
                                                RequestDispatcherResolver dispatcherResolver) {
         Map<String, Object> attributes = new LinkedHashMap<>();
+        Path webAppRoot = resolveWebAppRoot(initParameters);
+        if (webAppRoot != null) {
+            try {
+                Path tempDirectory = Files.createDirectories(webAppRoot.resolve(".velo-temp"));
+                attributes.put(TEMP_DIR_ATTRIBUTE, tempDirectory.toFile());
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to create servlet temp directory for " + webAppRoot, e);
+            }
+        }
         final ServletContext[] contextRef = new ServletContext[1];
 
         InvocationHandler handler = (proxy, method, args) -> switch (method.getName()) {
@@ -82,6 +102,10 @@ final class ServletProxyFactory {
             case "getInitParameter" -> initParameters.get((String) args[0]);
             case "getInitParameterNames" -> Collections.enumeration(initParameters.keySet());
             case "setInitParameter" -> false;
+            case "getResource" -> getResource(webAppRoot, (String) args[0]);
+            case "getResourceAsStream" -> getResourceAsStream(webAppRoot, (String) args[0]);
+            case "getResourcePaths" -> getResourcePaths(webAppRoot, (String) args[0]);
+            case "getRealPath" -> getRealPath(webAppRoot, (String) args[0]);
             case "log" -> {
                 if (args != null && args.length > 0) {
                     System.out.println("[servlet-context] " + args[0]);
@@ -94,16 +118,15 @@ final class ServletProxyFactory {
             case "createListener" -> ((Class<?>) args[0]).getDeclaredConstructor().newInstance();
             case "getSessionTimeout" -> 30;
             case "setSessionTimeout" -> null;
-            case "getResource", "getResourceAsStream", "getContext", "getNamedDispatcher",
+            case "getContext", "getNamedDispatcher",
                  "addServlet", "createServlet", "getServletRegistration",
                  "getServletRegistrations", "addFilter", "createFilter", "getFilterRegistration",
                  "getFilterRegistrations", "getJspConfigDescriptor", "getServlet", "getServlets",
-                 "getServletNames", "declareRoles", "getRealPath", "getMimeType",
+                 "getServletNames", "declareRoles", "getMimeType",
                  "getDefaultSessionTrackingModes", "getEffectiveSessionTrackingModes",
                  "getSessionCookieConfig" -> null;
             case "getRequestDispatcher" -> createRequestDispatcher(dispatcherResolver, (String) args[0]);
             case "setSessionTrackingModes" -> null;
-            case "getResourcePaths" -> Set.of();
             default -> defaultValue(proxy, method, args);
         };
 
@@ -274,7 +297,7 @@ final class ServletProxyFactory {
             }
             case "getStatus" -> responseContext.status();
             case "sendError" -> {
-                responseContext.setStatus((Integer) args[0]);
+                responseContext.sendError((Integer) args[0], args.length > 1 ? (String) args[1] : null);
                 if (args.length > 1 && args[1] instanceof String message) {
                     responseContext.writer().write(message);
                 }
@@ -387,6 +410,83 @@ final class ServletProxyFactory {
     private static String buildRequestUrl(ServletRequestContext requestContext) {
         return "http://" + requestContext.localAddress().getHostString() + ":" + requestContext.localAddress().getPort()
                 + requestContext.exchange().path();
+    }
+
+    private static Path resolveWebAppRoot(Map<String, String> initParameters) {
+        String configuredRoot = initParameters.get(WEB_APP_ROOT_ATTRIBUTE);
+        if (configuredRoot == null || configuredRoot.isBlank()) {
+            configuredRoot = initParameters.get(JSP_WEB_APP_ROOT_ATTRIBUTE);
+        }
+        if (configuredRoot == null || configuredRoot.isBlank()) {
+            return null;
+        }
+        Path root = Path.of(configuredRoot).toAbsolutePath().normalize();
+        return Files.exists(root) ? root : null;
+    }
+
+    private static URL getResource(Path webAppRoot, String resourcePath) {
+        Path resolved = resolveResourcePath(webAppRoot, resourcePath);
+        if (resolved == null || !Files.exists(resolved)) {
+            return null;
+        }
+        try {
+            return resolved.toUri().toURL();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to resolve resource URL for " + resourcePath, e);
+        }
+    }
+
+    private static InputStream getResourceAsStream(Path webAppRoot, String resourcePath) {
+        Path resolved = resolveResourcePath(webAppRoot, resourcePath);
+        if (resolved == null || !Files.exists(resolved) || Files.isDirectory(resolved)) {
+            return null;
+        }
+        try {
+            return Files.newInputStream(resolved);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to open resource stream for " + resourcePath, e);
+        }
+    }
+
+    private static Set<String> getResourcePaths(Path webAppRoot, String resourcePath) {
+        Path resolved = resolveResourcePath(webAppRoot, resourcePath);
+        if (resolved == null || !Files.isDirectory(resolved)) {
+            return Set.of();
+        }
+        try (Stream<Path> children = Files.list(resolved)) {
+            return children
+                    .map(path -> {
+                        String relativePath = "/" + webAppRoot.relativize(path).toString().replace('\\', '/');
+                        return Files.isDirectory(path) ? relativePath + "/" : relativePath;
+                    })
+                    .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to list servlet resources for " + resourcePath, e);
+        }
+    }
+
+    private static String getRealPath(Path webAppRoot, String resourcePath) {
+        Path resolved = resolveResourcePath(webAppRoot, resourcePath);
+        return resolved == null ? null : resolved.toString();
+    }
+
+    private static Path resolveResourcePath(Path webAppRoot, String resourcePath) {
+        if (webAppRoot == null) {
+            return null;
+        }
+        String normalizedPath = normalizeResourcePath(resourcePath);
+        Path resolved = webAppRoot.resolve(normalizedPath).normalize();
+        if (!resolved.startsWith(webAppRoot)) {
+            return null;
+        }
+        return resolved;
+    }
+
+    private static String normalizeResourcePath(String resourcePath) {
+        if (resourcePath == null || resourcePath.isBlank() || "/".equals(resourcePath)) {
+            return "";
+        }
+        return resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
     }
 
     private static Object defaultValue(Object proxy, Method method, Object[] args) {

@@ -33,7 +33,7 @@ mvn clean package -DskipTests
 다음 명령어를 통해 Velo WAS 서버를 백그라운드나 새 터미널 창에서 실행합니다.
 
 ```sh
-java -jar was-bootstrap/target/was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar
+java -jar was-bootstrap/target/was-bootstrap-0.5.1-jar-with-dependencies.jar
 ```
 
 서버 구동 로그에 `Hot deploy watcher started` 메시지가 표시되면 정상적으로 자동 배포를 모니터링 중인 상태입니다.
@@ -54,7 +54,7 @@ cd test-war
 mvn clean package
 
 # 빌드 결과물을 Velo WAS의 deploy 디렉토리로 복사
-cp target/test-war-0.1.0-SNAPSHOT.war ../deploy/test.war
+cp target/test-war-0.5.1.war ../deploy/test.war
 ```
 
 `hotDeploy`가 활성화되어 있으므로, 복사 즉시(약 2초 내) 서버 로그에 배포 완료 메시지가 나타납니다.

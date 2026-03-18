@@ -14,10 +14,11 @@ public record WebXmlDescriptor(
         List<FilterDef> filters,
         List<FilterMapping> filterMappings,
         List<String> listenerClasses,
-        List<String> welcomeFiles
+        List<String> welcomeFiles,
+        List<ErrorPageDef> errorPages
 ) {
     public static WebXmlDescriptor empty() {
-        return new WebXmlDescriptor(null, Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        return new WebXmlDescriptor(null, Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     /**
@@ -77,6 +78,13 @@ public record WebXmlDescriptor(
             String filterName,
             String urlPattern,
             List<String> dispatchers
+    ) {
+    }
+
+    public record ErrorPageDef(
+            Integer errorCode,
+            String exceptionType,
+            String location
     ) {
     }
 }

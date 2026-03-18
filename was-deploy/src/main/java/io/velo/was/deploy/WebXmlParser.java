@@ -1,11 +1,13 @@
 package io.velo.was.deploy;
 
+import javax.xml.XMLConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ import java.util.Map;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
 /**
  * Parses a WEB-INF/web.xml deployment descriptor into a {@link WebXmlDescriptor}.
@@ -41,12 +44,18 @@ public final class WebXmlParser {
         }
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
         factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
         factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
         factory.setNamespaceAware(true);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
 
         DocumentBuilder builder = factory.newDocumentBuilder();
+        builder.setEntityResolver((publicId, systemId) -> new InputSource(new StringReader("")));
 
         Document document;
         try (InputStream in = Files.newInputStream(webXmlPath)) {
@@ -63,13 +72,14 @@ public final class WebXmlParser {
         List<WebXmlDescriptor.FilterMapping> filterMappings = parseFilterMappings(root);
         List<String> listeners = parseListeners(root);
         List<String> welcomeFiles = parseWelcomeFiles(root);
+        List<WebXmlDescriptor.ErrorPageDef> errorPages = parseErrorPages(root);
 
         WebXmlDescriptor descriptor = new WebXmlDescriptor(
                 displayName, contextParams, servlets, servletMappings,
-                filters, filterMappings, listeners, welcomeFiles);
+                filters, filterMappings, listeners, welcomeFiles, errorPages);
 
-        log.info("Parsed web.xml: servlets={}, filters={}, listeners={}, mappings={}",
-                servlets.size(), filters.size(), listeners.size(), servletMappings.size());
+        log.info("Parsed web.xml: servlets={}, filters={}, listeners={}, mappings={}, errorPages={}",
+                servlets.size(), filters.size(), listeners.size(), servletMappings.size(), errorPages.size());
         return descriptor;
     }
 
@@ -180,6 +190,22 @@ public final class WebXmlParser {
             files.addAll(textContents(element, "welcome-file"));
         }
         return files;
+    }
+
+    private static List<WebXmlDescriptor.ErrorPageDef> parseErrorPages(Element root) {
+        List<WebXmlDescriptor.ErrorPageDef> errorPages = new ArrayList<>();
+        NodeList nodes = root.getElementsByTagName("error-page");
+        for (int i = 0; i < nodes.getLength(); i++) {
+            Element element = (Element) nodes.item(i);
+            String errorCodeText = textContent(element, "error-code");
+            String exceptionType = textContent(element, "exception-type");
+            String location = textContent(element, "location");
+            Integer errorCode = errorCodeText == null ? null : Integer.parseInt(errorCodeText.trim());
+            if (location != null && (errorCode != null || exceptionType != null)) {
+                errorPages.add(new WebXmlDescriptor.ErrorPageDef(errorCode, exceptionType, location));
+            }
+        }
+        return errorPages;
     }
 
     private static Map<String, String> parseInitParams(Element parent) {

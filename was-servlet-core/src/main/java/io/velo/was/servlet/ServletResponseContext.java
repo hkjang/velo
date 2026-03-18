@@ -25,6 +25,8 @@ class ServletResponseContext {
     private int status = 200;
     private String characterEncoding = StandardCharsets.UTF_8.name();
     private String contentType = "text/plain; charset=UTF-8";
+    private boolean errorSent;
+    private String errorMessage;
     private boolean committed;
     private PrintWriter writer = newWriter();
 
@@ -42,6 +44,20 @@ class ServletResponseContext {
 
     public int status() {
         return status;
+    }
+
+    public void sendError(int status, String message) {
+        this.status = status;
+        this.errorSent = true;
+        this.errorMessage = message;
+    }
+
+    public boolean errorSent() {
+        return errorSent;
+    }
+
+    public String errorMessage() {
+        return errorMessage;
     }
 
     public void addHeader(String name, String value) {
@@ -92,6 +108,8 @@ class ServletResponseContext {
         headers.clear();
         cookies.clear();
         status = 200;
+        errorSent = false;
+        errorMessage = null;
     }
 
     public boolean isCommitted() {

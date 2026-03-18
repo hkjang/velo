@@ -120,7 +120,7 @@ bin\build.bat -c -p
 패키징 완료 후 Fat JAR 경로:
 
 ```
-was-bootstrap/target/was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar
+was-bootstrap/target/was-bootstrap-0.5.1-jar-with-dependencies.jar
 ```
 
 ---

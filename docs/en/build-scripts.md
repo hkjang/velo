@@ -120,7 +120,7 @@ bin\build.bat -c -p
 After packaging, the fat JAR is at:
 
 ```
-was-bootstrap/target/was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar
+was-bootstrap/target/was-bootstrap-0.5.1-jar-with-dependencies.jar
 ```
 
 ---

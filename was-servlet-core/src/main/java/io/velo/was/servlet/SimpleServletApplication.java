@@ -22,6 +22,8 @@ public class SimpleServletApplication implements ServletApplication {
     private final String contextPath;
     private final ClassLoader classLoader;
     private final Map<String, Servlet> servlets;
+    private final Map<String, String> servletNames;
+    private final Map<String, Map<String, String>> servletInitParameters;
     private final List<FilterRegistrationSpec> filters;
     private final List<ServletContextListener> servletContextListeners;
     private final List<ServletContextAttributeListener> servletContextAttributeListeners;
@@ -29,6 +31,7 @@ public class SimpleServletApplication implements ServletApplication {
     private final List<HttpSessionListener> httpSessionListeners;
     private final List<HttpSessionAttributeListener> httpSessionAttributeListeners;
     private final List<HttpSessionIdListener> httpSessionIdListeners;
+    private final List<ErrorPageSpec> errorPages;
     private final Map<String, String> initParameters;
     private final List<String> welcomeFiles;
 
@@ -36,6 +39,8 @@ public class SimpleServletApplication implements ServletApplication {
                                     String contextPath,
                                     ClassLoader classLoader,
                                     Map<String, Servlet> servlets,
+                                    Map<String, String> servletNames,
+                                    Map<String, Map<String, String>> servletInitParameters,
                                     List<FilterRegistrationSpec> filters,
                                     List<ServletContextListener> servletContextListeners,
                                     List<ServletContextAttributeListener> servletContextAttributeListeners,
@@ -43,16 +48,19 @@ public class SimpleServletApplication implements ServletApplication {
                                     List<HttpSessionListener> httpSessionListeners,
                                     List<HttpSessionAttributeListener> httpSessionAttributeListeners,
                                     List<HttpSessionIdListener> httpSessionIdListeners,
+                                    List<ErrorPageSpec> errorPages,
                                     Map<String, String> initParameters) {
-        this(name, contextPath, classLoader, servlets, filters, servletContextListeners,
+        this(name, contextPath, classLoader, servlets, servletNames, servletInitParameters, filters, servletContextListeners,
                 servletContextAttributeListeners, servletRequestListeners, httpSessionListeners,
-                httpSessionAttributeListeners, httpSessionIdListeners, initParameters, List.of());
+                httpSessionAttributeListeners, httpSessionIdListeners, errorPages, initParameters, List.of());
     }
 
     public SimpleServletApplication(String name,
                                     String contextPath,
                                     ClassLoader classLoader,
                                     Map<String, Servlet> servlets,
+                                    Map<String, String> servletNames,
+                                    Map<String, Map<String, String>> servletInitParameters,
                                     List<FilterRegistrationSpec> filters,
                                     List<ServletContextListener> servletContextListeners,
                                     List<ServletContextAttributeListener> servletContextAttributeListeners,
@@ -60,12 +68,15 @@ public class SimpleServletApplication implements ServletApplication {
                                     List<HttpSessionListener> httpSessionListeners,
                                     List<HttpSessionAttributeListener> httpSessionAttributeListeners,
                                     List<HttpSessionIdListener> httpSessionIdListeners,
+                                    List<ErrorPageSpec> errorPages,
                                     Map<String, String> initParameters,
                                     List<String> welcomeFiles) {
         this.name = name;
         this.contextPath = normalizeContextPath(contextPath);
         this.classLoader = classLoader;
         this.servlets = new LinkedHashMap<>(servlets);
+        this.servletNames = new LinkedHashMap<>(servletNames);
+        this.servletInitParameters = copyServletInitParameters(servletInitParameters);
         this.filters = new ArrayList<>(filters);
         this.servletContextListeners = new ArrayList<>(servletContextListeners);
         this.servletContextAttributeListeners = new ArrayList<>(servletContextAttributeListeners);
@@ -73,6 +84,7 @@ public class SimpleServletApplication implements ServletApplication {
         this.httpSessionListeners = new ArrayList<>(httpSessionListeners);
         this.httpSessionAttributeListeners = new ArrayList<>(httpSessionAttributeListeners);
         this.httpSessionIdListeners = new ArrayList<>(httpSessionIdListeners);
+        this.errorPages = new ArrayList<>(errorPages);
         this.initParameters = new LinkedHashMap<>(initParameters);
         this.welcomeFiles = new ArrayList<>(welcomeFiles);
     }
@@ -99,6 +111,17 @@ public class SimpleServletApplication implements ServletApplication {
     @Override
     public Map<String, Servlet> servlets() {
         return Map.copyOf(servlets);
+    }
+
+    @Override
+    public String servletName(String mappingPath) {
+        return servletNames.getOrDefault(mappingPath, mappingPath);
+    }
+
+    @Override
+    public Map<String, String> servletInitParameters(String mappingPath) {
+        Map<String, String> parameters = servletInitParameters.get(mappingPath);
+        return parameters == null ? Map.of() : Map.copyOf(parameters);
     }
 
     @Override
@@ -137,6 +160,11 @@ public class SimpleServletApplication implements ServletApplication {
     }
 
     @Override
+    public List<ErrorPageSpec> errorPages() {
+        return List.copyOf(errorPages);
+    }
+
+    @Override
     public Map<String, String> initParameters() {
         return Map.copyOf(initParameters);
     }
@@ -153,11 +181,22 @@ public class SimpleServletApplication implements ServletApplication {
         return contextPath.startsWith("/") ? contextPath : "/" + contextPath;
     }
 
+    private static Map<String, Map<String, String>> copyServletInitParameters(
+            Map<String, Map<String, String>> servletInitParameters) {
+        Map<String, Map<String, String>> copied = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, String>> entry : servletInitParameters.entrySet()) {
+            copied.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
+        }
+        return copied;
+    }
+
     public static final class Builder {
         private final String name;
         private final String contextPath;
         private ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         private final Map<String, Servlet> servlets = new LinkedHashMap<>();
+        private final Map<String, String> servletNames = new LinkedHashMap<>();
+        private final Map<String, Map<String, String>> servletInitParameters = new LinkedHashMap<>();
         private final List<FilterRegistrationSpec> filters = new ArrayList<>();
         private final List<ServletContextListener> servletContextListeners = new ArrayList<>();
         private final List<ServletContextAttributeListener> servletContextAttributeListeners = new ArrayList<>();
@@ -165,6 +204,7 @@ public class SimpleServletApplication implements ServletApplication {
         private final List<HttpSessionListener> httpSessionListeners = new ArrayList<>();
         private final List<HttpSessionAttributeListener> httpSessionAttributeListeners = new ArrayList<>();
         private final List<HttpSessionIdListener> httpSessionIdListeners = new ArrayList<>();
+        private final List<ErrorPageSpec> errorPages = new ArrayList<>();
         private final Map<String, String> initParameters = new LinkedHashMap<>();
         private final List<String> welcomeFiles = new ArrayList<>();
 
@@ -179,7 +219,18 @@ public class SimpleServletApplication implements ServletApplication {
         }
 
         public Builder servlet(String path, Servlet servlet) {
-            servlets.put(normalizeServletPath(path), servlet);
+            return servlet(path, normalizeServletPath(path), servlet, Map.of());
+        }
+
+        public Builder servlet(String path, String servletName, Servlet servlet) {
+            return servlet(path, servletName, servlet, Map.of());
+        }
+
+        public Builder servlet(String path, String servletName, Servlet servlet, Map<String, String> initParameters) {
+            String normalizedPath = normalizeServletPath(path);
+            servlets.put(normalizedPath, servlet);
+            servletNames.put(normalizedPath, servletName);
+            servletInitParameters.put(normalizedPath, new LinkedHashMap<>(initParameters));
             return this;
         }
 
@@ -231,6 +282,16 @@ public class SimpleServletApplication implements ServletApplication {
             return this;
         }
 
+        public Builder errorPage(int statusCode, String location) {
+            errorPages.add(new ErrorPageSpec(statusCode, null, normalizeServletPath(location)));
+            return this;
+        }
+
+        public Builder errorPage(Class<? extends Throwable> exceptionType, String location) {
+            errorPages.add(new ErrorPageSpec(null, exceptionType, normalizeServletPath(location)));
+            return this;
+        }
+
         public Builder welcomeFile(String welcomeFile) {
             welcomeFiles.add(welcomeFile);
             return this;
@@ -247,6 +308,8 @@ public class SimpleServletApplication implements ServletApplication {
                     contextPath,
                     classLoader,
                     servlets,
+                    servletNames,
+                    servletInitParameters,
                     filters,
                     servletContextListeners,
                     servletContextAttributeListeners,
@@ -254,6 +317,7 @@ public class SimpleServletApplication implements ServletApplication {
                     httpSessionListeners,
                     httpSessionAttributeListeners,
                     httpSessionIdListeners,
+                    errorPages,
                     initParameters,
                     welcomeFiles);
         }

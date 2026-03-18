@@ -32,8 +32,11 @@ import jakarta.servlet.http.HttpSessionEvent;
 import jakarta.servlet.http.HttpSessionIdListener;
 import jakarta.servlet.http.HttpSessionListener;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +53,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SimpleServletContainerTest {
+
+    @TempDir
+    Path tempDir;
 
     @Test
     void dispatchesHttpServletAndPersistsSessionAcrossRequests() throws Exception {
@@ -616,6 +622,187 @@ class SimpleServletContainerTest {
                         "session-id-changed:" + oldSessionId + "->" + newSessionId,
                         "session-destroyed:" + newSessionId),
                 events);
+    }
+
+    @Test
+    void sendErrorDispatchesToConfiguredErrorPage() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        List<String> filterEvents = new ArrayList<>();
+
+        container.deploy(SimpleServletApplication.builder("error-status-app", "/app")
+                .filter("/errors/*", new Filter() {
+                    @Override
+                    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+                            throws IOException, ServletException {
+                        filterEvents.add("error-filter-" + ((HttpServletRequest) request).getDispatcherType());
+                        chain.doFilter(request, response);
+                    }
+                }, DispatcherType.ERROR)
+                .servlet("/missing", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.sendError(HttpServletResponse.SC_NOT_FOUND, "resource missing");
+                    }
+                })
+                .servlet("/errors/notfound", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("STATUS[" + req.getDispatcherType()
+                                + ":" + req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE)
+                                + ":" + req.getAttribute(RequestDispatcher.ERROR_MESSAGE)
+                                + ":" + req.getAttribute(RequestDispatcher.ERROR_REQUEST_URI)
+                                + ":" + req.getAttribute(RequestDispatcher.ERROR_SERVLET_NAME) + "]");
+                    }
+                })
+                .errorPage(HttpServletResponse.SC_NOT_FOUND, "/errors/notfound")
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/missing"),
+                null, null));
+
+        assertEquals(404, response.status().code());
+        assertEquals("STATUS[ERROR:404:resource missing:/app/missing:/missing]",
+                response.content().toString(StandardCharsets.UTF_8));
+        assertEquals(List.of("error-filter-ERROR"), filterEvents);
+    }
+
+    @Test
+    void exceptionDispatchesToMostSpecificErrorPage() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        List<String> filterEvents = new ArrayList<>();
+
+        container.deploy(SimpleServletApplication.builder("error-exception-app", "/app")
+                .filter("/errors/*", new Filter() {
+                    @Override
+                    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+                            throws IOException, ServletException {
+                        filterEvents.add("error-filter-" + ((HttpServletRequest) request).getDispatcherType());
+                        chain.doFilter(request, response);
+                    }
+                }, DispatcherType.ERROR)
+                .servlet("/boom", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+                        throw new IllegalStateException("kaboom");
+                    }
+                })
+                .servlet("/errors/runtime", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("RUNTIME");
+                    }
+                })
+                .servlet("/errors/illegal", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        Class<?> exceptionType = (Class<?>) req.getAttribute(RequestDispatcher.ERROR_EXCEPTION_TYPE);
+                        Throwable throwable = (Throwable) req.getAttribute(RequestDispatcher.ERROR_EXCEPTION);
+                        resp.getWriter().write("EX[" + req.getDispatcherType()
+                                + ":" + req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE)
+                                + ":" + exceptionType.getSimpleName()
+                                + ":" + throwable.getMessage()
+                                + ":" + req.getAttribute(RequestDispatcher.ERROR_REQUEST_URI)
+                                + ":" + req.getAttribute(RequestDispatcher.ERROR_SERVLET_NAME) + "]");
+                    }
+                })
+                .errorPage(RuntimeException.class, "/errors/runtime")
+                .errorPage(IllegalStateException.class, "/errors/illegal")
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/boom"),
+                null, null));
+
+        assertEquals(500, response.status().code());
+        assertEquals("EX[ERROR:500:IllegalStateException:kaboom:/app/boom:/boom]",
+                response.content().toString(StandardCharsets.UTF_8));
+        assertEquals(List.of("error-filter-ERROR"), filterEvents);
+    }
+
+    @Test
+    void servletContextExposesExplodedWarResourcesAndServletInitParameters() throws Exception {
+        Path webAppRoot = tempDir.resolve("bridge-app");
+        Files.createDirectories(webAppRoot.resolve("WEB-INF").resolve("configuration"));
+        Files.writeString(webAppRoot.resolve("WEB-INF").resolve("launch.ini"), "--launcher", StandardCharsets.UTF_8);
+        Files.writeString(webAppRoot.resolve("WEB-INF").resolve("configuration").resolve("config.ini"),
+                "osgi.bundles=example\n", StandardCharsets.UTF_8);
+
+        SimpleServletContainer container = new SimpleServletContainer();
+        AtomicReference<String> servletName = new AtomicReference<>();
+        AtomicReference<String> initParameter = new AtomicReference<>();
+
+        container.deploy(SimpleServletApplication.builder("resource-app", "/app")
+                .initParameter("io.velo.was.webAppRoot", webAppRoot.toString())
+                .servlet("/bridge", "BridgeServlet", new HttpServlet() {
+                    @Override
+                    public void init() {
+                        servletName.set(getServletConfig().getServletName());
+                        initParameter.set(getServletConfig().getInitParameter("commandline"));
+                    }
+
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        boolean hasLaunchIni = req.getServletContext().getResource("/WEB-INF/launch.ini") != null;
+                        boolean hasConfig = req.getServletContext()
+                                .getResourceAsStream("/WEB-INF/configuration/config.ini") != null;
+                        boolean hasConfigurationDir = req.getServletContext()
+                                .getResourcePaths("/WEB-INF/")
+                                .contains("/WEB-INF/configuration/");
+                        Object tempDirectory = req.getServletContext().getAttribute("jakarta.servlet.context.tempdir");
+                        String realPath = req.getServletContext().getRealPath("/WEB-INF/launch.ini");
+                        resp.getWriter().write("launch=" + hasLaunchIni
+                                + "|config=" + hasConfig
+                                + "|dir=" + hasConfigurationDir
+                                + "|temp=" + (tempDirectory != null)
+                                + "|real=" + (realPath != null));
+                    }
+                }, java.util.Map.of("commandline", "-console"))
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/bridge"),
+                null, null));
+
+        assertEquals("BridgeServlet", servletName.get());
+        assertEquals("-console", initParameter.get());
+        assertEquals(200, response.status().code());
+        assertEquals("launch=true|config=true|dir=true|temp=true|real=true",
+                response.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void supportsSameApplicationNameAcrossDifferentContextPaths() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+
+        container.deploy(SimpleServletApplication.builder("shared-name", "/")
+                .servlet("/hello", "RootHello", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("root");
+                    }
+                })
+                .build());
+
+        container.deploy(SimpleServletApplication.builder("shared-name", "/tadpole")
+                .servlet("/hello", "TadpoleHello", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("tadpole");
+                    }
+                })
+                .build());
+
+        FullHttpResponse rootResponse = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/hello"),
+                null, null));
+        FullHttpResponse tadpoleResponse = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/tadpole/hello"),
+                null, null));
+
+        assertEquals("root", rootResponse.content().toString(StandardCharsets.UTF_8));
+        assertEquals("tadpole", tadpoleResponse.content().toString(StandardCharsets.UTF_8));
+        assertEquals(2, container.listDeployedApplications().size());
     }
 
     // ────────────────────────────────────────────────────────────────────────

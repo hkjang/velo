@@ -56,7 +56,7 @@ public class DeploymentRegistry {
         }
 
         try {
-            container.undeploy(result.application().name());
+            container.undeploy(result.application().contextPath());
             deployer.cleanup(result);
             log.info("Undeployed application: {}", appName);
         } catch (Exception e) {

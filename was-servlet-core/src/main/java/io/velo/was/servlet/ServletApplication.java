@@ -31,7 +31,18 @@ public interface ServletApplication {
     default List<HttpSessionIdListener> httpSessionIdListeners() {
         return List.of();
     }
+    default List<ErrorPageSpec> errorPages() {
+        return List.of();
+    }
     default Map<String, String> initParameters() {
+        return Map.of();
+    }
+
+    default String servletName(String mappingPath) {
+        return mappingPath;
+    }
+
+    default Map<String, String> servletInitParameters(String mappingPath) {
         return Map.of();
     }
 

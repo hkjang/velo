@@ -25,7 +25,7 @@
 
 **실행 방법:**
 ```bash
-java -jar was-bootstrap/target/was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar [config-path]
+java -jar was-bootstrap/target/was-bootstrap-0.5.1-jar-with-dependencies.jar [config-path]
 ```
 
 - `config-path` 미지정 시 `conf/server.yaml` 사용

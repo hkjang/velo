@@ -21,6 +21,7 @@ import java.nio.file.StandardCopyOption;
  */
 public class ApplicationsPageServlet extends HttpServlet {
 
+    private static final String CSRF_TOKEN_ATTR = "velo.csrf.token";
     private final ServerConfiguration configuration;
 
     public ApplicationsPageServlet(ServerConfiguration configuration) {
@@ -32,6 +33,11 @@ public class ApplicationsPageServlet extends HttpServlet {
         resp.setContentType("text/html; charset=UTF-8");
         ServerConfiguration.Server server = configuration.getServer();
         String ctx = req.getContextPath();
+        String csrfToken = "";
+        if (req.getSession(false) != null) {
+            Object token = req.getSession(false).getAttribute(CSRF_TOKEN_ATTR);
+            csrfToken = token != null ? token.toString() : "";
+        }
 
         String body = """
                 <style>
@@ -236,9 +242,23 @@ public class ApplicationsPageServlet extends HttpServlet {
 
                 <script>
                 var CTX = '%s';
+                var CSRF_TOKEN = '%s';
+                var UPLOAD_ENDPOINT = CTX + '/upload-war';
                 var rollbackTarget = null;
                 var logTarget = null;
                 function esc(s) { if(!s) return ''; var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+                function readJsonResponse(response) {
+                  return response.text().then(function(text) {
+                    if (!text || !text.trim()) {
+                      return {success: response.ok, message: response.ok ? '' : ('HTTP ' + response.status)};
+                    }
+                    try {
+                      return JSON.parse(text);
+                    } catch (e) {
+                      return {success: false, message: text.trim() || e.message};
+                    }
+                  });
+                }
 
                 function loadApps() {
                   fetch(CTX + '/api/applications').then(function(r){return r.json();}).then(function(d) {
@@ -420,10 +440,11 @@ public class ApplicationsPageServlet extends HttpServlet {
                   showDeployProgress();
                   setDeployStep('upload','active');
                   document.getElementById('deployStatusMsg').innerHTML = '<span class="spinner"></span> Uploading WAR file...';
-                  fetch(CTX + '/applications', {
+                  fetch(UPLOAD_ENDPOINT, {
                     method: 'POST',
+                    headers: {'X-CSRF-Token': CSRF_TOKEN},
                     body: formData
-                  }).then(function(r){return r.json();}).then(function(d) {
+                  }).then(readJsonResponse).then(function(d) {
                     setDeployStep('upload','done');
                     if (d.success) {
                       advanceDeploySteps(['validate','deploy','start','running'], 0, function(){
@@ -450,7 +471,8 @@ public class ApplicationsPageServlet extends HttpServlet {
                 server.getDeploy().isHotDeploy() ? "<span class='badge badge-success'>Enabled</span>" : "<span class='badge badge-neutral'>Disabled</span>",
                 server.getDeploy().getScanIntervalSeconds(),
                 h(server.getName()),
-                ctx
+                ctx,
+                escapeJson(csrfToken)
         );
 
         resp.getWriter().write(AdminPageLayout.page("Applications", server.getName(), server.getNodeId(),

@@ -54,7 +54,7 @@ mvn test
 ## 실행
 
 ```bash
-java -jar was-bootstrap/target/was-bootstrap-0.1.0-SNAPSHOT-jar-with-dependencies.jar [config-path]
+java -jar was-bootstrap/target/was-bootstrap-0.5.1-jar-with-dependencies.jar [config-path]
 ```
 
 - `config-path` 미지정 시 `conf/server.yaml` 사용
@@ -154,9 +154,12 @@ curl http://localhost:8080/app/hello
 - 서블릿 컨테이너
   - `HttpServlet` dispatch (context path + servlet path longest-match)
   - `Filter` chain 실행 (DispatcherType 기반 매칭)
-  - `ServletContextListener`, `ServletRequestListener` lifecycle
+  - `ServletContextListener`, `ServletContextAttributeListener`, `ServletRequestListener` lifecycle
+  - `HttpSessionListener`, `HttpSessionAttributeListener`, `HttpSessionIdListener`
   - `RequestDispatcher` forward/include (상대 경로 및 `..` 해석 포함)
+  - `error-page` 매핑 (`error-code`, `exception-type`) + `DispatcherType.ERROR`
   - In-memory `JSESSIONID` 쿠키 세션 + **TTL 만료 스케줄러** (타임아웃 설정 가능)
+  - `changeSessionId()` 기반 session fixation 완화
   - **AsyncContext**: dispatch, complete, timeout, listener
   - **Multipart**: `multipart/form-data` 파싱, `Part` API 지원
   - 동적 프록시 기반 `HttpServletRequest`/`HttpServletResponse`/`ServletContext`/`HttpSession`

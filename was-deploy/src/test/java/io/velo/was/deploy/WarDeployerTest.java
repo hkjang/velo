@@ -31,8 +31,11 @@ class WarDeployerTest {
         assertEquals("test-app", app.name());
         assertEquals("/myapp", app.contextPath());
         assertFalse(result.extracted());
-        assertEquals(1, app.servlets().size());
+        assertEquals(2, app.servlets().size());
         assertTrue(app.servlets().containsKey("/hello"));
+        assertTrue(app.servlets().containsKey("/error"));
+        assertEquals("HelloServlet", app.servletName("/hello"));
+        assertEquals("hello-init", app.servletInitParameters("/hello").get("message"));
         assertEquals(1, app.filters().size());
         assertEquals("world", app.initParameters().get("greeting"));
         assertEquals(1, app.servletContextListeners().size());
@@ -40,6 +43,7 @@ class WarDeployerTest {
         assertEquals(1, app.httpSessionListeners().size());
         assertEquals(1, app.httpSessionAttributeListeners().size());
         assertEquals(1, app.httpSessionIdListeners().size());
+        assertEquals(2, app.errorPages().size());
     }
 
     @Test
@@ -64,9 +68,10 @@ class WarDeployerTest {
         WebXmlDescriptor descriptor = WebXmlParser.parse(webXml);
 
         assertEquals("test-app", descriptor.displayName());
-        assertEquals(1, descriptor.servlets().size());
+        assertEquals(2, descriptor.servlets().size());
         assertEquals("HelloServlet", descriptor.servlets().get(0).name());
-        assertEquals(1, descriptor.servletMappings().size());
+        assertEquals("hello-init", descriptor.servlets().get(0).initParams().get("message"));
+        assertEquals(2, descriptor.servletMappings().size());
         assertEquals("/hello", descriptor.servletMappings().get(0).urlPattern());
         assertEquals(1, descriptor.filters().size());
         assertEquals("TestFilter", descriptor.filters().get(0).name());
@@ -74,6 +79,7 @@ class WarDeployerTest {
         assertEquals(1, descriptor.listenerClasses().size());
         assertEquals(1, descriptor.contextParams().size());
         assertEquals("world", descriptor.contextParams().get("greeting"));
+        assertEquals(2, descriptor.errorPages().size());
     }
 
     @Test
@@ -83,6 +89,34 @@ class WarDeployerTest {
         assertNotNull(descriptor);
         assertTrue(descriptor.servlets().isEmpty());
         assertTrue(descriptor.filters().isEmpty());
+    }
+
+    @Test
+    void parsesLegacyWebXmlWithDoctypeWithoutLoadingExternalDtd() throws Exception {
+        Path webXml = tempDir.resolve("legacy-web.xml");
+        Files.writeString(webXml, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE web-app PUBLIC
+                  "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+                  "http://java.sun.com/dtd/web-app_2_3.dtd">
+                <web-app>
+                  <display-name>legacy-app</display-name>
+                  <servlet>
+                    <servlet-name>HelloServlet</servlet-name>
+                    <servlet-class>test.HelloServlet</servlet-class>
+                  </servlet>
+                  <servlet-mapping>
+                    <servlet-name>HelloServlet</servlet-name>
+                    <url-pattern>/hello</url-pattern>
+                  </servlet-mapping>
+                </web-app>
+                """, StandardCharsets.UTF_8);
+
+        WebXmlDescriptor descriptor = WebXmlParser.parse(webXml);
+
+        assertEquals("legacy-app", descriptor.displayName());
+        assertEquals(1, descriptor.servlets().size());
+        assertEquals(1, descriptor.servletMappings().size());
     }
 
     @Test
@@ -112,6 +146,20 @@ class WarDeployerTest {
         assertFalse(Files.exists(result.appRoot()));
     }
 
+    @Test
+    void deploysSameWarToDifferentContextsUsingSeparateWorkDirectories() throws Exception {
+        Path warFile = createWarFile();
+        Path workDir = tempDir.resolve("work");
+        WarDeployer deployer = new WarDeployer(workDir);
+
+        WarDeployer.DeploymentResult rootResult = deployer.deploy(warFile, "/");
+        WarDeployer.DeploymentResult tadpoleResult = deployer.deploy(warFile, "/tadpole");
+
+        assertNotEquals(rootResult.appRoot(), tadpoleResult.appRoot());
+        assertTrue(Files.isDirectory(rootResult.appRoot()));
+        assertTrue(Files.isDirectory(tadpoleResult.appRoot()));
+    }
+
     private Path createExplodedWar() throws Exception {
         Path appRoot = tempDir.resolve("test-app");
         Path webInf = appRoot.resolve("WEB-INF");
@@ -130,6 +178,18 @@ class WarDeployerTest {
                 }
                 """;
         compileAndPlaceClass(classes, "test.HelloServlet", servletSource);
+
+        String errorServletSource = """
+                package test;
+                import jakarta.servlet.http.*;
+                import java.io.*;
+                public class ErrorServlet extends HttpServlet {
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("Error");
+                    }
+                }
+                """;
+        compileAndPlaceClass(classes, "test.ErrorServlet", errorServletSource);
 
         // Create a simple filter class
         String filterSource = """
@@ -178,11 +238,23 @@ class WarDeployerTest {
                     <servlet>
                         <servlet-name>HelloServlet</servlet-name>
                         <servlet-class>test.HelloServlet</servlet-class>
+                        <init-param>
+                            <param-name>message</param-name>
+                            <param-value>hello-init</param-value>
+                        </init-param>
                         <load-on-startup>1</load-on-startup>
                     </servlet>
                     <servlet-mapping>
                         <servlet-name>HelloServlet</servlet-name>
                         <url-pattern>/hello</url-pattern>
+                    </servlet-mapping>
+                    <servlet>
+                        <servlet-name>ErrorServlet</servlet-name>
+                        <servlet-class>test.ErrorServlet</servlet-class>
+                    </servlet>
+                    <servlet-mapping>
+                        <servlet-name>ErrorServlet</servlet-name>
+                        <url-pattern>/error</url-pattern>
                     </servlet-mapping>
                     <filter>
                         <filter-name>TestFilter</filter-name>
@@ -196,6 +268,14 @@ class WarDeployerTest {
                     <listener>
                         <listener-class>test.TestListener</listener-class>
                     </listener>
+                    <error-page>
+                        <error-code>404</error-code>
+                        <location>/error</location>
+                    </error-page>
+                    <error-page>
+                        <exception-type>java.lang.IllegalStateException</exception-type>
+                        <location>/error</location>
+                    </error-page>
                 </web-app>
                 """;
         Files.writeString(webInf.resolve("web.xml"), webXml, StandardCharsets.UTF_8);

@@ -33,9 +33,33 @@ class ServletResponseContextTest {
         assertTrue(body.contains("__veloRapBrowserCompatPatched"));
         assertTrue(body.contains("__veloLastSourceSyncAt"));
         assertTrue(body.contains("evaluationSucceeded"));
+        assertTrue(body.contains("var retryWindowMs = 10000;"));
         assertTrue(body.indexOf("__veloRapBrowserCompatPatched") > body.indexOf("rap-client.js"));
         assertTrue(body.indexOf("__veloRapBrowserCompatPatched")
                 < body.indexOf("rwt.remote.MessageProcessor.processMessage"));
+    }
+
+    @Test
+    void injectsRapBrowserCompatibilityPatchIntoXhtmlResponses() {
+        ServletResponseContext responseContext = new ServletResponseContext();
+        responseContext.setContentType("application/xhtml+xml; charset=UTF-8");
+        responseContext.writer().write("""
+                <!DOCTYPE html>
+                <html>
+                  <body>
+                    <script type="text/javascript" src="rwt-resources/440/rap-client.js"></script>
+                    <script type="text/javascript">
+                      rwt.remote.MessageProcessor.processMessage({});
+                    </script>
+                  </body>
+                </html>
+                """);
+
+        String body = responseContext.toNettyResponse(false, null)
+                .content()
+                .toString(CharsetUtil.UTF_8);
+
+        assertTrue(body.contains("__veloRapBrowserCompatPatched"));
     }
 
     @Test

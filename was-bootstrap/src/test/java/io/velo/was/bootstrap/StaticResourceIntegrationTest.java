@@ -144,6 +144,78 @@ class StaticResourceIntegrationTest {
         }
     }
 
+    @Test
+    void injectsRapCompatibilityPatchForRootContextWelcomePage() throws Exception {
+        Path warDir = tempDir.resolve("ROOT");
+        Path webInf = warDir.resolve("WEB-INF");
+        Files.createDirectories(webInf);
+
+        Files.writeString(webInf.resolve("web.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee" version="6.0">
+                    <display-name>root-rap-app</display-name>
+                    <welcome-file-list>
+                        <welcome-file>index.html</welcome-file>
+                    </welcome-file-list>
+                </web-app>
+                """, StandardCharsets.UTF_8);
+
+        Files.writeString(warDir.resolve("index.html"), """
+                <!doctype html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>RAP Root Test</title>
+                    <script type="text/javascript" src="/rwt-resources/440/rap-client.js"></script>
+                </head>
+                <body>
+                    <script type="text/javascript">
+                      rwt.remote.MessageProcessor.processMessage({});
+                    </script>
+                </body>
+                </html>
+                """, StandardCharsets.UTF_8);
+
+        int port;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            port = socket.getLocalPort();
+        }
+
+        ServerConfiguration.Server serverConfig = new ServerConfiguration.Server();
+        ServerConfiguration.Listener listener = new ServerConfiguration.Listener();
+        listener.setHost("127.0.0.1");
+        listener.setPort(port);
+        serverConfig.setListener(listener);
+
+        WarDeployer warDeployer = new WarDeployer(tempDir.resolve("work"));
+        WarDeployer.DeploymentResult deploymentResult = warDeployer.deploy(warDir, "");
+
+        SimpleServletContainer servletContainer = new SimpleServletContainer();
+        servletContainer.deploy(deploymentResult.application());
+
+        HttpHandlerRegistry registry = new HttpHandlerRegistry()
+                .fallback(servletContainer::handle);
+
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+
+        try (NettyServer server = new NettyServer(serverConfig, registry)) {
+            server.start();
+            String base = "http://127.0.0.1:" + port;
+
+            HttpResponse<String> rootResponse = send(client, base + "/", "text/html", null,
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, rootResponse.statusCode());
+            assertTrue(rootResponse.body().contains("__veloRapBrowserCompatPatched"));
+            assertTrue(rootResponse.body().contains("var retryWindowMs = 10000;"));
+            assertTrue(rootResponse.body().indexOf("__veloRapBrowserCompatPatched")
+                    > rootResponse.body().indexOf("rap-client.js"));
+        } finally {
+            warDeployer.cleanup(deploymentResult);
+        }
+    }
+
     private static <T> HttpResponse<T> send(HttpClient client,
                                             String url,
                                             String accept,

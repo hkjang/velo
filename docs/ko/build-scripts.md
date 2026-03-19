@@ -120,7 +120,7 @@ bin\build.bat -c -p
 ?⑦궎吏??꾨즺 ??Fat JAR 寃쎈줈:
 
 ```
-was-bootstrap/target/was-bootstrap-0.5.8-jar-with-dependencies.jar
+was-bootstrap/target/was-bootstrap-0.5.9-jar-with-dependencies.jar
 ```
 
 ---

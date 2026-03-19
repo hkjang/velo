@@ -27,6 +27,7 @@ class ServletResponseContext {
     private static final String RAP_CLIENT_SCRIPT = "rap-client.js";
     private static final String RAP_BOOTSTRAP_MARKER = "rwt.remote.MessageProcessor.processMessage";
     private static final String RAP_BROWSER_COMPAT_MARKER = "__veloRapBrowserCompatPatched";
+    private static final String XHTML_CONTENT_TYPE = "application/xhtml+xml";
     private static final Pattern SCRIPT_NONCE_PATTERN =
             Pattern.compile("\\snonce\\s*=\\s*(\"[^\"]*\"|'[^']*')", Pattern.CASE_INSENSITIVE);
     private static final String RAP_BROWSER_COMPAT_PATCH_TEMPLATE = """
@@ -76,7 +77,7 @@ class ServletResponseContext {
                   Browser.prototype.execute = function(script) {
                     var self = this;
                     var retryDelayMs = 50;
-                    var retryWindowMs = 2000;
+                    var retryWindowMs = 10000;
                     function isDisposed() {
                       return self.isDisposed && self.isDisposed();
                     }
@@ -99,6 +100,11 @@ class ServletResponseContext {
                           return true;
                         }
                         if (doc.readyState && doc.readyState !== "complete") {
+                          return true;
+                        }
+                        if (typeof doc.body.childElementCount === "number"
+                            && doc.body.childElementCount === 0
+                            && !(doc.body.textContent && doc.body.textContent.trim())) {
                           return true;
                         }
                         var href = doc.location && doc.location.href ? String(doc.location.href) : "";
@@ -382,7 +388,11 @@ class ServletResponseContext {
     }
 
     private boolean isHtmlResponse() {
-        return contentType != null && contentType.toLowerCase(java.util.Locale.ROOT).contains("text/html");
+        if (contentType == null) {
+            return false;
+        }
+        String normalized = contentType.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("text/html") || normalized.contains(XHTML_CONTENT_TYPE);
     }
 
     private Charset responseCharset() {

@@ -32,7 +32,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-browser-sample-wars.ps1
 ## 실행
 
 ```powershell
-java -jar .\was-bootstrap\target\was-bootstrap-0.5.8-jar-with-dependencies.jar .\conf\server.yaml
+java -jar .\was-bootstrap\target\was-bootstrap-0.5.9-jar-with-dependencies.jar .\conf\server.yaml
 ```
 
 기본 설정 기준으로 `deploy/` 를 hot deploy 하므로, 서버가 떠 있으면 WAR를 덮어쓴 뒤

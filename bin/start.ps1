@@ -38,8 +38,12 @@ Examples:
 }
 
 # ── Toolchain ──
-$LocalJdk = Join-Path $ProjectRoot ".tools\jdk\jdk-21.0.10+7"
-if (Test-Path $LocalJdk) {
+$LocalJdkCandidates = @(
+    (Join-Path $ProjectRoot ".tools\jdk\jdk-21.0.10+7"),
+    (Join-Path $ProjectRoot "tools\java\jdk-21.0.10+7")
+)
+$LocalJdk = $LocalJdkCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($LocalJdk) {
     $env:JAVA_HOME = $LocalJdk
 } elseif (-not $env:JAVA_HOME) {
     throw "JAVA_HOME is not set"

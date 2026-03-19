@@ -66,4 +66,22 @@ class ServletResponseContextTest {
         assertTrue(twiceInjected.contains("__veloRapBrowserCompatPatched"));
         assertTrue(onceInjected.equals(twiceInjected));
     }
+
+    @Test
+    void copiesNonceFromRapClientScriptToCompatibilityPatch() {
+        String body = ServletResponseContext.injectRapBrowserCompatibilityPatch("""
+                <!DOCTYPE html>
+                <html>
+                  <body>
+                    <script type="text/javascript" nonce="abc123" src="rwt-resources/440/rap-client.js"></script>
+                    <script type="text/javascript">
+                      rwt.remote.MessageProcessor.processMessage({});
+                    </script>
+                  </body>
+                </html>
+                """);
+
+        assertTrue(body.contains("nonce=\"abc123\""));
+        assertTrue(body.contains("<script type=\"text/javascript\" nonce=\"abc123\">"));
+    }
 }

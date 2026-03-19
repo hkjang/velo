@@ -16,14 +16,18 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 class ServletResponseContext {
 
     private static final String RAP_CLIENT_SCRIPT = "rap-client.js";
     private static final String RAP_BOOTSTRAP_MARKER = "rwt.remote.MessageProcessor.processMessage";
     private static final String RAP_BROWSER_COMPAT_MARKER = "__veloRapBrowserCompatPatched";
-    private static final String RAP_BROWSER_COMPAT_PATCH = """
-            <script type="text/javascript">
+    private static final Pattern SCRIPT_NONCE_PATTERN =
+            Pattern.compile("\\snonce\\s*=\\s*(\"[^\"]*\"|'[^']*')", Pattern.CASE_INSENSITIVE);
+    private static final String RAP_BROWSER_COMPAT_PATCH_TEMPLATE = """
+            <script type="text/javascript"%2$s>
             (function() {
               if (window.%1$s) {
                 return;
@@ -170,7 +174,7 @@ class ServletResponseContext {
               }
             })();
             </script>
-            """.formatted(RAP_BROWSER_COMPAT_MARKER);
+            """;
 
     private final ServletBodyOutputStream outputStream = new ServletBodyOutputStream();
     private final Map<String, List<String>> headers = new LinkedHashMap<>();
@@ -333,9 +337,28 @@ class ServletResponseContext {
             return responseBody;
         }
         int insertIndex = scriptCloseIndex + "</script>".length();
+        String nonceAttribute = extractScriptNonceAttribute(responseBody, rapScriptIndex);
+        String patch = RAP_BROWSER_COMPAT_PATCH_TEMPLATE.formatted(RAP_BROWSER_COMPAT_MARKER, nonceAttribute);
         return responseBody.substring(0, insertIndex)
                 + "\n"
-                + RAP_BROWSER_COMPAT_PATCH
+                + patch
                 + responseBody.substring(insertIndex);
+    }
+
+    private static String extractScriptNonceAttribute(String responseBody, int scriptContentIndex) {
+        int scriptOpenIndex = responseBody.lastIndexOf("<script", scriptContentIndex);
+        if (scriptOpenIndex < 0) {
+            return "";
+        }
+        int scriptTagEndIndex = responseBody.indexOf('>', scriptOpenIndex);
+        if (scriptTagEndIndex < 0) {
+            return "";
+        }
+        String scriptTag = responseBody.substring(scriptOpenIndex, scriptTagEndIndex);
+        Matcher matcher = SCRIPT_NONCE_PATTERN.matcher(scriptTag);
+        if (!matcher.find()) {
+            return "";
+        }
+        return " nonce=" + matcher.group(1);
     }
 }

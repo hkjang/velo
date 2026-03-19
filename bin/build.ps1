@@ -49,17 +49,26 @@ Examples:
 }
 
 # ── Toolchain ──
-$LocalJdk = Join-Path $ProjectRoot ".tools\jdk\jdk-21.0.10+7"
-$LocalMvn = Join-Path $ProjectRoot ".tools\maven\apache-maven-3.9.13"
+$LocalJdkCandidates = @(
+    (Join-Path $ProjectRoot ".tools\jdk\jdk-21.0.10+7"),
+    (Join-Path $ProjectRoot "tools\java\jdk-21.0.10+7")
+)
+$LocalMvnCandidates = @(
+    (Join-Path $ProjectRoot ".tools\maven\apache-maven-3.9.13"),
+    (Join-Path $ProjectRoot "tools\maven\apache-maven-3.9.13")
+)
 
-if (Test-Path $LocalJdk) {
+$LocalJdk = $LocalJdkCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+$LocalMvn = $LocalMvnCandidates | Where-Object { Test-Path (Join-Path $_ "bin\mvn.cmd") } | Select-Object -First 1
+
+if ($LocalJdk) {
     $env:JAVA_HOME = $LocalJdk
 } elseif (-not $env:JAVA_HOME) {
-    throw "JAVA_HOME is not set and local JDK not found at $LocalJdk"
+    throw "JAVA_HOME is not set and local JDK not found under tools\\java or .tools\\jdk"
 }
 
-if (Test-Path "$LocalMvn\bin\mvn.cmd") {
-    $Mvn = "$LocalMvn\bin\mvn.cmd"
+if ($LocalMvn) {
+    $Mvn = Join-Path $LocalMvn "bin\mvn.cmd"
 } else {
     $Mvn = (Get-Command mvn -ErrorAction SilentlyContinue).Source
     if (-not $Mvn) { throw "Maven not found" }

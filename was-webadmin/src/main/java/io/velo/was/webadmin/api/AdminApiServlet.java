@@ -48,9 +48,13 @@ public class AdminApiServlet extends HttpServlet {
     private final AdminClient adminClient;
 
     public AdminApiServlet(ServerConfiguration configuration) {
+        this(configuration, new LocalAdminClient(configuration));
+    }
+
+    public AdminApiServlet(ServerConfiguration configuration, AdminClient adminClient) {
         this.configuration = configuration;
         this.commandRegistry = VeloAdmin.createRegistry();
-        this.adminClient = new LocalAdminClient(configuration);
+        this.adminClient = adminClient;
     }
 
     @Override

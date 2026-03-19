@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.management.ManagementFactory;
@@ -35,7 +36,11 @@ public class AdminLoginServlet extends HttpServlet {
     private final int sessionTimeoutSeconds;
 
     public AdminLoginServlet(ServerConfiguration configuration) {
-        this.adminClient = new LocalAdminClient(configuration);
+        this(configuration, new LocalAdminClient(configuration));
+    }
+
+    public AdminLoginServlet(ServerConfiguration configuration, AdminClient adminClient) {
+        this.adminClient = adminClient;
         this.sessionTimeoutSeconds = configuration.getServer().getSession().getTimeoutSeconds();
     }
 
@@ -801,6 +806,9 @@ public class AdminLoginServlet extends HttpServlet {
                   var newPw = document.getElementById('wizardNewPw').value;
                   var confirmPw = document.getElementById('wizardConfirmPw').value;
                   var errDiv = document.getElementById('wizardPwError');
+                  var username = document.getElementById('usernameInput').value || 'admin';
+                  var currentPassword = document.getElementById('passwordInput').value || 'admin';
+                  var csrfToken = document.querySelector('input[name="_csrf"]').value;
 
                   if (!newPw || newPw.length < 8) {
                     errDiv.textContent = 'Password must be at least 8 characters.';
@@ -812,9 +820,33 @@ public class AdminLoginServlet extends HttpServlet {
                     errDiv.style.display = 'block';
                     return;
                   }
-                  errDiv.style.display = 'none';
-                  // Phase 1: Store intent, actual password change via API in future
-                  wizardNext();
+                  fetch('%s/login?action=change-default-password', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                      username: username,
+                      currentPassword: currentPassword,
+                      password: newPw
+                    })
+                  }).then(function(r) {
+                    return r.json();
+                  }).then(function(d) {
+                    if (!d.success) {
+                      errDiv.textContent = d.message || 'Failed to change password.';
+                      errDiv.style.display = 'block';
+                      return;
+                    }
+                    errDiv.style.display = 'none';
+                    document.getElementById('usernameInput').value = username;
+                    document.getElementById('passwordInput').value = newPw;
+                    wizardNext();
+                  }).catch(function() {
+                    errDiv.textContent = 'Failed to change password.';
+                    errDiv.style.display = 'block';
+                  });
                 }
 
                 function selectTheme(theme) {
@@ -860,6 +892,8 @@ public class AdminLoginServlet extends HttpServlet {
                 sessionTimeout,
                 // Safe mode refresh fetch URL
                 contextPath,
+                // Wizard password change URL contextPath
+                contextPath,
                 // Server status fetch URL
                 contextPath
         );
@@ -867,6 +901,12 @@ public class AdminLoginServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String action = req.getParameter("action");
+        if ("change-default-password".equals(action)) {
+            handleChangeDefaultPassword(req, resp);
+            return;
+        }
+
         String username = req.getParameter("username");
         String password = req.getParameter("password");
         String contextPath = req.getContextPath();
@@ -882,6 +922,9 @@ public class AdminLoginServlet extends HttpServlet {
         HttpSession session = req.getSession(true);
         String sessionToken = (String) session.getAttribute(AdminAuthFilter.CSRF_TOKEN_ATTR);
         String requestToken = req.getParameter(AdminAuthFilter.CSRF_FORM_FIELD);
+        if (requestToken == null) {
+            requestToken = req.getHeader(AdminAuthFilter.CSRF_HEADER);
+        }
         if (sessionToken == null || !sessionToken.equals(requestToken)) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
             resp.setContentType("text/plain; charset=UTF-8");
@@ -918,5 +961,88 @@ public class AdminLoginServlet extends HttpServlet {
                 resp.sendRedirect(contextPath + "/login?error=1");
             }
         }
+    }
+
+    private void handleChangeDefaultPassword(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String clientIp = req.getRemoteAddr();
+        if (AdminAuthFilter.isLockedOut(clientIp)) {
+            writeJson(resp, 429,
+                    "{\"success\":false,\"message\":\"Account locked due to too many failed attempts.\"}");
+            return;
+        }
+
+        HttpSession session = req.getSession(true);
+        String sessionToken = (String) session.getAttribute(AdminAuthFilter.CSRF_TOKEN_ATTR);
+        String requestToken = req.getHeader(AdminAuthFilter.CSRF_HEADER);
+        if (requestToken == null) {
+            requestToken = req.getParameter(AdminAuthFilter.CSRF_FORM_FIELD);
+        }
+        if (sessionToken == null || !sessionToken.equals(requestToken)) {
+            writeJson(resp, HttpServletResponse.SC_FORBIDDEN,
+                    "{\"success\":false,\"message\":\"CSRF token validation failed\"}");
+            return;
+        }
+
+        String body = readBody(req);
+        String username = extractJsonValue(body, "username");
+        String currentPassword = extractJsonValue(body, "currentPassword");
+        String newPassword = extractJsonValue(body, "password");
+        if (username == null || username.isBlank() || currentPassword == null || currentPassword.isBlank()
+                || newPassword == null || newPassword.isBlank()) {
+            writeJson(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "{\"success\":false,\"message\":\"Username, current password, and new password are required\"}");
+            return;
+        }
+        if (newPassword.length() < 8) {
+            writeJson(resp, HttpServletResponse.SC_BAD_REQUEST,
+                    "{\"success\":false,\"message\":\"Password must be at least 8 characters.\"}");
+            return;
+        }
+        if (!adminClient.authenticate(username, currentPassword)) {
+            AdminAuthFilter.recordFailedAttempt(clientIp);
+            AuditEngine.instance().record(username, "CHANGE_PASSWORD", "login-wizard",
+                    "Password change rejected due to invalid current credentials", clientIp, false);
+            writeJson(resp, HttpServletResponse.SC_UNAUTHORIZED,
+                    "{\"success\":false,\"message\":\"Current credentials are invalid.\"}");
+            return;
+        }
+
+        adminClient.changePassword(username, newPassword);
+        AdminAuthFilter.clearFailedAttempts(clientIp);
+        AuditEngine.instance().record(username, "CHANGE_PASSWORD", "login-wizard",
+                "Password changed from login wizard", clientIp, true);
+        writeJson(resp, HttpServletResponse.SC_OK,
+                "{\"success\":true,\"message\":\"Password changed successfully.\"}");
+    }
+
+    private static void writeJson(HttpServletResponse resp, int status, String body) throws IOException {
+        resp.setStatus(status);
+        resp.setContentType("application/json; charset=UTF-8");
+        resp.setCharacterEncoding("UTF-8");
+        resp.getWriter().write(body);
+    }
+
+    private static String readBody(HttpServletRequest req) throws IOException {
+        StringBuilder body = new StringBuilder();
+        try (BufferedReader reader = req.getReader()) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                body.append(line);
+            }
+        }
+        return body.toString();
+    }
+
+    private static String extractJsonValue(String json, String key) {
+        String search = "\"" + key + "\"";
+        int idx = json.indexOf(search);
+        if (idx < 0) return null;
+        int colon = json.indexOf(':', idx + search.length());
+        if (colon < 0) return null;
+        int qStart = json.indexOf('"', colon + 1);
+        if (qStart < 0) return null;
+        int qEnd = json.indexOf('"', qStart + 1);
+        if (qEnd < 0) return null;
+        return json.substring(qStart + 1, qEnd);
     }
 }

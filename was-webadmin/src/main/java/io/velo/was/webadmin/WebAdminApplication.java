@@ -1,5 +1,7 @@
 package io.velo.was.webadmin;
 
+import io.velo.was.admin.client.AdminClient;
+import io.velo.was.admin.client.LocalAdminClient;
 import io.velo.was.config.ServerConfiguration;
 import io.velo.was.servlet.SimpleServletApplication;
 import io.velo.was.webadmin.api.AdminApiDocsServlet;
@@ -45,12 +47,13 @@ public final class WebAdminApplication {
      */
     public static SimpleServletApplication create(ServerConfiguration configuration) {
         String contextPath = configuration.getServer().getWebAdmin().getContextPath();
+        AdminClient adminClient = new LocalAdminClient(configuration);
 
         var builder = SimpleServletApplication.builder(APP_NAME, contextPath)
                 .filter(new AdminAuthFilter())
                 // Core pages
                 .servlet("/", new AdminDashboardServlet(configuration))
-                .servlet("/login", new AdminLoginServlet(configuration))
+                .servlet("/login", new AdminLoginServlet(configuration, adminClient))
                 .servlet("/logout", new AdminLogoutServlet())
                 .servlet("/console", new AdminConsoleServlet(configuration))
                 // Management pages
@@ -67,7 +70,7 @@ public final class WebAdminApplication {
                 .servlet("/scripts", new ScriptsPageServlet(configuration))
                 .servlet("/settings", new SettingsPageServlet(configuration))
                 // API endpoints
-                .servlet("/api/*", new AdminApiServlet(configuration))
+                .servlet("/api/*", new AdminApiServlet(configuration, adminClient))
                 .servlet("/sse/*", new AdminSseServlet(configuration))
                 // Static resources
                 .servlet("/static/*", new AdminStaticResourceServlet());

@@ -65,6 +65,7 @@ public final class WebXmlParser {
         Element root = document.getDocumentElement();
 
         String displayName = textContent(root, "display-name");
+        boolean metadataComplete = Boolean.parseBoolean(root.getAttribute("metadata-complete"));
         Map<String, String> contextParams = parseContextParams(root);
         List<WebXmlDescriptor.ServletDef> servlets = parseServlets(root);
         List<WebXmlDescriptor.ServletMapping> servletMappings = parseServletMappings(root);
@@ -75,7 +76,7 @@ public final class WebXmlParser {
         List<WebXmlDescriptor.ErrorPageDef> errorPages = parseErrorPages(root);
 
         WebXmlDescriptor descriptor = new WebXmlDescriptor(
-                displayName, contextParams, servlets, servletMappings,
+                displayName, metadataComplete, contextParams, servlets, servletMappings,
                 filters, filterMappings, listeners, welcomeFiles, errorPages);
 
         log.info("Parsed web.xml: servlets={}, filters={}, listeners={}, mappings={}, errorPages={}",
@@ -158,10 +159,15 @@ public final class WebXmlParser {
             Element element = (Element) nodes.item(i);
             String name = textContent(element, "filter-name");
             List<String> urlPatterns = textContents(element, "url-pattern");
+            List<String> servletNames = textContents(element, "servlet-name");
             List<String> dispatchers = textContents(element, "dispatcher");
             if (name != null) {
                 for (String pattern : urlPatterns) {
-                    mappings.add(new WebXmlDescriptor.FilterMapping(name, pattern,
+                    mappings.add(new WebXmlDescriptor.FilterMapping(name, pattern, null,
+                            dispatchers.isEmpty() ? List.of("REQUEST") : dispatchers));
+                }
+                for (String servletName : servletNames) {
+                    mappings.add(new WebXmlDescriptor.FilterMapping(name, null, servletName,
                             dispatchers.isEmpty() ? List.of("REQUEST") : dispatchers));
                 }
             }

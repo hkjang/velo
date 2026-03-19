@@ -9,6 +9,7 @@ import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.Cookie;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,6 +29,8 @@ class VeloAsyncContext implements AsyncContext {
     private final ResponseSink responseSink;
     private final AsyncDispatcher dispatcher;
     private final ScheduledExecutorService scheduler;
+    private final Runnable cleanup;
+    private final boolean hasOriginalRequestAndResponse;
     private final List<AsyncListener> listeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean completed = new AtomicBoolean(false);
     private volatile long timeout = 30000;
@@ -40,7 +43,8 @@ class VeloAsyncContext implements AsyncContext {
                      String httpMethod,
                      ResponseSink responseSink,
                      AsyncDispatcher dispatcher,
-                     ScheduledExecutorService scheduler) {
+                     ScheduledExecutorService scheduler,
+                     Runnable cleanup) {
         this.request = request;
         this.response = response;
         this.responseContext = responseContext;
@@ -49,6 +53,10 @@ class VeloAsyncContext implements AsyncContext {
         this.responseSink = responseSink;
         this.dispatcher = dispatcher;
         this.scheduler = scheduler;
+        this.cleanup = cleanup == null ? () -> {
+        } : cleanup;
+        this.hasOriginalRequestAndResponse =
+                DispatchBridgeSupport.hasOriginalRequestAndResponse(request, response);
         scheduleTimeout();
     }
 
@@ -64,12 +72,17 @@ class VeloAsyncContext implements AsyncContext {
 
     @Override
     public boolean hasOriginalRequestAndResponse() {
-        return true;
+        return hasOriginalRequestAndResponse;
     }
 
     @Override
     public void dispatch() {
-        InternalRequestBridge bridge = (InternalRequestBridge) request;
+        InternalRequestBridge bridge;
+        try {
+            bridge = DispatchBridgeSupport.requestBridge(request);
+        } catch (ServletException e) {
+            throw new IllegalStateException("Unsupported async request type", e);
+        }
         ServletRequestContext ctx = bridge.requestContext();
         String path = ctx.servletPath();
         if (ctx.pathInfo() != null) {
@@ -80,8 +93,12 @@ class VeloAsyncContext implements AsyncContext {
 
     @Override
     public void dispatch(String path) {
-        InternalRequestBridge bridge = (InternalRequestBridge) request;
-        dispatch(bridge.requestContext().servletContext(), path);
+        try {
+            InternalRequestBridge bridge = DispatchBridgeSupport.requestBridge(request);
+            dispatch(bridge.requestContext().servletContext(), path);
+        } catch (ServletException e) {
+            throw new IllegalStateException("Unsupported async request type", e);
+        }
     }
 
     @Override
@@ -110,12 +127,15 @@ class VeloAsyncContext implements AsyncContext {
             return;
         }
         cancelTimeout();
-        fireOnComplete();
+        try {
+            fireOnComplete();
+        } finally {
+            cleanup.run();
+        }
         if (responseSink != null && !responseContext.isCommitted()) {
             FullHttpResponse nettyResponse = responseContext.toNettyResponse(
                     "HEAD".equals(httpMethod),
-                    sessionHolder.shouldSetCookie(),
-                    sessionHolder.sessionId());
+                    sessionHolder.sessionCookie());
             responseSink.send(nettyResponse);
         }
     }
@@ -216,7 +236,6 @@ class VeloAsyncContext implements AsyncContext {
     }
 
     interface SessionHolder {
-        boolean shouldSetCookie();
-        String sessionId();
+        Cookie sessionCookie();
     }
 }

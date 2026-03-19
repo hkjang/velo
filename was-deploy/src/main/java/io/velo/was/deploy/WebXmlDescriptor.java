@@ -8,6 +8,7 @@ import java.util.Map;
  */
 public record WebXmlDescriptor(
         String displayName,
+        boolean metadataComplete,
         Map<String, String> contextParams,
         List<ServletDef> servlets,
         List<ServletMapping> servletMappings,
@@ -18,7 +19,7 @@ public record WebXmlDescriptor(
         List<ErrorPageDef> errorPages
 ) {
     public static WebXmlDescriptor empty() {
-        return new WebXmlDescriptor(null, Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        return new WebXmlDescriptor(null, false, Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     /**
@@ -77,8 +78,16 @@ public record WebXmlDescriptor(
     public record FilterMapping(
             String filterName,
             String urlPattern,
+            String servletName,
             List<String> dispatchers
     ) {
+        public boolean isUrlPatternMapping() {
+            return urlPattern != null;
+        }
+
+        public boolean isServletNameMapping() {
+            return servletName != null;
+        }
     }
 
     public record ErrorPageDef(

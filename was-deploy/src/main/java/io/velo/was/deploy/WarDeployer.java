@@ -5,12 +5,17 @@ import io.velo.was.servlet.ErrorPageSpec;
 import io.velo.was.servlet.FilterRegistrationSpec;
 import io.velo.was.servlet.ServletApplication;
 import io.velo.was.servlet.SimpleServletApplication;
+import io.velo.was.servlet.StaticResourceServlet;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.Servlet;
 import jakarta.servlet.ServletContextAttributeListener;
 import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.ServletRequestListener;
+import jakarta.servlet.annotation.WebFilter;
+import jakarta.servlet.annotation.WebInitParam;
+import jakarta.servlet.annotation.WebListener;
+import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpSessionAttributeListener;
 import jakarta.servlet.http.HttpSessionIdListener;
 import jakarta.servlet.http.HttpSessionListener;
@@ -19,15 +24,21 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.EventListener;
+import java.util.HashSet;
+import java.util.jar.JarFile;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Deploys a WAR file or exploded WAR directory into a {@link ServletApplication}.
@@ -87,6 +98,9 @@ public class WarDeployer {
         String appName = descriptor.displayName() != null ? descriptor.displayName() : deriveAppName(source);
 
         WebAppClassLoader classLoader = WebAppClassLoader.create(appName, appRoot, getClass().getClassLoader());
+        AnnotationScanResult annotations = descriptor.metadataComplete()
+                ? AnnotationScanResult.empty()
+                : scanAnnotations(appRoot, classLoader, descriptor);
 
         SimpleServletApplication.Builder appBuilder = SimpleServletApplication.builder(appName, normalizedContextPath)
                 .classLoader(classLoader)
@@ -118,6 +132,30 @@ public class WarDeployer {
             appBuilder.servlet(urlPattern, mapping.servletName(), servlet, servletDef.initParams());
             log.debug("app={} mapped servlet {} -> {}", appName, mapping.servletName(), urlPattern);
         }
+        for (AnnotatedServlet annotatedServlet : annotations.servlets()) {
+            servletInstances.put(annotatedServlet.name(), annotatedServlet.servlet());
+            for (String urlPattern : annotatedServlet.urlPatterns()) {
+                appBuilder.servlet(normalizeUrlPattern(urlPattern),
+                        annotatedServlet.name(),
+                        annotatedServlet.servlet(),
+                        annotatedServlet.initParams());
+                log.debug("app={} mapped annotated servlet {} -> {}",
+                        appName, annotatedServlet.name(), urlPattern);
+            }
+        }
+
+        boolean hasDefaultServlet = descriptor.servletMappings().stream()
+                .map(WebXmlDescriptor.ServletMapping::urlPattern)
+                .map(WarDeployer::normalizeUrlPattern)
+                .anyMatch("/"::equals)
+                || annotations.servlets().stream()
+                .flatMap(servlet -> servlet.urlPatterns().stream())
+                .map(WarDeployer::normalizeUrlPattern)
+                .anyMatch("/"::equals);
+        if (!hasDefaultServlet) {
+            appBuilder.servlet("/", "VeloDefaultStaticServlet", new StaticResourceServlet());
+            log.debug("app={} registered default static resource servlet", appName);
+        }
 
         // Instantiate and register filters with their mappings
         Map<String, Filter> filterInstances = new LinkedHashMap<>();
@@ -131,9 +169,43 @@ public class WarDeployer {
             if (filter == null) {
                 throw new DeploymentException("Filter mapping references unknown filter: " + mapping.filterName());
             }
+            WebXmlDescriptor.FilterDef filterDef = descriptor.filterByName(mapping.filterName());
             EnumSet<DispatcherType> types = parseDispatcherTypes(mapping.dispatchers());
-            appBuilder.filter(mapping.urlPattern(), filter, types.toArray(DispatcherType[]::new));
-            log.debug("app={} mapped filter {} -> {} dispatchers={}", appName, mapping.filterName(), mapping.urlPattern(), types);
+            Map<String, String> initParameters = filterDef == null ? Map.of() : filterDef.initParams();
+            if (mapping.isUrlPatternMapping()) {
+                appBuilder.filter(mapping.filterName(), mapping.urlPattern(), filter,
+                        initParameters,
+                        types.toArray(DispatcherType[]::new));
+                log.debug("app={} mapped filter {} -> {} dispatchers={}",
+                        appName, mapping.filterName(), mapping.urlPattern(), types);
+            } else if (mapping.isServletNameMapping()) {
+                appBuilder.filterForServlet(mapping.filterName(), mapping.servletName(), filter,
+                        initParameters,
+                        types.toArray(DispatcherType[]::new));
+                log.debug("app={} mapped filter {} -> servlet-name:{} dispatchers={}",
+                        appName, mapping.filterName(), mapping.servletName(), types);
+            }
+        }
+        for (AnnotatedFilter annotatedFilter : annotations.filters()) {
+            filterInstances.put(annotatedFilter.name(), annotatedFilter.filter());
+            for (String urlPattern : annotatedFilter.urlPatterns()) {
+                appBuilder.filter(annotatedFilter.name(),
+                        normalizeUrlPattern(urlPattern),
+                        annotatedFilter.filter(),
+                        annotatedFilter.initParams(),
+                        annotatedFilter.dispatcherTypes().toArray(DispatcherType[]::new));
+                log.debug("app={} mapped annotated filter {} -> {} dispatchers={}",
+                        appName, annotatedFilter.name(), urlPattern, annotatedFilter.dispatcherTypes());
+            }
+            for (String servletName : annotatedFilter.servletNames()) {
+                appBuilder.filterForServlet(annotatedFilter.name(),
+                        servletName,
+                        annotatedFilter.filter(),
+                        annotatedFilter.initParams(),
+                        annotatedFilter.dispatcherTypes().toArray(DispatcherType[]::new));
+                log.debug("app={} mapped annotated filter {} -> servlet-name:{} dispatchers={}",
+                        appName, annotatedFilter.name(), servletName, annotatedFilter.dispatcherTypes());
+            }
         }
 
         // Register welcome files from web.xml
@@ -155,25 +227,13 @@ public class WarDeployer {
         // Instantiate and register listeners
         for (String listenerClass : descriptor.listenerClasses()) {
             EventListener listener = instantiate(classLoader, listenerClass, EventListener.class);
-            if (listener instanceof ServletContextListener scl) {
-                appBuilder.servletContextListener(scl);
-            }
-            if (listener instanceof ServletContextAttributeListener scal) {
-                appBuilder.servletContextAttributeListener(scal);
-            }
-            if (listener instanceof ServletRequestListener srl) {
-                appBuilder.servletRequestListener(srl);
-            }
-            if (listener instanceof HttpSessionListener hsl) {
-                appBuilder.httpSessionListener(hsl);
-            }
-            if (listener instanceof HttpSessionAttributeListener hsal) {
-                appBuilder.httpSessionAttributeListener(hsal);
-            }
-            if (listener instanceof HttpSessionIdListener hsil) {
-                appBuilder.httpSessionIdListener(hsil);
-            }
+            registerListener(appBuilder, listener);
             log.debug("app={} registered listener {}", appName, listenerClass);
+        }
+        for (String listenerClass : annotations.listeners()) {
+            EventListener listener = instantiate(classLoader, listenerClass, EventListener.class);
+            registerListener(appBuilder, listener);
+            log.debug("app={} registered annotated listener {}", appName, listenerClass);
         }
 
         ServletApplication application = appBuilder.build();
@@ -264,6 +324,222 @@ public class WarDeployer {
         return types.isEmpty() ? EnumSet.of(DispatcherType.REQUEST) : types;
     }
 
+    private static AnnotationScanResult scanAnnotations(Path appRoot,
+                                                        ClassLoader classLoader,
+                                                        WebXmlDescriptor descriptor) throws IOException {
+        Set<String> existingServletClasses = descriptor.servlets().stream()
+                .map(WebXmlDescriptor.ServletDef::className)
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+        Set<String> existingServletNames = descriptor.servlets().stream()
+                .map(WebXmlDescriptor.ServletDef::name)
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+        Set<String> existingServletMappings = descriptor.servletMappings().stream()
+                .map(WebXmlDescriptor.ServletMapping::urlPattern)
+                .map(WarDeployer::normalizeUrlPattern)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        Set<String> existingFilterClasses = descriptor.filters().stream()
+                .map(WebXmlDescriptor.FilterDef::className)
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+        Set<String> existingFilterNames = descriptor.filters().stream()
+                .map(WebXmlDescriptor.FilterDef::name)
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+        Set<String> existingListenerClasses = new LinkedHashSet<>(descriptor.listenerClasses());
+
+        List<AnnotatedServlet> discoveredServlets = new ArrayList<>();
+        List<AnnotatedFilter> discoveredFilters = new ArrayList<>();
+        List<String> discoveredListeners = new ArrayList<>();
+
+        for (String className : discoverClassNames(appRoot)) {
+            try {
+                Class<?> candidate = classLoader.loadClass(className);
+
+                WebServlet webServlet = candidate.getAnnotation(WebServlet.class);
+                if (webServlet != null && Servlet.class.isAssignableFrom(candidate)) {
+                    AnnotatedServlet servlet = toAnnotatedServlet(candidate, webServlet, classLoader,
+                            existingServletClasses, existingServletNames, existingServletMappings);
+                    if (servlet != null) {
+                        discoveredServlets.add(servlet);
+                        existingServletClasses.add(className);
+                        existingServletNames.add(servlet.name());
+                        servlet.urlPatterns().stream()
+                                .map(WarDeployer::normalizeUrlPattern)
+                                .forEach(existingServletMappings::add);
+                    }
+                }
+
+                WebFilter webFilter = candidate.getAnnotation(WebFilter.class);
+                if (webFilter != null && Filter.class.isAssignableFrom(candidate)) {
+                    AnnotatedFilter filter = toAnnotatedFilter(candidate, webFilter, classLoader,
+                            existingFilterClasses, existingFilterNames);
+                    if (filter != null) {
+                        discoveredFilters.add(filter);
+                        existingFilterClasses.add(className);
+                        existingFilterNames.add(filter.name());
+                    }
+                }
+
+                if (candidate.isAnnotationPresent(WebListener.class)
+                        && EventListener.class.isAssignableFrom(candidate)
+                        && existingListenerClasses.add(className)) {
+                    discoveredListeners.add(className);
+                }
+            } catch (ClassNotFoundException | LinkageError | DeploymentException exception) {
+                log.debug("Skipping annotation scan for class {} due to load failure: {}", className, exception.toString());
+            }
+        }
+
+        log.info("Annotation scan completed: servlets={}, filters={}, listeners={}",
+                discoveredServlets.size(), discoveredFilters.size(), discoveredListeners.size());
+        return new AnnotationScanResult(discoveredServlets, discoveredFilters, discoveredListeners);
+    }
+
+    private static Set<String> discoverClassNames(Path appRoot) throws IOException {
+        Set<String> classNames = new LinkedHashSet<>();
+        Path classesDir = appRoot.resolve("WEB-INF").resolve("classes");
+        if (Files.isDirectory(classesDir)) {
+            try (var walk = Files.walk(classesDir)) {
+                walk.filter(Files::isRegularFile)
+                        .filter(path -> path.getFileName().toString().endsWith(".class"))
+                        .forEach(path -> classNames.add(toClassName(classesDir, path)));
+            }
+        }
+
+        Path libDir = appRoot.resolve("WEB-INF").resolve("lib");
+        if (Files.isDirectory(libDir)) {
+            try (DirectoryStream<Path> jars = Files.newDirectoryStream(libDir, "*.jar")) {
+                for (Path jar : jars) {
+                    try (JarFile jarFile = new JarFile(jar.toFile())) {
+                        jarFile.stream()
+                                .filter(entry -> !entry.isDirectory())
+                                .map(java.util.jar.JarEntry::getName)
+                                .filter(name -> name.endsWith(".class"))
+                                .filter(name -> !name.startsWith("META-INF/versions/"))
+                                .forEach(name -> classNames.add(name.substring(0, name.length() - 6).replace('/', '.')));
+                    }
+                }
+            }
+        }
+        return classNames;
+    }
+
+    private static String toClassName(Path classesDir, Path classFile) {
+        String relative = classesDir.relativize(classFile).toString().replace('\\', '/');
+        return relative.substring(0, relative.length() - 6).replace('/', '.');
+    }
+
+    private static AnnotatedServlet toAnnotatedServlet(Class<?> candidate,
+                                                       WebServlet annotation,
+                                                       ClassLoader classLoader,
+                                                       Set<String> existingServletClasses,
+                                                       Set<String> existingServletNames,
+                                                       Set<String> existingServletMappings) throws DeploymentException {
+        String className = candidate.getName();
+        String servletName = annotation.name().isBlank() ? candidate.getSimpleName() : annotation.name().trim();
+        if (existingServletClasses.contains(className) || existingServletNames.contains(servletName)) {
+            return null;
+        }
+
+        List<String> urlPatterns = annotationValues(annotation.value(), annotation.urlPatterns());
+        if (urlPatterns.isEmpty()) {
+            return null;
+        }
+
+        List<String> effectivePatterns = urlPatterns.stream()
+                .map(WarDeployer::normalizeUrlPattern)
+                .filter(pattern -> !existingServletMappings.contains(pattern))
+                .distinct()
+                .toList();
+        if (effectivePatterns.isEmpty()) {
+            return null;
+        }
+
+        Servlet servlet = instantiate(classLoader, className, Servlet.class);
+        return new AnnotatedServlet(servletName, className, servlet, initParams(annotation.initParams()), effectivePatterns);
+    }
+
+    private static AnnotatedFilter toAnnotatedFilter(Class<?> candidate,
+                                                     WebFilter annotation,
+                                                     ClassLoader classLoader,
+                                                     Set<String> existingFilterClasses,
+                                                     Set<String> existingFilterNames) throws DeploymentException {
+        String className = candidate.getName();
+        String filterName = annotation.filterName().isBlank() ? candidate.getSimpleName() : annotation.filterName().trim();
+        if (existingFilterClasses.contains(className) || existingFilterNames.contains(filterName)) {
+            return null;
+        }
+
+        List<String> urlPatterns = annotationValues(annotation.value(), annotation.urlPatterns());
+        List<String> servletNames = annotationValues(annotation.servletNames(), null);
+        if (urlPatterns.isEmpty() && servletNames.isEmpty()) {
+            return null;
+        }
+        urlPatterns = urlPatterns.stream().distinct().toList();
+        servletNames = servletNames.stream().distinct().toList();
+
+        Filter filter = instantiate(classLoader, className, Filter.class);
+        EnumSet<DispatcherType> dispatchers = annotation.dispatcherTypes().length == 0
+                ? EnumSet.of(DispatcherType.REQUEST)
+                : EnumSet.copyOf(List.of(annotation.dispatcherTypes()));
+        return new AnnotatedFilter(filterName, className, filter,
+                initParams(annotation.initParams()),
+                urlPatterns,
+                servletNames,
+                dispatchers);
+    }
+
+    private static List<String> annotationValues(String[] primary, String[] secondary) {
+        List<String> values = new ArrayList<>();
+        addNonBlank(values, primary);
+        addNonBlank(values, secondary);
+        return values;
+    }
+
+    private static void addNonBlank(Collection<String> target, String[] values) {
+        if (values == null) {
+            return;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                target.add(value.trim());
+            }
+        }
+    }
+
+    private static Map<String, String> initParams(WebInitParam[] initParams) {
+        Map<String, String> values = new LinkedHashMap<>();
+        if (initParams == null) {
+            return values;
+        }
+        for (WebInitParam initParam : initParams) {
+            if (initParam.name() != null && !initParam.name().isBlank()) {
+                values.put(initParam.name().trim(), initParam.value());
+            }
+        }
+        return values;
+    }
+
+    private static void registerListener(SimpleServletApplication.Builder appBuilder, EventListener listener) {
+        if (listener instanceof ServletContextListener scl) {
+            appBuilder.servletContextListener(scl);
+        }
+        if (listener instanceof ServletContextAttributeListener scal) {
+            appBuilder.servletContextAttributeListener(scal);
+        }
+        if (listener instanceof ServletRequestListener srl) {
+            appBuilder.servletRequestListener(srl);
+        }
+        if (listener instanceof HttpSessionListener hsl) {
+            appBuilder.httpSessionListener(hsl);
+        }
+        if (listener instanceof HttpSessionAttributeListener hsal) {
+            appBuilder.httpSessionAttributeListener(hsal);
+        }
+        if (listener instanceof HttpSessionIdListener hsil) {
+            appBuilder.httpSessionIdListener(hsil);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static <T> T instantiate(ClassLoader classLoader, String className, Class<T> expectedType) throws DeploymentException {
         try {
@@ -319,6 +595,36 @@ public class WarDeployer {
             WebAppClassLoader classLoader,
             WebXmlDescriptor descriptor,
             boolean extracted
+    ) {
+    }
+
+    private record AnnotationScanResult(
+            List<AnnotatedServlet> servlets,
+            List<AnnotatedFilter> filters,
+            List<String> listeners
+    ) {
+        private static AnnotationScanResult empty() {
+            return new AnnotationScanResult(List.of(), List.of(), List.of());
+        }
+    }
+
+    private record AnnotatedServlet(
+            String name,
+            String className,
+            Servlet servlet,
+            Map<String, String> initParams,
+            List<String> urlPatterns
+    ) {
+    }
+
+    private record AnnotatedFilter(
+            String name,
+            String className,
+            Filter filter,
+            Map<String, String> initParams,
+            List<String> urlPatterns,
+            List<String> servletNames,
+            EnumSet<DispatcherType> dispatcherTypes
     ) {
     }
 }

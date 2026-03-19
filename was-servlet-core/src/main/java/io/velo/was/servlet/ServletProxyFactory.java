@@ -118,7 +118,7 @@ final class ServletProxyFactory {
             case "createListener" -> ((Class<?>) args[0]).getDeclaredConstructor().newInstance();
             case "getSessionTimeout" -> 30;
             case "setSessionTimeout" -> null;
-            case "getContext", "getNamedDispatcher",
+            case "getContext",
                  "addServlet", "createServlet", "getServletRegistration",
                  "getServletRegistrations", "addFilter", "createFilter", "getFilterRegistration",
                  "getFilterRegistrations", "getJspConfigDescriptor", "getServlet", "getServlets",
@@ -126,6 +126,7 @@ final class ServletProxyFactory {
                  "getDefaultSessionTrackingModes", "getEffectiveSessionTrackingModes",
                  "getSessionCookieConfig" -> null;
             case "getRequestDispatcher" -> createRequestDispatcher(dispatcherResolver, (String) args[0]);
+            case "getNamedDispatcher" -> createNamedRequestDispatcher(dispatcherResolver, (String) args[0]);
             case "setSessionTrackingModes" -> null;
             default -> defaultValue(proxy, method, args);
         };
@@ -172,7 +173,7 @@ final class ServletProxyFactory {
                 handler);
     }
 
-    static ServletRequestEvent createServletRequestEvent(ServletContext servletContext, HttpServletRequest request) {
+    static ServletRequestEvent createServletRequestEvent(ServletContext servletContext, ServletRequest request) {
         return new ServletRequestEvent(servletContext, request);
     }
 
@@ -335,8 +336,12 @@ final class ServletProxyFactory {
             case "getOutputStream" -> responseContext.outputStream();
             case "isCommitted" -> responseContext.isCommitted();
             case "responseContext" -> responseContext;
-            case "reset", "resetBuffer" -> {
+            case "reset" -> {
                 responseContext.reset();
+                yield null;
+            }
+            case "resetBuffer" -> {
+                responseContext.resetBuffer();
                 yield null;
             }
             case "flushBuffer" -> {
@@ -560,6 +565,18 @@ final class ServletProxyFactory {
     interface RequestDispatcherResolver {
         void forward(String path, ServletRequest request, ServletResponse response) throws Exception;
         void include(String path, ServletRequest request, ServletResponse response) throws Exception;
+
+        default boolean hasNamedDispatcher(String servletName) {
+            return false;
+        }
+
+        default void forwardNamed(String servletName, ServletRequest request, ServletResponse response) throws Exception {
+            throw new ServletException("Named dispatcher not supported for " + servletName);
+        }
+
+        default void includeNamed(String servletName, ServletRequest request, ServletResponse response) throws Exception {
+            throw new ServletException("Named dispatcher not supported for " + servletName);
+        }
     }
 
     interface AsyncContextAccessor {
@@ -577,6 +594,29 @@ final class ServletProxyFactory {
             }
             case "include" -> {
                 resolver.include(path, (ServletRequest) args[0], (ServletResponse) args[1]);
+                yield null;
+            }
+            default -> defaultValue(proxy, method, args);
+        };
+
+        return (RequestDispatcher) Proxy.newProxyInstance(
+                RequestDispatcher.class.getClassLoader(),
+                new Class<?>[]{RequestDispatcher.class},
+                handler);
+    }
+
+    private static RequestDispatcher createNamedRequestDispatcher(RequestDispatcherResolver resolver, String servletName) {
+        if (servletName == null || servletName.isBlank() || !resolver.hasNamedDispatcher(servletName)) {
+            return null;
+        }
+
+        InvocationHandler handler = (proxy, method, args) -> switch (method.getName()) {
+            case "forward" -> {
+                resolver.forwardNamed(servletName, (ServletRequest) args[0], (ServletResponse) args[1]);
+                yield null;
+            }
+            case "include" -> {
+                resolver.includeNamed(servletName, (ServletRequest) args[0], (ServletResponse) args[1]);
                 yield null;
             }
             default -> defaultValue(proxy, method, args);

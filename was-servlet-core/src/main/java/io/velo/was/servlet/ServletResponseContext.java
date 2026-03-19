@@ -13,9 +13,12 @@ import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -259,12 +262,24 @@ class ServletResponseContext {
         if (committed) {
             throw new IllegalStateException("Response already committed");
         }
-        writer.flush();
-        outputStream.reset();
-        writer = newWriter();
+        resetBuffer();
         headers.clear();
         cookies.clear();
         status = 200;
+        errorSent = false;
+        errorMessage = null;
+    }
+
+    public void resetBuffer() {
+        if (committed) {
+            throw new IllegalStateException("Response already committed");
+        }
+        writer.flush();
+        outputStream.reset();
+        writer = newWriter();
+    }
+
+    public void clearErrorState() {
         errorSent = false;
         errorMessage = null;
     }
@@ -273,7 +288,7 @@ class ServletResponseContext {
         return committed;
     }
 
-    public FullHttpResponse toNettyResponse(boolean headRequest, boolean setSessionCookie, String sessionId) {
+    public FullHttpResponse toNettyResponse(boolean headRequest, Cookie sessionCookie) {
         writer.flush();
         byte[] body = applyCompatibilityPatches(outputStream.toByteArray());
         FullHttpResponse response = new DefaultFullHttpResponse(
@@ -289,13 +304,61 @@ class ServletResponseContext {
             response.headers().set(entry.getKey(), entry.getValue());
         }
         for (Cookie cookie : cookies) {
-            response.headers().add(HttpHeaderNames.SET_COOKIE, cookie.getName() + "=" + cookie.getValue() + "; Path=/; HttpOnly");
+            response.headers().add(HttpHeaderNames.SET_COOKIE, encodeCookie(cookie));
         }
-        if (setSessionCookie && sessionId != null) {
-            response.headers().add(HttpHeaderNames.SET_COOKIE, "JSESSIONID=" + sessionId + "; Path=/; HttpOnly");
+        if (sessionCookie != null) {
+            response.headers().add(HttpHeaderNames.SET_COOKIE, encodeCookie(sessionCookie));
         }
         committed = true;
         return response;
+    }
+
+    private static String encodeCookie(Cookie cookie) {
+        StringBuilder builder = new StringBuilder(cookie.getName())
+                .append('=')
+                .append(cookie.getValue() == null ? "" : cookie.getValue());
+
+        if (cookie.getPath() != null && !cookie.getPath().isBlank()) {
+            builder.append("; Path=").append(cookie.getPath());
+        }
+        if (cookie.getDomain() != null && !cookie.getDomain().isBlank()) {
+            builder.append("; Domain=").append(cookie.getDomain());
+        }
+        if (cookie.getMaxAge() >= 0) {
+            builder.append("; Max-Age=").append(cookie.getMaxAge());
+        }
+        if (cookie.getSecure()) {
+            builder.append("; Secure");
+        }
+        if (cookie.isHttpOnly()) {
+            builder.append("; HttpOnly");
+        }
+
+        appendCustomAttributes(builder, cookie);
+        return builder.toString();
+    }
+
+    private static void appendCustomAttributes(StringBuilder builder, Cookie cookie) {
+        Map<String, String> attributes = cookie.getAttributes();
+        if (attributes == null || attributes.isEmpty()) {
+            return;
+        }
+
+        Set<String> emitted = new LinkedHashSet<>(Set.of(
+                "path", "domain", "max-age", "secure", "httponly", "expires"));
+        for (Map.Entry<String, String> entry : attributes.entrySet()) {
+            if (entry.getKey() == null || entry.getKey().isBlank()) {
+                continue;
+            }
+            String normalized = entry.getKey().trim().toLowerCase(Locale.ROOT);
+            if (emitted.contains(normalized)) {
+                continue;
+            }
+            builder.append("; ").append(entry.getKey().trim());
+            if (entry.getValue() != null && !entry.getValue().isBlank()) {
+                builder.append('=').append(entry.getValue().trim());
+            }
+        }
     }
 
     private PrintWriter newWriter() {

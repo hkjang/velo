@@ -1,0 +1,77 @@
+{
+  "allowedLicenses": [
+    "Apache-2.0",
+    "MIT"
+  ],
+  "blockedLicenses": [
+    "GPL-2.0-only",
+    "GPL-3.0-only",
+    "AGPL-3.0-only",
+    "SSPL-1.0"
+  ],
+  "dependencies": [
+    {
+      "groupId": "io.netty",
+      "artifactId": "*",
+      "license": "Apache-2.0",
+      "status": "allowed",
+      "notes": "Netty transport, HTTP, and native runtime modules."
+    },
+    {
+      "groupId": "org.slf4j",
+      "artifactId": "*",
+      "license": "MIT",
+      "status": "allowed",
+      "notes": "Logging API and simple backend."
+    },
+    {
+      "groupId": "org.yaml",
+      "artifactId": "snakeyaml",
+      "license": "Apache-2.0",
+      "status": "allowed",
+      "notes": "YAML configuration parser."
+    },
+    {
+      "groupId": "jakarta.servlet",
+      "artifactId": "jakarta.servlet-api",
+      "license": "EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0",
+      "status": "review-required",
+      "notes": "Servlet specification API dependency. Keep out of Apache/MIT source-vendoring path and route through legal review for distribution."
+    },
+    {
+      "groupId": "jakarta.servlet.jsp",
+      "artifactId": "jakarta.servlet.jsp-api",
+      "license": "EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0",
+      "status": "review-required",
+      "notes": "JSP specification API dependency."
+    },
+    {
+      "groupId": "jakarta.el",
+      "artifactId": "jakarta.el-api",
+      "license": "EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0",
+      "status": "review-required",
+      "notes": "Expression Language specification API dependency."
+    },
+    {
+      "groupId": "org.jline",
+      "artifactId": "jline",
+      "license": "BSD-3-Clause",
+      "status": "review-required",
+      "notes": "Admin CLI shell dependency."
+    },
+    {
+      "groupId": "com.h2database",
+      "artifactId": "h2",
+      "license": "MPL-2.0 OR EPL-1.0",
+      "status": "review-required",
+      "notes": "Embedded datasource used in tests and local scenarios."
+    },
+    {
+      "groupId": "org.junit.jupiter",
+      "artifactId": "junit-jupiter",
+      "license": "EPL-2.0",
+      "status": "review-required",
+      "notes": "Test-only dependency."
+    }
+  ]
+}

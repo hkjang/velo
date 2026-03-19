@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpSessionIdListener;
 import jakarta.servlet.http.HttpSessionListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Cookie;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -42,6 +43,8 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
 
     private final HttpSessionStore sessionStore;
     private final SessionExpirationScheduler sessionScheduler;
+    private final SessionCookieSettings sessionCookieSettings;
+    private final ServletPathMapper servletPathMapper;
     private final Map<String, DeployedApplication> applications = new ConcurrentHashMap<>();
     private final Map<String, Object> serverAttributes = new ConcurrentHashMap<>();
     private final ScheduledExecutorService asyncExecutor =
@@ -49,14 +52,14 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                     Thread.ofVirtual().name("velo-async-", 0).factory());
 
     public SimpleServletContainer() {
-        this(60, 1800);
+        this(60, 1800, SessionCookieSettings.defaults(), new DefaultServletPathMapper());
     }
 
     /**
      * @param sessionPurgeIntervalSeconds interval between session expiration scans
      */
     public SimpleServletContainer(int sessionPurgeIntervalSeconds) {
-        this(sessionPurgeIntervalSeconds, 1800);
+        this(sessionPurgeIntervalSeconds, 1800, SessionCookieSettings.defaults(), new DefaultServletPathMapper());
     }
 
     /**
@@ -64,15 +67,62 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
      * @param defaultSessionTimeoutSeconds default session timeout in seconds
      */
     public SimpleServletContainer(int sessionPurgeIntervalSeconds, int defaultSessionTimeoutSeconds) {
-        this(new InMemoryHttpSessionStore(defaultSessionTimeoutSeconds), sessionPurgeIntervalSeconds);
+        this(new InMemoryHttpSessionStore(defaultSessionTimeoutSeconds),
+                sessionPurgeIntervalSeconds,
+                SessionCookieSettings.defaults(),
+                new DefaultServletPathMapper());
+    }
+
+    public SimpleServletContainer(int sessionPurgeIntervalSeconds,
+                                  int defaultSessionTimeoutSeconds,
+                                  SessionCookieSettings sessionCookieSettings) {
+        this(sessionPurgeIntervalSeconds,
+                defaultSessionTimeoutSeconds,
+                sessionCookieSettings,
+                new DefaultServletPathMapper());
+    }
+
+    public SimpleServletContainer(int sessionPurgeIntervalSeconds,
+                                  int defaultSessionTimeoutSeconds,
+                                  SessionCookieSettings sessionCookieSettings,
+                                  ServletPathMapper servletPathMapper) {
+        this(new InMemoryHttpSessionStore(defaultSessionTimeoutSeconds),
+                sessionPurgeIntervalSeconds,
+                sessionCookieSettings,
+                servletPathMapper);
     }
 
     public SimpleServletContainer(HttpSessionStore sessionStore) {
-        this(sessionStore, 60);
+        this(sessionStore, 60, SessionCookieSettings.defaults(), new DefaultServletPathMapper());
     }
 
     public SimpleServletContainer(HttpSessionStore sessionStore, int sessionPurgeIntervalSeconds) {
+        this(sessionStore,
+                sessionPurgeIntervalSeconds,
+                SessionCookieSettings.defaults(),
+                new DefaultServletPathMapper());
+    }
+
+    public SimpleServletContainer(HttpSessionStore sessionStore,
+                                  int sessionPurgeIntervalSeconds,
+                                  SessionCookieSettings sessionCookieSettings) {
+        this(sessionStore,
+                sessionPurgeIntervalSeconds,
+                sessionCookieSettings,
+                new DefaultServletPathMapper());
+    }
+
+    public SimpleServletContainer(HttpSessionStore sessionStore,
+                                  int sessionPurgeIntervalSeconds,
+                                  SessionCookieSettings sessionCookieSettings,
+                                  ServletPathMapper servletPathMapper) {
         this.sessionStore = Objects.requireNonNull(sessionStore, "sessionStore");
+        this.sessionCookieSettings = sessionCookieSettings == null
+                ? SessionCookieSettings.defaults()
+                : sessionCookieSettings;
+        this.servletPathMapper = servletPathMapper == null
+                ? new DefaultServletPathMapper()
+                : servletPathMapper;
         this.sessionScheduler = new SessionExpirationScheduler(this.sessionStore, sessionPurgeIntervalSeconds);
         this.sessionScheduler.start();
     }
@@ -132,6 +182,25 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                     public void include(String path, jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response) throws Exception {
                         dispatchFromProxy(application.contextPath(), path, request, response, DispatcherType.INCLUDE);
                     }
+
+                    @Override
+                    public boolean hasNamedDispatcher(String servletName) {
+                        return SimpleServletContainer.this.hasNamedDispatcher(application.contextPath(), servletName);
+                    }
+
+                    @Override
+                    public void forwardNamed(String servletName,
+                                             jakarta.servlet.ServletRequest request,
+                                             jakarta.servlet.ServletResponse response) throws Exception {
+                        dispatchNamedFromProxy(application.contextPath(), servletName, request, response, DispatcherType.FORWARD);
+                    }
+
+                    @Override
+                    public void includeNamed(String servletName,
+                                             jakarta.servlet.ServletRequest request,
+                                             jakarta.servlet.ServletResponse response) throws Exception {
+                        dispatchNamedFromProxy(application.contextPath(), servletName, request, response, DispatcherType.INCLUDE);
+                    }
                 });
         ServletContextEvent servletContextEvent = new ServletContextEvent(servletContext);
 
@@ -139,24 +208,30 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         for (int index = 0; index < application.filters().size(); index++) {
             FilterRegistrationSpec registration = application.filters().get(index);
             Filter filter = registration.filter();
+            Map<String, String> filterInitParameters = new LinkedHashMap<>(application.initParameters());
+            filterInitParameters.putAll(registration.initParameters());
             FilterConfig filterConfig = ServletProxyFactory.createFilterConfig(
-                    "filter-" + index,
+                    registration.filterName() == null ? "filter-" + index : registration.filterName(),
                     servletContext,
-                    application.initParameters());
+                    filterInitParameters);
             filter.init(filterConfig);
             filterRuntimes.add(new FilterRuntime(registration, filter));
         }
 
         Map<String, ServletRuntime> servletRuntimes = new LinkedHashMap<>();
+        Map<String, ServletRuntime> servletRuntimesByName = new LinkedHashMap<>();
         for (Map.Entry<String, Servlet> entry : application.servlets().entrySet()) {
             Map<String, String> servletInitParameters = new LinkedHashMap<>(application.initParameters());
             servletInitParameters.putAll(application.servletInitParameters(entry.getKey()));
+            String servletName = application.servletName(entry.getKey());
             ServletConfig config = ServletProxyFactory.createServletConfig(
-                    application.servletName(entry.getKey()),
+                    servletName,
                     servletContext,
                     servletInitParameters);
             entry.getValue().init(config);
-            servletRuntimes.put(entry.getKey(), new ServletRuntime(entry.getKey(), entry.getValue()));
+            ServletRuntime runtime = new ServletRuntime(entry.getKey(), servletName, entry.getValue());
+            servletRuntimes.put(entry.getKey(), runtime);
+            servletRuntimesByName.put(servletName, runtime);
         }
 
         List<ServletContextListener> servletContextListeners = List.copyOf(application.servletContextListeners());
@@ -174,6 +249,8 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 application.contextPath(),
                 servletContext,
                 servletRuntimes,
+                servletRuntimesByName,
+                this.servletPathMapper,
                 filterRuntimes,
                 servletContextListeners,
                 servletContextAttributeListeners,
@@ -234,12 +311,13 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             }
         }
 
-        ServletRuntime runtime = application.resolveServlet(effectivePath);
-        if (runtime == null) {
+        ResolvedServlet resolvedServlet = application.resolveServlet(effectivePath);
+        if (resolvedServlet == null) {
             return HttpResponses.notFound("No servlet mapping for " + exchange.path());
         }
-        String servletPath = resolveServletPath(applicationRelative, runtime.mapping);
-        String pathInfo = resolvePathInfo(applicationRelative, runtime.mapping);
+        ServletRuntime runtime = resolvedServlet.runtime();
+        String servletPath = resolvedServlet.pathMatch().servletPath();
+        String pathInfo = resolvedServlet.pathMatch().pathInfo();
 
         SessionState initialSessionState = resolveSession(exchange);
         ServletRequestContext requestContext = new ServletRequestContext(
@@ -261,6 +339,9 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                     sessionHolder,
                     exchange.request().method().name(),
                     exchange.responseSink(),
+                    null,
+                    null,
+                    null,
                     true);
             if (dispatchResult.asyncStarted()) {
                 return null;
@@ -283,8 +364,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             }
             return responseContext.toNettyResponse(
                     "HEAD".equals(exchange.request().method().name()),
-                    dispatchResult.sessionHolder.shouldSetCookie(),
-                    dispatchResult.sessionHolder.sessionId());
+                    dispatchResult.sessionHolder.sessionCookie());
         } catch (Exception exception) {
             try {
                 DispatchResult errorDispatchResult = dispatchErrorPage(
@@ -304,8 +384,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                     }
                     return responseContext.toNettyResponse(
                             "HEAD".equals(exchange.request().method().name()),
-                            sessionHolder.shouldSetCookie(),
-                            sessionHolder.sessionId());
+                            sessionHolder.sessionCookie());
                 }
             } catch (Exception ignored) {
                 // Fall back to plain 500 response when error-page dispatch fails.
@@ -319,8 +398,8 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                                    jakarta.servlet.ServletRequest request,
                                    jakarta.servlet.ServletResponse response,
                                    DispatcherType dispatcherType) throws Exception {
-        InternalRequestBridge requestBridge = (InternalRequestBridge) request;
-        InternalResponseBridge responseBridge = (InternalResponseBridge) response;
+        InternalRequestBridge requestBridge = DispatchBridgeSupport.requestBridge(request);
+        InternalResponseBridge responseBridge = DispatchBridgeSupport.responseBridge(response);
         ServletRequestContext sourceRequest = requestBridge.requestContext();
         ServletResponseContext sourceResponse = responseBridge.responseContext();
 
@@ -331,25 +410,30 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         if (application == null) {
             throw new jakarta.servlet.ServletException("No application for dispatcher path " + dispatchPath);
         }
-        ServletRuntime runtime = application.resolveServlet(dispatchPath);
-        if (runtime == null) {
+        ResolvedServlet resolvedServlet = application.resolveServlet(dispatchPath);
+        if (resolvedServlet == null) {
             throw new jakarta.servlet.ServletException("No servlet for dispatcher path " + dispatchPath);
         }
+        ServletRuntime runtime = resolvedServlet.runtime();
 
         if (dispatcherType == DispatcherType.FORWARD) {
-            sourceResponse.reset();
+            sourceResponse.resetBuffer();
+            sourceResponse.clearErrorState();
         }
 
         String applicationRelative = application.contextPath.isEmpty() ? dispatchPath : dispatchPath.substring(application.contextPath.length());
         if (applicationRelative.isEmpty()) {
             applicationRelative = "/";
         }
-        String servletPath = resolveServletPath(applicationRelative, runtime.mapping);
-        String pathInfo = resolvePathInfo(applicationRelative, runtime.mapping);
+        String servletPath = resolvedServlet.pathMatch().servletPath();
+        String pathInfo = resolvedServlet.pathMatch().pathInfo();
+        Runnable completionAction = null;
         if (dispatcherType == DispatcherType.FORWARD) {
             applyForwardAttributes(sourceRequest);
         } else if (dispatcherType == DispatcherType.INCLUDE) {
+            IncludeAttributeSnapshot includeSnapshot = snapshotIncludeAttributes(sourceRequest);
             applyIncludeAttributes(sourceRequest, dispatchPath, application.contextPath, servletPath, pathInfo, dispatchQueryString);
+            completionAction = () -> restoreIncludeAttributes(sourceRequest, includeSnapshot);
         }
 
         String effectiveRequestUri = dispatcherType == DispatcherType.FORWARD ? dispatchPath : sourceRequest.requestUri();
@@ -368,15 +452,62 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 new SessionHolder(application, dispatchRequest, application.servletContext, sourceRequest.sessionState()),
                 sourceRequest.request().method().name(),
                 null,
+                request,
+                response,
+                completionAction,
+                false);
+    }
+
+    private void dispatchNamedFromProxy(String contextPath,
+                                        String targetServletName,
+                                        jakarta.servlet.ServletRequest request,
+                                        jakarta.servlet.ServletResponse response,
+                                        DispatcherType dispatcherType) throws Exception {
+        InternalRequestBridge requestBridge = DispatchBridgeSupport.requestBridge(request);
+        InternalResponseBridge responseBridge = DispatchBridgeSupport.responseBridge(response);
+        ServletRequestContext sourceRequest = requestBridge.requestContext();
+        ServletResponseContext sourceResponse = responseBridge.responseContext();
+
+        DeployedApplication application = resolveApplicationByContextPath(contextPath);
+        if (application == null) {
+            throw new jakarta.servlet.ServletException("No application for dispatcher context " + contextPath);
+        }
+        ServletRuntime runtime = application.resolveServletByName(targetServletName);
+        if (runtime == null) {
+            throw new jakarta.servlet.ServletException("No servlet named " + targetServletName + " for context " + contextPath);
+        }
+
+        if (dispatcherType == DispatcherType.FORWARD) {
+            sourceResponse.resetBuffer();
+            sourceResponse.clearErrorState();
+        }
+
+        ServletRequestContext dispatchRequest = sourceRequest.forDispatch(
+                sourceRequest.requestUri(),
+                sourceRequest.queryString(),
+                sourceRequest.servletPath(),
+                sourceRequest.pathInfo(),
+                dispatcherType,
+                null);
+        dispatch(application,
+                runtime,
+                dispatchRequest,
+                sourceResponse,
+                new SessionHolder(application, dispatchRequest, application.servletContext, sourceRequest.sessionState()),
+                sourceRequest.request().method().name(),
+                null,
+                request,
+                response,
+                null,
                 false);
     }
 
     private void asyncDispatchFromContext(String contextPath,
-                                         String targetPath,
-                                         ServletRequest request,
-                                         ServletResponse response) throws Exception {
-        InternalRequestBridge requestBridge = (InternalRequestBridge) request;
-        InternalResponseBridge responseBridge = (InternalResponseBridge) response;
+                                          String targetPath,
+                                          ServletRequest request,
+                                          ServletResponse response) throws Exception {
+        InternalRequestBridge requestBridge = DispatchBridgeSupport.requestBridge(request);
+        InternalResponseBridge responseBridge = DispatchBridgeSupport.responseBridge(response);
         ServletRequestContext sourceRequest = requestBridge.requestContext();
         ServletResponseContext sourceResponse = responseBridge.responseContext();
 
@@ -387,17 +518,18 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         if (application == null) {
             throw new jakarta.servlet.ServletException("No application for async dispatch path " + dispatchPath);
         }
-        ServletRuntime runtime = application.resolveServlet(dispatchPath);
-        if (runtime == null) {
+        ResolvedServlet resolvedServlet = application.resolveServlet(dispatchPath);
+        if (resolvedServlet == null) {
             throw new jakarta.servlet.ServletException("No servlet for async dispatch path " + dispatchPath);
         }
+        ServletRuntime runtime = resolvedServlet.runtime();
 
         String applicationRelative = application.contextPath.isEmpty() ? dispatchPath : dispatchPath.substring(application.contextPath.length());
         if (applicationRelative.isEmpty()) {
             applicationRelative = "/";
         }
-        String servletPath = resolveServletPath(applicationRelative, runtime.mapping);
-        String pathInfo = resolvePathInfo(applicationRelative, runtime.mapping);
+        String servletPath = resolvedServlet.pathMatch().servletPath();
+        String pathInfo = resolvedServlet.pathMatch().pathInfo();
 
         ServletRequestContext dispatchRequest = sourceRequest.forDispatch(
                 dispatchPath,
@@ -412,6 +544,9 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 new SessionHolder(application, dispatchRequest, application.servletContext, sourceRequest.sessionState()),
                 sourceRequest.request().method().name(),
                 null,
+                request,
+                response,
+                null,
                 false);
     }
 
@@ -422,10 +557,12 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                                     SessionHolder sessionHolder,
                                     String httpMethod,
                                     ResponseSink responseSink,
+                                    ServletRequest requestOverride,
+                                    ServletResponse responseOverride,
+                                    Runnable completionAction,
                                     boolean invokeRequestListeners) throws Exception {
         AsyncHolder asyncHolder = new AsyncHolder();
         HttpServletResponse response = ServletProxyFactory.createResponse(responseContext);
-        asyncHolder.response(response);
 
         HttpServletRequest request = ServletProxyFactory.createRequest(
                 requestContext,
@@ -456,13 +593,8 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                     public AsyncContext startAsync(ServletRequest req, ServletResponse res) {
                         VeloAsyncContext.SessionHolder asyncSessionHolder = new VeloAsyncContext.SessionHolder() {
                             @Override
-                            public boolean shouldSetCookie() {
-                                return sessionHolder.shouldSetCookie();
-                            }
-
-                            @Override
-                            public String sessionId() {
-                                return sessionHolder.sessionId();
+                            public Cookie sessionCookie() {
+                                return sessionHolder.sessionCookie();
                             }
                         };
                         VeloAsyncContext asyncContext = new VeloAsyncContext(
@@ -474,7 +606,8 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                                 responseSink,
                                 (path, asyncReq, asyncRes) ->
                                         asyncDispatchFromContext(application.contextPath, path, asyncReq, asyncRes),
-                                asyncExecutor);
+                                asyncExecutor,
+                                asyncHolder.restoreAction());
                         asyncHolder.start(asyncContext);
                         return asyncContext;
                     }
@@ -494,8 +627,22 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                         return asyncHolder.context();
                     }
                 });
-        asyncHolder.request(request);
-        ServletRequestEvent requestEvent = ServletProxyFactory.createServletRequestEvent(application.servletContext, request);
+        DispatchBridgeSupport.Binding<ServletRequest> requestBinding =
+                DispatchBridgeSupport.bindRequest(requestOverride, request);
+        DispatchBridgeSupport.Binding<ServletResponse> responseBinding =
+                DispatchBridgeSupport.bindResponse(responseOverride, response);
+        ServletRequest dispatchRequest = requestBinding.exposed();
+        ServletResponse dispatchResponse = responseBinding.exposed();
+        asyncHolder.request(dispatchRequest);
+        asyncHolder.response(dispatchResponse);
+        asyncHolder.restoreAction(() -> {
+            requestBinding.restore().run();
+            responseBinding.restore().run();
+            if (completionAction != null) {
+                completionAction.run();
+            }
+        });
+        ServletRequestEvent requestEvent = ServletProxyFactory.createServletRequestEvent(application.servletContext, dispatchRequest);
 
         try {
             if (invokeRequestListeners) {
@@ -503,13 +650,17 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                     listener.requestInitialized(requestEvent);
                 }
             }
-            new SimpleFilterChain(application.resolveFilters(requestContext), runtime.servlet).doFilter(request, response);
+            new SimpleFilterChain(application.resolveFilters(requestContext, runtime), runtime.servlet)
+                    .doFilter(dispatchRequest, dispatchResponse);
             return new DispatchResult(sessionHolder, asyncHolder.isStarted());
         } finally {
             if (invokeRequestListeners && !asyncHolder.isStarted()) {
                 for (int index = application.servletRequestListeners.size() - 1; index >= 0; index--) {
                     application.servletRequestListeners.get(index).requestDestroyed(requestEvent);
                 }
+            }
+            if (!asyncHolder.isStarted()) {
+                asyncHolder.restoreAction().run();
             }
         }
     }
@@ -548,6 +699,31 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         sourceRequest.setAttribute(RequestDispatcher.INCLUDE_QUERY_STRING, queryString);
     }
 
+    private IncludeAttributeSnapshot snapshotIncludeAttributes(ServletRequestContext requestContext) {
+        return new IncludeAttributeSnapshot(
+                requestContext.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI),
+                requestContext.getAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH),
+                requestContext.getAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH),
+                requestContext.getAttribute(RequestDispatcher.INCLUDE_PATH_INFO),
+                requestContext.getAttribute(RequestDispatcher.INCLUDE_QUERY_STRING));
+    }
+
+    private void restoreIncludeAttributes(ServletRequestContext requestContext, IncludeAttributeSnapshot snapshot) {
+        restoreAttribute(requestContext, RequestDispatcher.INCLUDE_REQUEST_URI, snapshot.requestUri());
+        restoreAttribute(requestContext, RequestDispatcher.INCLUDE_CONTEXT_PATH, snapshot.contextPath());
+        restoreAttribute(requestContext, RequestDispatcher.INCLUDE_SERVLET_PATH, snapshot.servletPath());
+        restoreAttribute(requestContext, RequestDispatcher.INCLUDE_PATH_INFO, snapshot.pathInfo());
+        restoreAttribute(requestContext, RequestDispatcher.INCLUDE_QUERY_STRING, snapshot.queryString());
+    }
+
+    private void restoreAttribute(ServletRequestContext requestContext, String name, Object value) {
+        if (value == null) {
+            requestContext.removeAttribute(name);
+            return;
+        }
+        requestContext.setAttribute(name, value);
+    }
+
     private String stripQueryString(String path) {
         int queryIndex = path.indexOf('?');
         return queryIndex >= 0 ? path.substring(0, queryIndex) : path;
@@ -581,10 +757,11 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         }
 
         String dispatchPath = application.contextPath + errorPage.location();
-        ServletRuntime errorRuntime = application.resolveServlet(dispatchPath);
-        if (errorRuntime == null) {
+        ResolvedServlet resolvedErrorServlet = application.resolveServlet(dispatchPath);
+        if (resolvedErrorServlet == null) {
             return null;
         }
+        ServletRuntime errorRuntime = resolvedErrorServlet.runtime();
 
         responseContext.reset();
         responseContext.setStatus(statusCode);
@@ -596,8 +773,8 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         if (applicationRelative.isEmpty()) {
             applicationRelative = "/";
         }
-        String servletPath = resolveServletPath(applicationRelative, errorRuntime.mapping);
-        String pathInfo = resolvePathInfo(applicationRelative, errorRuntime.mapping);
+        String servletPath = resolvedErrorServlet.pathMatch().servletPath();
+        String pathInfo = resolvedErrorServlet.pathMatch().pathInfo();
 
         ServletRequestContext errorRequest = sourceRequest.forDispatch(
                 dispatchPath,
@@ -605,14 +782,17 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 servletPath,
                 pathInfo,
                 DispatcherType.ERROR);
-        return dispatch(application,
-                errorRuntime,
-                errorRequest,
-                responseContext,
-                sessionHolder,
-                httpMethod,
-                responseSink,
-                false);
+            return dispatch(application,
+                    errorRuntime,
+                    errorRequest,
+                    responseContext,
+                    sessionHolder,
+                    httpMethod,
+                    responseSink,
+                    null,
+                    null,
+                    null,
+                    false);
     }
 
     private void populateErrorAttributes(ServletRequestContext requestContext,
@@ -635,6 +815,15 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 .filter(app -> app.matches(requestPath))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private DeployedApplication resolveApplicationByContextPath(String contextPath) {
+        return applications.get(applicationKey(contextPath));
+    }
+
+    private boolean hasNamedDispatcher(String contextPath, String servletName) {
+        DeployedApplication application = resolveApplicationByContextPath(contextPath);
+        return application != null && application.resolveServletByName(servletName) != null;
     }
 
     private void destroyApplication(DeployedApplication application) throws Exception {
@@ -668,7 +857,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         }
         for (String cookiePart : cookieHeader.split(";")) {
             String[] pair = cookiePart.trim().split("=", 2);
-            if (pair.length == 2 && "JSESSIONID".equals(pair[0].trim())) {
+            if (pair.length == 2 && sessionCookieSettings.name().equals(pair[0].trim())) {
                 SessionState sessionState = sessionStore.find(pair[1].trim());
                 if (sessionState != null && sessionState.isValid()) {
                     sessionState.touch();
@@ -693,9 +882,16 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         String base = directoryPath.endsWith("/") ? directoryPath : directoryPath + "/";
         for (String welcomeFile : application.welcomeFiles) {
             String candidate = base + welcomeFile;
+            try {
+                if (application.servletContext.getResource(candidate) != null) {
+                    return candidate;
+                }
+            } catch (Exception ignored) {
+                // Fall back to servlet mapping resolution when the resource lookup is unavailable.
+            }
             // Check if there's a servlet mapping that can handle this welcome file
             String testPath = application.contextPath + candidate;
-            ServletRuntime matched = application.resolveServlet(testPath);
+            ResolvedServlet matched = application.resolveServlet(testPath);
             if (matched != null) {
                 return candidate;
             }
@@ -703,40 +899,13 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         return null;
     }
 
-    private String resolveServletPath(String applicationRelative, String mapping) {
-        if ("/".equals(mapping) || mapping.startsWith("*.")) {
-            return applicationRelative;
-        }
-        // Path-prefix mapping: /path/* → servletPath = /path
-        if (mapping.endsWith("/*")) {
-            return mapping.substring(0, mapping.length() - 2);
-        }
-        return mapping;
-    }
-
-    private String resolvePathInfo(String applicationRelative, String mapping) {
-        if ("/".equals(mapping) || mapping.startsWith("*.")) {
-            return null;
-        }
-        // Path-prefix mapping: /path/* → pathInfo = remainder after prefix
-        if (mapping.endsWith("/*")) {
-            String prefix = mapping.substring(0, mapping.length() - 2);
-            if (applicationRelative.equals(prefix)) {
-                return null;
-            }
-            return applicationRelative.substring(prefix.length());
-        }
-        if (applicationRelative.equals(mapping)) {
-            return null;
-        }
-        return applicationRelative.substring(mapping.length());
-    }
-
     private record DeployedApplication(
             String name,
             String contextPath,
             ServletContext servletContext,
             Map<String, ServletRuntime> servlets,
+            Map<String, ServletRuntime> servletsByName,
+            ServletPathMapper servletPathMapper,
             List<FilterRuntime> filters,
             List<ServletContextListener> servletContextListeners,
             List<ServletContextAttributeListener> servletContextAttributeListeners,
@@ -754,30 +923,44 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             return requestPath.equals(contextPath) || requestPath.startsWith(contextPath + "/");
         }
 
-        private ServletRuntime resolveServlet(String requestPath) {
+        private ResolvedServlet resolveServlet(String requestPath) {
             String applicationRelative = contextPath.isEmpty() ? requestPath : requestPath.substring(contextPath.length());
             if (applicationRelative.isEmpty()) {
                 applicationRelative = "/";
             }
-            String resolvedPath = applicationRelative;
-
-            return servlets.values().stream()
-                    .sorted(Comparator.comparingInt((ServletRuntime runtime) -> runtime.mapping.length()).reversed())
-                    .filter(runtime -> runtime.matches(resolvedPath))
-                    .findFirst()
-                    .orElse(null);
+            ServletPathMatch pathMatch = servletPathMapper.resolve(servlets.keySet(), applicationRelative);
+            if (pathMatch == null) {
+                return null;
+            }
+            ServletRuntime runtime = servlets.get(pathMatch.mapping());
+            if (runtime == null) {
+                return null;
+            }
+            return new ResolvedServlet(runtime, pathMatch);
         }
 
-        private List<Filter> resolveFilters(ServletRequestContext requestContext) {
-            String applicationRelativePath = requestContext.servletPath();
-            if (requestContext.pathInfo() != null) {
-                applicationRelativePath = applicationRelativePath + requestContext.pathInfo();
+        private ServletRuntime resolveServletByName(String servletName) {
+            return servletsByName.get(servletName);
+        }
+
+        private List<Filter> resolveFilters(ServletRequestContext requestContext, ServletRuntime runtime) {
+            String effectivePath = requestContext.dispatchTargetPath();
+            List<Filter> resolvedFilters = new ArrayList<>();
+            if (effectivePath != null) {
+                for (FilterRuntime filterRuntime : filters) {
+                    if (filterRuntime.registration.isUrlPatternMapping()
+                            && filterRuntime.registration.matchesPath(effectivePath, requestContext.dispatcherType())) {
+                        resolvedFilters.add(filterRuntime.filter);
+                    }
+                }
             }
-            String effectivePath = applicationRelativePath == null || applicationRelativePath.isBlank() ? "/" : applicationRelativePath;
-            return filters.stream()
-                    .filter(runtime -> runtime.registration.matches(effectivePath, requestContext.dispatcherType()))
-                    .map(runtime -> runtime.filter)
-                    .toList();
+            for (FilterRuntime filterRuntime : filters) {
+                if (filterRuntime.registration.isServletNameMapping()
+                        && filterRuntime.registration.matchesServlet(runtime.servletName, requestContext.dispatcherType())) {
+                    resolvedFilters.add(filterRuntime.filter);
+                }
+            }
+            return resolvedFilters;
         }
 
         private ErrorPageSpec resolveErrorPage(Throwable throwable, int statusCode) {
@@ -807,28 +990,13 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
 
     private static class ServletRuntime {
         private final String mapping;
+        private final String servletName;
         private final Servlet servlet;
 
-        private ServletRuntime(String mapping, Servlet servlet) {
+        private ServletRuntime(String mapping, String servletName, Servlet servlet) {
             this.mapping = mapping;
+            this.servletName = servletName;
             this.servlet = servlet;
-        }
-
-        private boolean matches(String applicationRelative) {
-            if ("/".equals(mapping)) {
-                return true;
-            }
-            // Extension mapping: *.ext
-            if (mapping.startsWith("*.")) {
-                String extension = mapping.substring(1); // ".jsp"
-                return applicationRelative.endsWith(extension);
-            }
-            // Path-prefix mapping: /path/*
-            if (mapping.endsWith("/*")) {
-                String prefix = mapping.substring(0, mapping.length() - 2);
-                return applicationRelative.equals(prefix) || applicationRelative.startsWith(prefix + "/");
-            }
-            return applicationRelative.equals(mapping) || applicationRelative.startsWith(mapping + "/");
         }
 
         private void service(HttpServletRequest request, HttpServletResponse response) throws Exception {
@@ -849,10 +1017,22 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
     private record DispatchResult(SessionHolder sessionHolder, boolean asyncStarted) {
     }
 
+    private record ResolvedServlet(ServletRuntime runtime, ServletPathMatch pathMatch) {
+    }
+
+    private record IncludeAttributeSnapshot(Object requestUri,
+                                            Object contextPath,
+                                            Object servletPath,
+                                            Object pathInfo,
+                                            Object queryString) {
+    }
+
     private static class AsyncHolder {
         private volatile VeloAsyncContext context;
-        private volatile HttpServletRequest request;
-        private volatile HttpServletResponse response;
+        private volatile ServletRequest request;
+        private volatile ServletResponse response;
+        private volatile Runnable restoreAction = () -> {
+        };
 
         void start(VeloAsyncContext ctx) {
             this.context = ctx;
@@ -866,20 +1046,29 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             return context;
         }
 
-        void request(HttpServletRequest request) {
+        void request(ServletRequest request) {
             this.request = request;
         }
 
-        HttpServletRequest request() {
+        ServletRequest request() {
             return request;
         }
 
-        void response(HttpServletResponse response) {
+        void response(ServletResponse response) {
             this.response = response;
         }
 
-        HttpServletResponse response() {
+        ServletResponse response() {
             return response;
+        }
+
+        void restoreAction(Runnable restoreAction) {
+            this.restoreAction = restoreAction == null ? () -> {
+            } : restoreAction;
+        }
+
+        Runnable restoreAction() {
+            return restoreAction;
         }
     }
 
@@ -945,8 +1134,14 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
             return created || sessionCookieUpdated;
         }
 
-        private String sessionId() {
-            return session == null ? null : session.getId();
+        private Cookie sessionCookie() {
+            if (!shouldSetCookie() || session == null) {
+                return null;
+            }
+            return sessionCookieSettings.createSessionCookie(
+                    session.getId(),
+                    application.contextPath(),
+                    requestContext.requestSecure());
         }
 
         private SessionState.SessionNotifier sessionNotifier() {

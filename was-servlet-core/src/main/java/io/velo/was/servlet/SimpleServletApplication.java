@@ -240,15 +240,39 @@ public class SimpleServletApplication implements ServletApplication {
         }
 
         public Builder filter(Filter filter) {
-            filters.add(new FilterRegistrationSpec("/*", filter, EnumSet.allOf(DispatcherType.class)));
+            filters.add(new FilterRegistrationSpec(null, "/*", filter, EnumSet.allOf(DispatcherType.class), Map.of()));
             return this;
         }
 
         public Builder filter(String pathPattern, Filter filter, DispatcherType... dispatcherTypes) {
+            return filter(null, pathPattern, filter, Map.of(), dispatcherTypes);
+        }
+
+        public Builder filter(String filterName,
+                              String pathPattern,
+                              Filter filter,
+                              Map<String, String> initParameters,
+                              DispatcherType... dispatcherTypes) {
             EnumSet<DispatcherType> types = dispatcherTypes == null || dispatcherTypes.length == 0
                     ? EnumSet.allOf(DispatcherType.class)
                     : EnumSet.copyOf(List.of(dispatcherTypes));
-            filters.add(new FilterRegistrationSpec(pathPattern, filter, types));
+            filters.add(new FilterRegistrationSpec(filterName, pathPattern, filter, types, initParameters));
+            return this;
+        }
+
+        public Builder filterForServlet(String servletName, Filter filter, DispatcherType... dispatcherTypes) {
+            return filterForServlet(null, servletName, filter, Map.of(), dispatcherTypes);
+        }
+
+        public Builder filterForServlet(String filterName,
+                                        String servletName,
+                                        Filter filter,
+                                        Map<String, String> initParameters,
+                                        DispatcherType... dispatcherTypes) {
+            EnumSet<DispatcherType> types = dispatcherTypes == null || dispatcherTypes.length == 0
+                    ? EnumSet.allOf(DispatcherType.class)
+                    : EnumSet.copyOf(List.of(dispatcherTypes));
+            filters.add(FilterRegistrationSpec.forServletName(filterName, servletName, filter, types, initParameters));
             return this;
         }
 

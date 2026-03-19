@@ -10,8 +10,10 @@ import io.velo.was.http.HttpHandlerRegistry;
 import io.velo.was.http.HttpResponses;
 import io.velo.was.observability.MetricsCollector;
 import io.velo.was.jsp.JspServlet;
+import io.velo.was.servlet.SessionCookieSettings;
 import io.velo.was.servlet.SimpleServletApplication;
 import io.velo.was.servlet.SimpleServletContainer;
+import io.velo.was.servlet.ServletPathMapperFactory;
 import io.velo.was.tcp.bootstrap.TcpListenerManager;
 import io.velo.was.tcp.router.TcpMessageRouter;
 import io.velo.was.transport.netty.NettyServer;
@@ -42,7 +44,10 @@ public final class VeloWasApplication {
 
         SimpleServletContainer servletContainer = new SimpleServletContainer(
                 sessionConfig.getPurgeIntervalSeconds(),
-                sessionConfig.getTimeoutSeconds());
+                sessionConfig.getTimeoutSeconds(),
+                toSessionCookieSettings(sessionConfig.getCookie()),
+                ServletPathMapperFactory.fromStrategy(configuration.getServer().getServlet().getMappingStrategy()));
+        log.info("Servlet mapping strategy: {}", configuration.getServer().getServlet().getMappingStrategy());
 
         // Deploy Web Admin application (before business apps for bootstrap priority)
         ServerConfiguration.WebAdmin webAdminConfig = configuration.getServer().getWebAdmin();
@@ -231,5 +236,19 @@ public final class VeloWasApplication {
         if (!configuration.getServer().getDeploy().isHotDeploy()) {
             log.info("Deployed via upload without hot deploy: {}", warPath);
         }
+    }
+
+    private static SessionCookieSettings toSessionCookieSettings(ServerConfiguration.SessionCookie cookie) {
+        if (cookie == null) {
+            return SessionCookieSettings.defaults();
+        }
+        return new SessionCookieSettings(
+                cookie.getName(),
+                cookie.getPath(),
+                cookie.isHttpOnly(),
+                SessionCookieSettings.SecureMode.from(cookie.getSecureMode()),
+                cookie.getSameSite(),
+                cookie.getMaxAgeSeconds(),
+                cookie.getDomain());
     }
 }

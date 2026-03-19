@@ -1,0 +1,12 @@
+velo-was Third-Party Notice
+===========================
+
+This repository tracks third-party reuse policy, dependency status, and
+vendored-source notices under `THIRD_PARTY.md` and `third_party/`.
+
+Vendored source currently includes Apache Tomcat 11.0.18 under
+`vendor/upstream/apache-tomcat/11.0.18`.
+The upstream `LICENSE` and `NOTICE` files are preserved in that source tree.
+
+Apache and Tomcat are trademarks of The Apache Software Foundation. Source-code
+reuse and trademark usage must be reviewed separately.

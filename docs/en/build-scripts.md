@@ -1,4 +1,4 @@
-# Build / Start / Stop Scripts Guide
+﻿# Build / Start / Stop Scripts Guide
 
 Velo WAS provides platform-specific build, start, and stop scripts for Linux/macOS, Windows CMD, and Windows PowerShell.
 All scripts are located in the `bin/` directory.
@@ -7,15 +7,15 @@ All scripts are located in the `bin/` directory.
 
 ```
 bin/
-├── build.sh          # Linux / macOS build
-├── build.bat         # Windows CMD build
-├── build.ps1         # Windows PowerShell build
-├── start.sh          # Linux / macOS start
-├── start.bat         # Windows CMD start
-├── start.ps1         # Windows PowerShell start
-├── stop.sh           # Linux / macOS stop
-├── stop.bat          # Windows CMD stop
-└── stop.ps1          # Windows PowerShell stop
+?쒋?? build.sh          # Linux / macOS build
+?쒋?? build.bat         # Windows CMD build
+?쒋?? build.ps1         # Windows PowerShell build
+?쒋?? start.sh          # Linux / macOS start
+?쒋?? start.bat         # Windows CMD start
+?쒋?? start.ps1         # Windows PowerShell start
+?쒋?? stop.sh           # Linux / macOS stop
+?쒋?? stop.bat          # Windows CMD stop
+?붴?? stop.ps1          # Windows PowerShell stop
 ```
 
 ## Prerequisites
@@ -120,7 +120,7 @@ bin\build.bat -c -p
 After packaging, the fat JAR is at:
 
 ```
-was-bootstrap/target/was-bootstrap-0.5.6-jar-with-dependencies.jar
+was-bootstrap/target/was-bootstrap-0.5.7-jar-with-dependencies.jar
 ```
 
 ---
@@ -130,10 +130,10 @@ was-bootstrap/target/was-bootstrap-0.5.6-jar-with-dependencies.jar
 ### Basic Usage
 
 ```bash
-# Linux / macOS — foreground
+# Linux / macOS ??foreground
 ./bin/start.sh
 
-# Linux / macOS — daemon mode
+# Linux / macOS ??daemon mode
 ./bin/start.sh -d
 
 # Windows CMD
@@ -226,7 +226,7 @@ bin\stop.bat
 
 #### Graceful Shutdown (default)
 
-1. Check PID file → verify process is running
+1. Check PID file ??verify process is running
 2. Send SIGTERM (Linux/macOS) or `taskkill` (Windows)
 3. Wait up to 30 seconds (progress printed every 5 seconds)
 4. Force kill on timeout (SIGKILL / `taskkill /F`)
@@ -320,8 +320,9 @@ curl http://localhost:8080/admin/api/status
 ### Quick Module Rebuild
 
 ```bash
-# Rebuild webadmin only → repackage → restart
+# Rebuild webadmin only ??repackage ??restart
 ./bin/stop.sh
 ./bin/build.sh -p was-webadmin was-bootstrap
 ./bin/start.sh -d
 ```
+

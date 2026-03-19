@@ -1,18 +1,18 @@
-# WAR 배포 및 JSP 테스트 가이드
+﻿# WAR 諛고룷 諛?JSP ?뚯뒪??媛?대뱶
 
-이 문서는 Velo WAS 프로젝트에서 `test-war` 및 `test-app.war`를 배포하고 Servlet 및 JSP 엔드포인트가 올바르게 동작하는지 확인하는 과정을 안내합니다.
+??臾몄꽌??Velo WAS ?꾨줈?앺듃?먯꽌 `test-war` 諛?`test-app.war`瑜?諛고룷?섍퀬 Servlet 諛?JSP ?붾뱶?ъ씤?멸? ?щ컮瑜닿쾶 ?숈옉?섎뒗吏 ?뺤씤?섎뒗 怨쇱젙???덈궡?⑸땲??
 
-## 시스템 요구 사항
+## ?쒖뒪???붽뎄 ?ы빆
 
-- Java 21 이상
-- Maven (빌드 용도)
-- curl 유틸리티 (HTTP 테스트 용도)
+- Java 21 ?댁긽
+- Maven (鍮뚮뱶 ?⑸룄)
+- curl ?좏떥由ы떚 (HTTP ?뚯뒪???⑸룄)
 
-## 1. 사전 준비 및 빌드
+## 1. ?ъ쟾 以鍮?諛?鍮뚮뱶
 
-배포 및 핫 디플로이(Hot Deploy) 기능을 테스트하기 위해, 서버 환경 설정 파일(`conf/server.yaml`)에서 해당 기능을 활성화해야 합니다.
+諛고룷 諛????뷀뵆濡쒖씠(Hot Deploy) 湲곕뒫???뚯뒪?명븯湲??꾪빐, ?쒕쾭 ?섍꼍 ?ㅼ젙 ?뚯씪(`conf/server.yaml`)?먯꽌 ?대떦 湲곕뒫???쒖꽦?뷀빐???⑸땲??
 
-`conf/server.yaml` 파일을 열고 다음과 같이 `hotDeploy`를 `true`로 설정합니다:
+`conf/server.yaml` ?뚯씪???닿퀬 ?ㅼ쓬怨?媛숈씠 `hotDeploy`瑜?`true`濡??ㅼ젙?⑸땲??
 
 ```yaml
 deploy:
@@ -21,47 +21,47 @@ deploy:
   scanIntervalSeconds: 2
 ```
 
-설정 변경 후 Velo WAS 전체를 빌드합니다.
+?ㅼ젙 蹂寃???Velo WAS ?꾩껜瑜?鍮뚮뱶?⑸땲??
 
 ```sh
-# Velo WAS 전체 빌드
+# Velo WAS ?꾩껜 鍮뚮뱶
 mvn clean package -DskipTests
 ```
 
-## 2. 서버 실행
+## 2. ?쒕쾭 ?ㅽ뻾
 
-다음 명령어를 통해 Velo WAS 서버를 백그라운드나 새 터미널 창에서 실행합니다.
+?ㅼ쓬 紐낅졊?대? ?듯빐 Velo WAS ?쒕쾭瑜?諛깃렇?쇱슫?쒕굹 ???곕???李쎌뿉???ㅽ뻾?⑸땲??
 
 ```sh
-java -jar was-bootstrap/target/was-bootstrap-0.5.6-jar-with-dependencies.jar
+java -jar was-bootstrap/target/was-bootstrap-0.5.7-jar-with-dependencies.jar
 ```
 
-서버 구동 로그에 `Hot deploy watcher started` 메시지가 표시되면 정상적으로 자동 배포를 모니터링 중인 상태입니다.
+?쒕쾭 援щ룞 濡쒓렇??`Hot deploy watcher started` 硫붿떆吏媛 ?쒖떆?섎㈃ ?뺤긽?곸쑝濡??먮룞 諛고룷瑜?紐⑤땲?곕쭅 以묒씤 ?곹깭?낅땲??
 
 ---
 
-## 3. Servlet 프로젝트 배포 테스트 (`test.war`)
+## 3. Servlet ?꾨줈?앺듃 諛고룷 ?뚯뒪??(`test.war`)
 
-`test-war` 모듈은 기본적인 Servlet과 Filter 동작을 검증하기 위한 프로젝트입니다.
+`test-war` 紐⑤뱢? 湲곕낯?곸씤 Servlet怨?Filter ?숈옉??寃利앺븯湲??꾪븳 ?꾨줈?앺듃?낅땲??
 
-### 3.1. 패키징 및 배포
+### 3.1. ?⑦궎吏?諛?諛고룷
 
-`test-war` 디렉토리로 이동하여 패키징 후 서버의 `deploy` 디렉토리로 복사합니다.
+`test-war` ?붾젆?좊━濡??대룞?섏뿬 ?⑦궎吏????쒕쾭??`deploy` ?붾젆?좊━濡?蹂듭궗?⑸땲??
 
 ```sh
-# test-war 빌드
+# test-war 鍮뚮뱶
 cd test-war
 mvn clean package
 
-# 빌드 결과물을 Velo WAS의 deploy 디렉토리로 복사
-cp target/test-war-0.5.6.war ../deploy/test.war
+# 鍮뚮뱶 寃곌낵臾쇱쓣 Velo WAS??deploy ?붾젆?좊━濡?蹂듭궗
+cp target/test-war-0.5.7.war ../deploy/test.war
 ```
 
-`hotDeploy`가 활성화되어 있으므로, 복사 즉시(약 2초 내) 서버 로그에 배포 완료 메시지가 나타납니다.
+`hotDeploy`媛 ?쒖꽦?붾릺???덉쑝誘濡? 蹂듭궗 利됱떆(??2珥??? ?쒕쾭 濡쒓렇??諛고룷 ?꾨즺 硫붿떆吏媛 ?섑??⑸땲??
 
-### 3.2. 엔드포인트 검증
+### 3.2. ?붾뱶?ъ씤??寃利?
 
-배포가 완료되면 `curl` 명령어를 통해 서블릿 응답을 확인합니다.
+諛고룷媛 ?꾨즺?섎㈃ `curl` 紐낅졊?대? ?듯빐 ?쒕툝由??묐떟???뺤씤?⑸땲??
 
 ```sh
 $ curl -s http://localhost:8080/test/hello
@@ -69,46 +69,46 @@ $ curl -s http://localhost:8080/test/hello
 Hello from TestServlet! User-Agent: curl/8.x.x
 ```
 
-![TestServlet 응답 화면](../images/test_war_hello.png)
+![TestServlet ?묐떟 ?붾㈃](../images/test_war_hello.png)
 
-응답이 올바르게 출력된다면 `test.war`의 Servlet 매핑이 성공적으로 동작하는 것입니다.
+?묐떟???щ컮瑜닿쾶 異쒕젰?쒕떎硫?`test.war`??Servlet 留ㅽ븨???깃났?곸쑝濡??숈옉?섎뒗 寃껋엯?덈떎.
 
 ---
 
-## 4. JSP 프로젝트 배포 테스트 (`test-app`)
+## 4. JSP ?꾨줈?앺듃 諛고룷 ?뚯뒪??(`test-app`)
 
-`test-app`은 JSP 파일 파싱, Java 변환 및 JspServlet 매핑을 검증하기 위한 프로젝트입니다.
+`test-app`? JSP ?뚯씪 ?뚯떛, Java 蹂??諛?JspServlet 留ㅽ븨??寃利앺븯湲??꾪븳 ?꾨줈?앺듃?낅땲??
 
-### 4.1. 프로젝트 구조
+### 4.1. ?꾨줈?앺듃 援ъ“
 
 ```text
 test-app/
-├── index.jsp         # 기본 시작 페이지
-├── info.jsp          # 시스템 정보를 보여주는 페이지 (<%@ page import="..." %> 포함)
-└── WEB-INF/
-    └── web.xml       # 매핑 정보
+?쒋?? index.jsp         # 湲곕낯 ?쒖옉 ?섏씠吏
+?쒋?? info.jsp          # ?쒖뒪???뺣낫瑜?蹂댁뿬二쇰뒗 ?섏씠吏 (<%@ page import="..." %> ?ы븿)
+?붴?? WEB-INF/
+    ?붴?? web.xml       # 留ㅽ븨 ?뺣낫
 ```
 
-### 4.2. 패키징 및 배포
+### 4.2. ?⑦궎吏?諛?諛고룷
 
-`test-app` 디렉토리에서 WAR 포맷으로 컴파일 후 배포합니다.
+`test-app` ?붾젆?좊━?먯꽌 WAR ?щ㎎?쇰줈 而댄뙆????諛고룷?⑸땲??
 
 ```sh
 cd ../test-app
 
-# 수동으로 WAR 파일 압축 (jar 명령어 활용)
+# ?섎룞?쇰줈 WAR ?뚯씪 ?뺤텞 (jar 紐낅졊???쒖슜)
 jar -cvf ../deploy/test-app.war *
 ```
 
-배포 완료 시 로딩 로그에 다음과 같이 출력됩니다.
+諛고룷 ?꾨즺 ??濡쒕뵫 濡쒓렇???ㅼ쓬怨?媛숈씠 異쒕젰?⑸땲??
 > `INFO io.velo.was.deploy.WarDeployer - WAR deployed: name=test-app contextPath=/test-app source=deploy\test-app.war...`
 
-### 4.3. JSP 엔드포인트 검증
+### 4.3. JSP ?붾뱶?ъ씤??寃利?
 
-정상적으로 배포되었다면, 다음 URL을 호출하여 JSP 파일이 동적으로 HTML을 렌더링하는 것을 확인합니다.
+?뺤긽?곸쑝濡?諛고룷?섏뿀?ㅻ㈃, ?ㅼ쓬 URL???몄텧?섏뿬 JSP ?뚯씪???숈쟻?쇰줈 HTML???뚮뜑留곹븯??寃껋쓣 ?뺤씤?⑸땲??
 
 ```sh
-# 1. 메인 페이지 테스트
+# 1. 硫붿씤 ?섏씠吏 ?뚯뒪??
 $ curl -s http://localhost:8080/test-app/index.jsp
 
 <!DOCTYPE html>
@@ -123,35 +123,35 @@ $ curl -s http://localhost:8080/test-app/index.jsp
 </html>
 ```
 
-![test-app 메인 페이지 화면](../images/test_app_index.png)
+![test-app 硫붿씤 ?섏씠吏 ?붾㈃](../images/test_app_index.png)
 
 ```sh
-# 2. 서버 정보 페이지 테스트 (내부 JVM 객체 참조)
+# 2. ?쒕쾭 ?뺣낫 ?섏씠吏 ?뚯뒪??(?대? JVM 媛앹껜 李몄“)
 $ curl -s http://localhost:8080/test-app/info.jsp
 
 <!DOCTYPE html>
 <html>
 ...
     <table border="1" cellpadding="8" cellspacing="0">
-        <tr><th>항목</th><th>값</th></tr>
-        <tr><td>현재 시간</td><td>2026-03-15T11:03:34.840</td></tr>
+        <tr><th>??ぉ</th><th>媛?/th></tr>
+        <tr><td>?꾩옱 ?쒓컙</td><td>2026-03-15T11:03:34.840</td></tr>
 ...
 </html>
 ```
 
-![test-app 서버 정보 페이지 화면](../images/test_app_info.png)
+![test-app ?쒕쾭 ?뺣낫 ?섏씠吏 ?붾㈃](../images/test_app_info.png)
 
-위와 같이 `No servlet mapping` 에러나 `500 Server Error` 없이 HTML 본문과 정상적인 200 상태 코드가 반환되면 모든 JSP 컴파일, 트랜스레이션 및 클래스로더 연동이 완벽하게 성공한 것입니다.
+?꾩? 媛숈씠 `No servlet mapping` ?먮윭??`500 Server Error` ?놁씠 HTML 蹂몃Ц怨??뺤긽?곸씤 200 ?곹깭 肄붾뱶媛 諛섑솚?섎㈃ 紐⑤뱺 JSP 而댄뙆?? ?몃옖?ㅻ젅?댁뀡 諛??대옒?ㅻ줈???곕룞???꾨꼍?섍쾶 ?깃났??寃껋엯?덈떎.
 
 ---
 
-## 5. TCP 리스너 테스트 (Port 9090)
+## 5. TCP 由ъ뒪???뚯뒪??(Port 9090)
 
-Velo WAS는 웹 프로토콜 외에도 원원시 TCP 통신을 처리하기 위한 리스너를 지원합니다. `conf/server.yaml`에 정의된 `9090` 포트의 에코(Echo) 기능을 테스트합니다.
+Velo WAS?????꾨줈?좎퐳 ?몄뿉???먯썝??TCP ?듭떊??泥섎━?섍린 ?꾪븳 由ъ뒪?덈? 吏?먰빀?덈떎. `conf/server.yaml`???뺤쓽??`9090` ?ы듃???먯퐫(Echo) 湲곕뒫???뚯뒪?명빀?덈떎.
 
-### 5.1. 테스트용 파이썬 스크립트 (`test_tcp_echo.py`)
+### 5.1. ?뚯뒪?몄슜 ?뚯씠???ㅽ겕由쏀듃 (`test_tcp_echo.py`)
 
-TCP 리스너는 `LENGTH_FIELD` 프레이밍(4바이트 길이 헤더)을 사용하므로, 이를 준수하는 간단한 스크립트로 검증합니다.
+TCP 由ъ뒪?덈뒗 `LENGTH_FIELD` ?꾨젅?대컢(4諛붿씠??湲몄씠 ?ㅻ뜑)???ъ슜?섎?濡? ?대? 以?섑븯??媛꾨떒???ㅽ겕由쏀듃濡?寃利앺빀?덈떎.
 
 ```python
 import socket
@@ -161,11 +161,11 @@ def test_echo(msg):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(('127.0.0.1', 9090))
     
-    # [4바이트 길이] + [데이터] 전송
+    # [4諛붿씠??湲몄씠] + [?곗씠?? ?꾩넚
     payload = msg.encode('utf-8')
     s.sendall(struct.pack('>I', len(payload)) + payload)
     
-    # 응답 수신
+    # ?묐떟 ?섏떊
     header = s.recv(4)
     resp_len = struct.unpack('>I', header)[0]
     data = s.recv(resp_len)
@@ -175,23 +175,23 @@ def test_echo(msg):
 test_echo("Hello Velo TCP!")
 ```
 
-### 5.2. 실행 및 결과
+### 5.2. ?ㅽ뻾 諛?寃곌낵
 
-서버가 구동 중인 상태에서 위 스크립트를 실행하여 에코 응답을 확인합니다.
+?쒕쾭媛 援щ룞 以묒씤 ?곹깭?먯꽌 ???ㅽ겕由쏀듃瑜??ㅽ뻾?섏뿬 ?먯퐫 ?묐떟???뺤씤?⑸땲??
 
 ```sh
 $ python test_tcp_echo.py
 Received: Hello Velo TCP!
 ```
 
-응답 데이터가 전송한 메시지와 일치한다면 TCP 레이어의 프레임 디코딩 및 라우팅이 정상적으로 동작하고 있는 것입니다.
+?묐떟 ?곗씠?곌? ?꾩넚??硫붿떆吏? ?쇱튂?쒕떎硫?TCP ?덉씠?댁쓽 ?꾨젅???붿퐫??諛??쇱슦?낆씠 ?뺤긽?곸쑝濡??숈옉?섍퀬 ?덈뒗 寃껋엯?덈떎.
 
-### 4.4. 추가 API 엔드포인트 검증
+### 4.4. 異붽? API ?붾뱶?ъ씤??寃利?
 
-`test-app`은 혼합 모드(JSP + 서블릿) 라우팅을 검증하기 위해 `WEB-INF/classes` 내부에 일반 서블릿들도 포함하고 있습니다. 해당 서블릿들이 정상 호출되는지 확인합니다.
+`test-app`? ?쇳빀 紐⑤뱶(JSP + ?쒕툝由? ?쇱슦?낆쓣 寃利앺븯湲??꾪빐 `WEB-INF/classes` ?대????쇰컲 ?쒕툝由용뱾???ы븿?섍퀬 ?덉뒿?덈떎. ?대떦 ?쒕툝由용뱾???뺤긽 ?몄텧?섎뒗吏 ?뺤씤?⑸땲??
 
 ```sh
-# 1. Greeting 서블릿 테스트
+# 1. Greeting ?쒕툝由??뚯뒪??
 $ curl -s "http://localhost:8080/test-app/greeting?name=Velo"
 
 <!DOCTYPE html>
@@ -202,10 +202,10 @@ $ curl -s "http://localhost:8080/test-app/greeting?name=Velo"
 </html>
 ```
 
-![Greeting 서블릿 화면](../images/test_app_greeting.png)
+![Greeting ?쒕툝由??붾㈃](../images/test_app_greeting.png)
 
 ```sh
-# 2. 상태 조회 API 테스트
+# 2. ?곹깭 議고쉶 API ?뚯뒪??
 $ curl -s http://localhost:8080/test-app/api/status
 
 {
@@ -218,4 +218,5 @@ $ curl -s http://localhost:8080/test-app/api/status
 }
 ```
 
-![상태 정보 JSON 응답 화면](../images/test_app_status.png)
+![?곹깭 ?뺣낫 JSON ?묐떟 ?붾㈃](../images/test_app_status.png)
+

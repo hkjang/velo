@@ -25,7 +25,9 @@ import jakarta.servlet.ServletRequestListener;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponseWrapper;
 import jakarta.servlet.http.HttpSessionAttributeListener;
 import jakarta.servlet.http.HttpSessionBindingEvent;
 import jakarta.servlet.http.HttpSessionEvent;
@@ -135,6 +137,86 @@ class SimpleServletContainerTest {
         assertTrue(second.content().toString(StandardCharsets.UTF_8).contains("\"visits\":2"));
         assertTrue(events.contains("request-init"));
         assertNotNull(second.headers());
+    }
+
+    @Test
+    void exactServletMappingWinsOverPathPrefixMapping() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("mapping-app", "/app")
+                .servlet("/catalog", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("EXACT[" + req.getServletPath() + ":" + req.getPathInfo() + "]");
+                    }
+                })
+                .servlet("/catalog/*", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("PREFIX[" + req.getServletPath() + ":" + req.getPathInfo() + "]");
+                    }
+                })
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/catalog"),
+                null,
+                null));
+
+        assertEquals(200, response.status().code());
+        assertEquals("EXACT[/catalog:null]", response.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void exactServletMappingDoesNotCaptureSubPaths() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("mapping-fallback-app", "/app")
+                .servlet("/hello", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("EXACT");
+                    }
+                })
+                .servlet("/", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("DEFAULT[" + req.getServletPath() + ":" + req.getPathInfo() + "]");
+                    }
+                })
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/hello/details"),
+                null,
+                null));
+
+        assertEquals(200, response.status().code());
+        assertEquals("DEFAULT[/hello/details:null]", response.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void appliesUrlPatternFiltersBeforeServletNameFilters() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        List<String> filterEvents = new ArrayList<>();
+        container.deploy(SimpleServletApplication.builder("filter-order-app", "/app")
+                .filter("/*", recordingFilter(filterEvents, "all"), DispatcherType.REQUEST)
+                .filter("*.json", recordingFilter(filterEvents, "extension"), DispatcherType.REQUEST)
+                .filterForServlet("ApiServlet", recordingFilter(filterEvents, "servlet-name"), DispatcherType.REQUEST)
+                .servlet("/api/*", "ApiServlet", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("FILTERS[" + req.getServletPath() + ":" + req.getPathInfo() + "]");
+                    }
+                })
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/api/items.json"),
+                null,
+                null));
+
+        assertEquals(200, response.status().code());
+        assertEquals("FILTERS[/api:/items.json]", response.content().toString(StandardCharsets.UTF_8));
+        assertEquals(List.of("all", "extension", "servlet-name"), filterEvents);
     }
 
     @Test
@@ -251,6 +333,219 @@ class SimpleServletContainerTest {
     }
 
     @Test
+    void supportsNamedDispatcherForwardAndInclude() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        List<String> filterEvents = new ArrayList<>();
+        container.deploy(SimpleServletApplication.builder("named-dispatch-app", "/app")
+                .filter("/*", recordingFilter(filterEvents, "request-url"), DispatcherType.REQUEST)
+                .filter("/*", recordingFilter(filterEvents, "forward-url"), DispatcherType.FORWARD)
+                .filter("/*", recordingFilter(filterEvents, "include-url"), DispatcherType.INCLUDE)
+                .filterForServlet("NamedTarget", recordingFilter(filterEvents, "forward-named"), DispatcherType.FORWARD)
+                .filterForServlet("NamedTarget", recordingFilter(filterEvents, "include-named"), DispatcherType.INCLUDE)
+                .servlet("/target", "NamedTarget", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("NAMED[" + req.getDispatcherType()
+                                + ":" + req.getRequestURI()
+                                + ":" + req.getServletPath()
+                                + ":fwd=" + req.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI)
+                                + ":inc=" + req.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) + "]");
+                    }
+                })
+                .servlet("/forward-named", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        RequestDispatcher dispatcher = getServletContext().getNamedDispatcher("NamedTarget");
+                        assertNotNull(dispatcher);
+                        dispatcher.forward(req, resp);
+                    }
+                })
+                .servlet("/include-named", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        RequestDispatcher dispatcher = getServletContext().getNamedDispatcher("NamedTarget");
+                        assertNotNull(dispatcher);
+                        resp.getWriter().write("before:");
+                        dispatcher.include(req, resp);
+                        resp.getWriter().write(":after");
+                    }
+                })
+                .build());
+
+        FullHttpResponse forwardResponse = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/forward-named"),
+                null,
+                null));
+        assertEquals(200, forwardResponse.status().code());
+        assertEquals("NAMED[FORWARD:/app/forward-named:/forward-named:fwd=null:inc=null]",
+                forwardResponse.content().toString(StandardCharsets.UTF_8));
+        assertEquals(List.of("request-url", "forward-named"), filterEvents);
+
+        FullHttpResponse includeResponse = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/include-named"),
+                null,
+                null));
+        assertEquals(200, includeResponse.status().code());
+        assertEquals("before:NAMED[INCLUDE:/app/include-named:/include-named:fwd=null:inc=null]:after",
+                includeResponse.content().toString(StandardCharsets.UTF_8));
+        assertEquals(List.of("request-url", "forward-named", "request-url", "include-named"), filterEvents);
+    }
+
+    @Test
+    void forwardClearsBufferedBodyButPreservesHeaders() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("forward-buffer-app", "/app")
+                .servlet("/target", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("TARGET");
+                    }
+                })
+                .servlet("/forward-buffer", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        resp.setHeader("X-Before-Forward", "kept");
+                        resp.getWriter().write("discard-me");
+                        req.getRequestDispatcher("/target").forward(req, resp);
+                    }
+                })
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/forward-buffer"),
+                null,
+                null));
+
+        assertEquals(200, response.status().code());
+        assertEquals("kept", response.headers().get("X-Before-Forward"));
+        assertEquals("TARGET", response.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void requestDispatcherPreservesWrappedRequestAndResponse() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("wrapped-dispatch-app", "/app")
+                .servlet("/wrapped-target", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.setHeader("X-Wrapped-Resp", "seen");
+                        resp.getWriter().write("TARGET[" + req.getDispatcherType()
+                                + ":" + req.getHeader("X-Wrapped-Req")
+                                + ":" + req.getRequestURI() + "]");
+                    }
+                })
+                .servlet("/forward-wrapped", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(req) {
+                            @Override
+                            public String getHeader(String name) {
+                                if ("X-Wrapped-Req".equalsIgnoreCase(name)) {
+                                    return "wrapped-request";
+                                }
+                                return super.getHeader(name);
+                            }
+                        };
+                        HttpServletResponse wrappedResponse = new HttpServletResponseWrapper(resp) {
+                            @Override
+                            public void setHeader(String name, String value) {
+                                if ("X-Wrapped-Resp".equalsIgnoreCase(name)) {
+                                    super.setHeader(name, "wrapped-" + value);
+                                    return;
+                                }
+                                super.setHeader(name, value);
+                            }
+                        };
+                        req.getRequestDispatcher("/wrapped-target").forward(wrappedRequest, wrappedResponse);
+                    }
+                })
+                .servlet("/include-wrapped", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(req) {
+                            @Override
+                            public String getHeader(String name) {
+                                if ("X-Wrapped-Req".equalsIgnoreCase(name)) {
+                                    return "wrapped-request";
+                                }
+                                return super.getHeader(name);
+                            }
+                        };
+                        HttpServletResponse wrappedResponse = new HttpServletResponseWrapper(resp) {
+                            @Override
+                            public void setHeader(String name, String value) {
+                                if ("X-Wrapped-Resp".equalsIgnoreCase(name)) {
+                                    super.setHeader(name, "wrapped-" + value);
+                                    return;
+                                }
+                                super.setHeader(name, value);
+                            }
+                        };
+                        resp.getWriter().write("before:");
+                        req.getRequestDispatcher("/wrapped-target").include(wrappedRequest, wrappedResponse);
+                        resp.getWriter().write(":after-uri=" + wrappedRequest.getRequestURI());
+                    }
+                })
+                .build());
+
+        FullHttpResponse forwardResponse = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/forward-wrapped"),
+                null,
+                null));
+        assertEquals(200, forwardResponse.status().code());
+        assertEquals("wrapped-seen", forwardResponse.headers().get("X-Wrapped-Resp"));
+        assertEquals("TARGET[FORWARD:wrapped-request:/app/wrapped-target]",
+                forwardResponse.content().toString(StandardCharsets.UTF_8));
+
+        FullHttpResponse includeResponse = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/include-wrapped"),
+                null,
+                null));
+        assertEquals(200, includeResponse.status().code());
+        assertEquals("wrapped-seen", includeResponse.headers().get("X-Wrapped-Resp"));
+        assertEquals("before:TARGET[INCLUDE:wrapped-request:/app/include-wrapped]:after-uri=/app/include-wrapped",
+                includeResponse.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void includeAttributesAreRestoredAfterNestedDispatch() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("nested-include-app", "/app")
+                .servlet("/target-include", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("TARGET[" + req.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) + "]");
+                    }
+                })
+                .servlet("/middle-include", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        resp.getWriter().write("MIDDLE[" + req.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) + "]->");
+                        req.getRequestDispatcher("/target-include").include(req, resp);
+                        resp.getWriter().write("->MIDDLE-AFTER[" + req.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) + "]");
+                    }
+                })
+                .servlet("/outer-include", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        resp.getWriter().write("OUTER[" + req.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) + "]->");
+                        req.getRequestDispatcher("/middle-include").include(req, resp);
+                        resp.getWriter().write("->OUTER-AFTER[" + req.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) + "]");
+                    }
+                })
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/outer-include"),
+                null,
+                null));
+
+        assertEquals(200, response.status().code());
+        assertEquals("OUTER[null]->MIDDLE[/app/middle-include]->TARGET[/app/target-include]->MIDDLE-AFTER[/app/middle-include]->OUTER-AFTER[null]",
+                response.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
     void requestMetadataHonorsProxyAndHostHeaders() throws Exception {
         SimpleServletContainer container = new SimpleServletContainer();
         container.deploy(SimpleServletApplication.builder("proxy-app", "/app")
@@ -311,6 +606,57 @@ class SimpleServletContainerTest {
 
         assertEquals("https|true|console.example.com|9443|https://console.example.com:9443/app/meta",
                 hostResponse.content().toString(StandardCharsets.UTF_8));
+    }
+
+    private static Filter recordingFilter(List<String> events, String name) {
+        return new Filter() {
+            @Override
+            public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+                    throws IOException, ServletException {
+                events.add(name);
+                chain.doFilter(request, response);
+            }
+        };
+    }
+
+    @Test
+    void sessionCookiePolicyUsesConfiguredAttributesAndProxyAwareSecureFlag() throws Exception {
+        SessionCookieSettings cookieSettings = new SessionCookieSettings(
+                "VELOSESSION",
+                null,
+                true,
+                SessionCookieSettings.SecureMode.AUTO,
+                "Strict",
+                -1,
+                null);
+        SimpleServletContainer container = new SimpleServletContainer(60, 1800, cookieSettings);
+        container.deploy(SimpleServletApplication.builder("cookie-app", "/app")
+                .servlet("/login", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        req.getSession(true).setAttribute("user", "velo");
+                        resp.getWriter().write("ok");
+                    }
+                })
+                .build());
+
+        DefaultFullHttpRequest request =
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/login");
+        request.headers().set("X-Forwarded-Proto", "https");
+        request.headers().set(HttpHeaderNames.HOST, "internal.example:8080");
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                request,
+                new InetSocketAddress("192.0.2.10", 55000),
+                new InetSocketAddress("10.0.0.10", 8080)));
+
+        String setCookie = response.headers().get(HttpHeaderNames.SET_COOKIE);
+        assertNotNull(setCookie);
+        assertTrue(setCookie.startsWith("VELOSESSION="));
+        assertTrue(setCookie.contains("Path=/app"));
+        assertTrue(setCookie.contains("HttpOnly"));
+        assertTrue(setCookie.contains("Secure"));
+        assertTrue(setCookie.contains("SameSite=Strict"));
     }
 
     @Test
@@ -380,6 +726,63 @@ class SimpleServletContainerTest {
         FullHttpResponse asyncResponse = future.get(5, TimeUnit.SECONDS);
         assertEquals(200, asyncResponse.status().code());
         assertTrue(asyncResponse.content().toString(StandardCharsets.UTF_8).contains("\"mode\":\"async\""));
+    }
+
+    @Test
+    void asyncContextWithWrappedRequestResponsePreservesWrappers() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        AtomicReference<Boolean> hasOriginalRequestAndResponse = new AtomicReference<>();
+        container.deploy(SimpleServletApplication.builder("async-wrapped-app", "/app")
+                .servlet("/async-wrapped", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+                        HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(req) {
+                            @Override
+                            public String getHeader(String name) {
+                                if ("X-Async-Wrapped".equalsIgnoreCase(name)) {
+                                    return "wrapped-request";
+                                }
+                                return super.getHeader(name);
+                            }
+                        };
+                        HttpServletResponse wrappedResponse = new HttpServletResponseWrapper(resp) {
+                            @Override
+                            public void setHeader(String name, String value) {
+                                if ("X-Async-Wrapped".equalsIgnoreCase(name)) {
+                                    super.setHeader(name, "wrapped-" + value);
+                                    return;
+                                }
+                                super.setHeader(name, value);
+                            }
+                        };
+                        AsyncContext asyncContext = req.startAsync(wrappedRequest, wrappedResponse);
+                        hasOriginalRequestAndResponse.set(asyncContext.hasOriginalRequestAndResponse());
+                        asyncContext.start(() -> {
+                            try {
+                                HttpServletRequest asyncReq = (HttpServletRequest) asyncContext.getRequest();
+                                HttpServletResponse asyncResp = (HttpServletResponse) asyncContext.getResponse();
+                                asyncResp.setHeader("X-Async-Wrapped", "seen");
+                                asyncResp.getWriter().write(asyncReq.getHeader("X-Async-Wrapped"));
+                                asyncContext.complete();
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                    }
+                })
+                .build());
+
+        CompletableFuture<FullHttpResponse> future = new CompletableFuture<>();
+        FullHttpResponse syncResult = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/async-wrapped"),
+                null, null, future::complete));
+
+        assertNull(syncResult);
+        FullHttpResponse asyncResponse = future.get(5, TimeUnit.SECONDS);
+        assertEquals(200, asyncResponse.status().code());
+        assertEquals("wrapped-seen", asyncResponse.headers().get("X-Async-Wrapped"));
+        assertEquals("wrapped-request", asyncResponse.content().toString(StandardCharsets.UTF_8));
+        assertFalse(hasOriginalRequestAndResponse.get());
     }
 
     @Test

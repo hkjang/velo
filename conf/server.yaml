@@ -39,6 +39,9 @@ server:
     contextPath: /admin
     apiDocsEnabled: true
 
+  servlet:
+    mappingStrategy: TOMCAT_COMPAT
+
   compression:
     enabled: false
     minResponseSizeBytes: 1024
@@ -47,6 +50,14 @@ server:
   session:
     timeoutSeconds: 1800
     purgeIntervalSeconds: 60
+    cookie:
+      name: JSESSIONID
+      path: ""
+      httpOnly: true
+      secureMode: AUTO
+      sameSite: ""
+      maxAgeSeconds: -1
+      domain: ""
 
   deploy:
     directory: deploy

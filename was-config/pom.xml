@@ -7,9 +7,18 @@
     <parent>
         <groupId>io.velo.was</groupId>
         <artifactId>velo-was</artifactId>
-        <version>0.5.6</version>
+        <version>0.5.7</version>
     </parent>
 
     <artifactId>was-config</artifactId>
     <name>was-config</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>

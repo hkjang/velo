@@ -3,7 +3,9 @@ package io.velo.was.servlet;
 import io.netty.util.CharsetUtil;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ServletResponseContextTest {
@@ -24,7 +26,7 @@ class ServletResponseContextTest {
                 </html>
                 """);
 
-        String body = responseContext.toNettyResponse(false, false, null)
+        String body = responseContext.toNettyResponse(false, null)
                 .content()
                 .toString(CharsetUtil.UTF_8);
 
@@ -83,5 +85,35 @@ class ServletResponseContextTest {
 
         assertTrue(body.contains("nonce=\"abc123\""));
         assertTrue(body.contains("<script type=\"text/javascript\" nonce=\"abc123\">"));
+    }
+
+    @Test
+    void resetBufferPreservesHeadersStatusAndCookies() {
+        ServletResponseContext responseContext = new ServletResponseContext();
+        responseContext.setStatus(202);
+        responseContext.setHeader("X-Test", "yes");
+        responseContext.addCookie(new jakarta.servlet.http.Cookie("sample", "cookie"));
+        responseContext.writer().write("before");
+
+        responseContext.resetBuffer();
+        responseContext.writer().write("after");
+
+        var response = responseContext.toNettyResponse(false, null);
+        assertEquals(202, response.status().code());
+        assertEquals("yes", response.headers().get("X-Test"));
+        assertEquals("after", response.content().toString(CharsetUtil.UTF_8));
+        assertTrue(response.headers().getAll("Set-Cookie").stream().anyMatch(value -> value.startsWith("sample=cookie")));
+    }
+
+    @Test
+    void clearErrorStateKeepsStatusButDisablesErrorDispatchFlag() {
+        ServletResponseContext responseContext = new ServletResponseContext();
+        responseContext.sendError(404, "missing");
+
+        responseContext.clearErrorState();
+
+        assertEquals(404, responseContext.status());
+        assertFalse(responseContext.errorSent());
+        assertNull(responseContext.errorMessage());
     }
 }

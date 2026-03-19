@@ -1,0 +1,54 @@
+﻿{
+    "policyVersion":  1,
+    "lastUpdated":  "2026-03-19",
+    "candidates":  [
+                       {
+                           "name":  "apache-tomcat-servlet-mapping",
+                           "project":  "Apache Tomcat",
+                           "upstreamTrack":  "11.0.18",
+                           "license":  "Apache-2.0",
+                           "targetLayer":  "servlet-container",
+                           "status":  "adapter-in-progress",
+                           "verifiedAt":  "2026-03-19",
+                           "sourceArchiveUrl":  "https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.18/src/apache-tomcat-11.0.18-src.tar.gz",
+                           "sourceRepositoryUrl":  "https://github.com/apache/tomcat/tree/11.0.x",
+                           "notes":  "URL mapping adapter is wired through ServletPathMapperFactory, filter matching honors Tomcat-style URL-first then servlet-name ordering, named RequestDispatcher forward/include run through the compatibility bridge, forward preserves headers while clearing only the response buffer, and dispatcher/async flows now preserve user-supplied request/response wrappers. Full ApplicationDispatcher attribute parity is still pending."
+                       },
+                       {
+                           "name":  "apache-tomcat-web-resources",
+                           "project":  "Apache Tomcat",
+                           "upstreamTrack":  "11.0.18",
+                           "license":  "Apache-2.0",
+                           "targetLayer":  "static-resource",
+                           "status":  "planned",
+                           "verifiedAt":  "2026-03-19",
+                           "sourceArchiveUrl":  "https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.18/src/apache-tomcat-11.0.18-src.tar.gz",
+                           "sourceRepositoryUrl":  "https://github.com/apache/tomcat/tree/11.0.x",
+                           "notes":  "Range, ETag, Last-Modified, and resource cache baseline candidate."
+                       },
+                       {
+                           "name":  "apache-tomcat-webapp-loader",
+                           "project":  "Apache Tomcat",
+                           "upstreamTrack":  "11.0.18",
+                           "license":  "Apache-2.0",
+                           "targetLayer":  "webapp-loader",
+                           "status":  "planned",
+                           "verifiedAt":  "2026-03-19",
+                           "sourceArchiveUrl":  "https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.18/src/apache-tomcat-11.0.18-src.tar.gz",
+                           "sourceRepositoryUrl":  "https://github.com/apache/tomcat/tree/11.0.x",
+                           "notes":  "WAR and web application loading baseline candidate."
+                       }
+                   ],
+    "sources":  [
+                    {
+                        "component":  "apache-tomcat",
+                        "version":  "11.0.18",
+                        "path":  "vendor/upstream/apache-tomcat/11.0.18",
+                        "license":  "Apache-2.0",
+                        "upstreamTag":  "11.0.18",
+                        "upstreamUrl":  "https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.18/src/apache-tomcat-11.0.18-src.tar.gz",
+                        "noticeRequired":  true,
+                        "importedAt":  "2026-03-19"
+                    }
+                ]
+}

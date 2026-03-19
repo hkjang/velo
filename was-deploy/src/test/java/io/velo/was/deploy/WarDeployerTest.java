@@ -31,9 +31,11 @@ class WarDeployerTest {
         assertEquals("test-app", app.name());
         assertEquals("/myapp", app.contextPath());
         assertFalse(result.extracted());
-        assertEquals(2, app.servlets().size());
+        assertEquals(3, app.servlets().size());
         assertTrue(app.servlets().containsKey("/hello"));
         assertTrue(app.servlets().containsKey("/error"));
+        assertTrue(app.servlets().containsKey("/"));
+        assertEquals("VeloDefaultStaticServlet", app.servletName("/"));
         assertEquals("HelloServlet", app.servletName("/hello"));
         assertEquals("hello-init", app.servletInitParameters("/hello").get("message"));
         assertEquals(1, app.filters().size());
@@ -158,6 +160,212 @@ class WarDeployerTest {
         assertNotEquals(rootResult.appRoot(), tadpoleResult.appRoot());
         assertTrue(Files.isDirectory(rootResult.appRoot()));
         assertTrue(Files.isDirectory(tadpoleResult.appRoot()));
+    }
+
+    @Test
+    void deploysAnnotationOnlyWarWhenMetadataIsNotComplete() throws Exception {
+        Path appRoot = createAnnotatedWar(false);
+        WarDeployer.DeploymentResult result = new WarDeployer(tempDir.resolve("work")).deploy(appRoot, "/annotated");
+
+        ServletApplication app = result.application();
+        assertEquals("annotated-app", app.name());
+        assertTrue(app.servlets().containsKey("/hello"));
+        assertEquals("AnnotatedHello", app.servletName("/hello"));
+        assertEquals("annotation-init", app.servletInitParameters("/hello").get("message"));
+        assertEquals(1, app.filters().size());
+        assertEquals("AnnotatedFilter", app.filters().get(0).filterName());
+        assertEquals("AnnotatedHello", app.filters().get(0).servletName());
+        assertNull(app.filters().get(0).pathPattern());
+        assertEquals("on", app.filters().get(0).initParameters().get("trace"));
+        assertEquals(1, app.servletContextListeners().size());
+    }
+
+    @Test
+    void metadataCompleteWebXmlSkipsAnnotationScanning() throws Exception {
+        Path appRoot = createAnnotatedWar(true);
+        WarDeployer.DeploymentResult result = new WarDeployer(tempDir.resolve("work")).deploy(appRoot, "/annotated");
+
+        ServletApplication app = result.application();
+        assertFalse(app.servlets().containsKey("/hello"));
+        assertEquals(1, app.servlets().size(), "Only the default static servlet should remain");
+        assertTrue(app.filters().isEmpty());
+        assertTrue(app.servletContextListeners().isEmpty());
+    }
+
+    @Test
+    void doesNotOverrideExplicitDefaultServletMapping() throws Exception {
+        Path appRoot = tempDir.resolve("default-servlet-app");
+        Path webInf = appRoot.resolve("WEB-INF");
+        Path classes = webInf.resolve("classes");
+        Files.createDirectories(classes);
+
+        String rootServletSource = """
+                package test;
+                import jakarta.servlet.http.*;
+                import java.io.*;
+                public class RootServlet extends HttpServlet {
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("root");
+                    }
+                }
+                """;
+        compileAndPlaceClass(classes, "test.RootServlet", rootServletSource);
+
+        Files.writeString(webInf.resolve("web.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee" version="6.0">
+                    <display-name>default-servlet-app</display-name>
+                    <servlet>
+                        <servlet-name>RootServlet</servlet-name>
+                        <servlet-class>test.RootServlet</servlet-class>
+                    </servlet>
+                    <servlet-mapping>
+                        <servlet-name>RootServlet</servlet-name>
+                        <url-pattern>/</url-pattern>
+                    </servlet-mapping>
+                </web-app>
+                """, StandardCharsets.UTF_8);
+
+        WarDeployer.DeploymentResult result = new WarDeployer(tempDir.resolve("work")).deploy(appRoot, "/root");
+
+        assertEquals(1, result.application().servlets().size());
+        assertEquals("RootServlet", result.application().servletName("/"));
+    }
+
+    @Test
+    void parsesAndRegistersServletNameFilterMappingsFromWebXml() throws Exception {
+        Path appRoot = tempDir.resolve("servlet-name-filter-app");
+        Path webInf = appRoot.resolve("WEB-INF");
+        Path classes = webInf.resolve("classes");
+        Files.createDirectories(classes);
+
+        compileAndPlaceClass(classes, "test.HelloServlet", """
+                package test;
+                import jakarta.servlet.http.*;
+                import java.io.*;
+                public class HelloServlet extends HttpServlet {
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("hello");
+                    }
+                }
+                """);
+
+        compileAndPlaceClass(classes, "test.NamedFilter", """
+                package test;
+                import jakarta.servlet.*;
+                import java.io.*;
+                public class NamedFilter implements Filter {
+                    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
+                            throws IOException, ServletException {
+                        chain.doFilter(req, res);
+                    }
+                }
+                """);
+
+        Files.writeString(webInf.resolve("web.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee" version="6.0">
+                    <display-name>servlet-name-filter-app</display-name>
+                    <servlet>
+                        <servlet-name>HelloServlet</servlet-name>
+                        <servlet-class>test.HelloServlet</servlet-class>
+                    </servlet>
+                    <servlet-mapping>
+                        <servlet-name>HelloServlet</servlet-name>
+                        <url-pattern>/hello</url-pattern>
+                    </servlet-mapping>
+                    <filter>
+                        <filter-name>NamedFilter</filter-name>
+                        <filter-class>test.NamedFilter</filter-class>
+                    </filter>
+                    <filter-mapping>
+                        <filter-name>NamedFilter</filter-name>
+                        <servlet-name>HelloServlet</servlet-name>
+                        <dispatcher>REQUEST</dispatcher>
+                    </filter-mapping>
+                </web-app>
+                """, StandardCharsets.UTF_8);
+
+        WebXmlDescriptor descriptor = WebXmlParser.parse(webInf.resolve("web.xml"));
+        assertEquals(1, descriptor.filterMappings().size());
+        assertEquals("HelloServlet", descriptor.filterMappings().get(0).servletName());
+        assertNull(descriptor.filterMappings().get(0).urlPattern());
+
+        WarDeployer.DeploymentResult result = new WarDeployer(tempDir.resolve("work")).deploy(appRoot, "/named");
+
+        assertEquals(1, result.application().filters().size());
+        assertEquals("NamedFilter", result.application().filters().get(0).filterName());
+        assertEquals("HelloServlet", result.application().filters().get(0).servletName());
+        assertNull(result.application().filters().get(0).pathPattern());
+    }
+
+    private Path createAnnotatedWar(boolean metadataComplete) throws Exception {
+        Path appRoot = tempDir.resolve(metadataComplete ? "annotated-metadata-complete" : "annotated-app");
+        Path webInf = appRoot.resolve("WEB-INF");
+        Path classes = webInf.resolve("classes");
+        Files.createDirectories(classes);
+
+        compileAndPlaceClass(classes, "test.AnnotatedHelloServlet", """
+                package test;
+                import jakarta.servlet.annotation.WebInitParam;
+                import jakarta.servlet.annotation.WebServlet;
+                import jakarta.servlet.http.HttpServlet;
+                import jakarta.servlet.http.HttpServletRequest;
+                import jakarta.servlet.http.HttpServletResponse;
+                import java.io.IOException;
+                @WebServlet(name = "AnnotatedHello", urlPatterns = "/hello",
+                        initParams = @WebInitParam(name = "message", value = "annotation-init"))
+                public class AnnotatedHelloServlet extends HttpServlet {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("annotated");
+                    }
+                }
+                """);
+
+        compileAndPlaceClass(classes, "test.AnnotatedFilter", """
+                package test;
+                import jakarta.servlet.*;
+                import jakarta.servlet.annotation.WebFilter;
+                import jakarta.servlet.annotation.WebInitParam;
+                import java.io.IOException;
+                @WebFilter(filterName = "AnnotatedFilter", servletNames = "AnnotatedHello",
+                        initParams = @WebInitParam(name = "trace", value = "on"))
+                public class AnnotatedFilter implements Filter {
+                    @Override
+                    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
+                            throws IOException, ServletException {
+                        chain.doFilter(req, res);
+                    }
+                }
+                """);
+
+        compileAndPlaceClass(classes, "test.AnnotatedListener", """
+                package test;
+                import jakarta.servlet.ServletContextEvent;
+                import jakarta.servlet.ServletContextListener;
+                import jakarta.servlet.annotation.WebListener;
+                @WebListener
+                public class AnnotatedListener implements ServletContextListener {
+                    @Override
+                    public void contextInitialized(ServletContextEvent sce) {
+                        sce.getServletContext().setAttribute("annotated", "true");
+                    }
+                }
+                """);
+
+        if (metadataComplete) {
+            Files.writeString(webInf.resolve("web.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+                             version="6.0"
+                             metadata-complete="true">
+                        <display-name>annotated-complete</display-name>
+                    </web-app>
+                    """, StandardCharsets.UTF_8);
+        }
+
+        return appRoot;
     }
 
     private Path createExplodedWar() throws Exception {

@@ -28,6 +28,7 @@ class ServletRequestContext {
     private final String queryString;
     private String servletPath;
     private String pathInfo;
+    private final String dispatchTargetPath;
     private DispatcherType dispatcherType;
     private final Map<String, Object> attributes;
     private final Map<String, List<String>> parameters;
@@ -50,6 +51,7 @@ class ServletRequestContext {
                 extractQueryString(exchange.request().uri()),
                 servletPath,
                 pathInfo,
+                combineDispatchTargetPath(servletPath, pathInfo),
                 DispatcherType.REQUEST,
                 sessionState,
                 new LinkedHashMap<>());
@@ -62,6 +64,7 @@ class ServletRequestContext {
                           String queryString,
                           String servletPath,
                           String pathInfo,
+                          String dispatchTargetPath,
                           DispatcherType dispatcherType,
                           SessionState sessionState,
                           Map<String, Object> attributes) {
@@ -72,6 +75,7 @@ class ServletRequestContext {
         this.queryString = queryString;
         this.servletPath = servletPath;
         this.pathInfo = pathInfo;
+        this.dispatchTargetPath = dispatchTargetPath;
         this.dispatcherType = dispatcherType;
         this.sessionState = sessionState;
         this.attributes = attributes;
@@ -122,11 +126,29 @@ class ServletRequestContext {
         return dispatcherType;
     }
 
+    public String dispatchTargetPath() {
+        return dispatchTargetPath;
+    }
+
     public ServletRequestContext forDispatch(String requestUri,
                                              String queryString,
                                              String servletPath,
                                              String pathInfo,
                                              DispatcherType dispatcherType) {
+        return forDispatch(requestUri,
+                queryString,
+                servletPath,
+                pathInfo,
+                dispatcherType,
+                combineDispatchTargetPath(servletPath, pathInfo));
+    }
+
+    public ServletRequestContext forDispatch(String requestUri,
+                                             String queryString,
+                                             String servletPath,
+                                             String pathInfo,
+                                             DispatcherType dispatcherType,
+                                             String dispatchTargetPath) {
         return new ServletRequestContext(
                 exchange,
                 servletContext,
@@ -135,6 +157,7 @@ class ServletRequestContext {
                 queryString,
                 servletPath,
                 pathInfo,
+                dispatchTargetPath,
                 dispatcherType,
                 sessionState,
                 attributes);
@@ -353,6 +376,14 @@ class ServletRequestContext {
             return null;
         }
         return uri.substring(queryStart + 1);
+    }
+
+    private static String combineDispatchTargetPath(String servletPath, String pathInfo) {
+        String value = servletPath == null ? "" : servletPath;
+        if (pathInfo != null) {
+            value += pathInfo;
+        }
+        return value.isBlank() ? "/" : value;
     }
 
     private ExternalRequestTarget externalRequestTarget() {

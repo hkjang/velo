@@ -31,6 +31,7 @@ public class ServerConfiguration {
         private Listener listener = new Listener();
         private Threading threading = new Threading();
         private Tls tls = new Tls();
+        private ServletEngine servlet = new ServletEngine();
         private Jsp jsp = new Jsp();
         private Compression compression = new Compression();
         private Session session = new Session();
@@ -94,6 +95,14 @@ public class ServerConfiguration {
             this.jsp = jsp;
         }
 
+        public ServletEngine getServlet() {
+            return servlet;
+        }
+
+        public void setServlet(ServletEngine servlet) {
+            this.servlet = servlet;
+        }
+
         public Compression getCompression() {
             return compression;
         }
@@ -145,6 +154,10 @@ public class ServerConfiguration {
             if (tls == null) {
                 tls = new Tls();
             }
+            if (servlet == null) {
+                servlet = new ServletEngine();
+            }
+            servlet.validate();
             if (jsp == null) {
                 jsp = new Jsp();
             }
@@ -154,6 +167,7 @@ public class ServerConfiguration {
             if (session == null) {
                 session = new Session();
             }
+            session.validate();
             if (deploy == null) {
                 deploy = new Deploy();
             }
@@ -419,6 +433,26 @@ public class ServerConfiguration {
         public void setMaxLoadedJsps(int maxLoadedJsps) { this.maxLoadedJsps = maxLoadedJsps; }
     }
 
+    public static class ServletEngine {
+        private String mappingStrategy = "TOMCAT_COMPAT";
+
+        public String getMappingStrategy() {
+            return mappingStrategy;
+        }
+
+        public void setMappingStrategy(String mappingStrategy) {
+            this.mappingStrategy = mappingStrategy;
+        }
+
+        public void validate() {
+            String normalized = mappingStrategy == null ? "TOMCAT_COMPAT" : mappingStrategy.trim().toUpperCase();
+            if (!List.of("VELO", "TOMCAT_COMPAT").contains(normalized)) {
+                throw new IllegalArgumentException("server.servlet.mappingStrategy must be VELO or TOMCAT_COMPAT");
+            }
+            mappingStrategy = normalized;
+        }
+    }
+
     public static class Compression {
         private boolean enabled = false;
         private int minResponseSizeBytes = 1024;
@@ -440,11 +474,78 @@ public class ServerConfiguration {
     public static class Session {
         private int timeoutSeconds = 1800;
         private int purgeIntervalSeconds = 60;
+        private SessionCookie cookie = new SessionCookie();
 
         public int getTimeoutSeconds() { return timeoutSeconds; }
         public void setTimeoutSeconds(int timeoutSeconds) { this.timeoutSeconds = timeoutSeconds; }
         public int getPurgeIntervalSeconds() { return purgeIntervalSeconds; }
         public void setPurgeIntervalSeconds(int purgeIntervalSeconds) { this.purgeIntervalSeconds = purgeIntervalSeconds; }
+        public SessionCookie getCookie() { return cookie; }
+        public void setCookie(SessionCookie cookie) { this.cookie = cookie; }
+
+        public void validate() {
+            if (timeoutSeconds < 0) {
+                throw new IllegalArgumentException("server.session.timeoutSeconds must be >= 0");
+            }
+            if (purgeIntervalSeconds <= 0) {
+                throw new IllegalArgumentException("server.session.purgeIntervalSeconds must be positive");
+            }
+            if (cookie == null) {
+                cookie = new SessionCookie();
+            }
+            cookie.validate();
+        }
+    }
+
+    public static class SessionCookie {
+        private String name = "JSESSIONID";
+        private String path = "";
+        private boolean httpOnly = true;
+        private String secureMode = "AUTO";
+        private String sameSite = "";
+        private int maxAgeSeconds = -1;
+        private String domain = "";
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getPath() { return path; }
+        public void setPath(String path) { this.path = path; }
+        public boolean isHttpOnly() { return httpOnly; }
+        public void setHttpOnly(boolean httpOnly) { this.httpOnly = httpOnly; }
+        public String getSecureMode() { return secureMode; }
+        public void setSecureMode(String secureMode) { this.secureMode = secureMode; }
+        public String getSameSite() { return sameSite; }
+        public void setSameSite(String sameSite) { this.sameSite = sameSite; }
+        public int getMaxAgeSeconds() { return maxAgeSeconds; }
+        public void setMaxAgeSeconds(int maxAgeSeconds) { this.maxAgeSeconds = maxAgeSeconds; }
+        public String getDomain() { return domain; }
+        public void setDomain(String domain) { this.domain = domain; }
+
+        public void validate() {
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException("server.session.cookie.name is required");
+            }
+            if (maxAgeSeconds < -1) {
+                throw new IllegalArgumentException("server.session.cookie.maxAgeSeconds must be >= -1");
+            }
+            String normalizedSecureMode = secureMode == null ? "AUTO" : secureMode.trim().toUpperCase();
+            if (!List.of("AUTO", "ALWAYS", "NEVER").contains(normalizedSecureMode)) {
+                throw new IllegalArgumentException("server.session.cookie.secureMode must be AUTO, ALWAYS, or NEVER");
+            }
+            secureMode = normalizedSecureMode;
+            if (sameSite != null && !sameSite.isBlank()) {
+                String normalizedSameSite = switch (sameSite.trim().toLowerCase()) {
+                    case "strict" -> "Strict";
+                    case "lax" -> "Lax";
+                    case "none" -> "None";
+                    default -> null;
+                };
+                if (normalizedSameSite == null) {
+                    throw new IllegalArgumentException("server.session.cookie.sameSite must be Strict, Lax, or None");
+                }
+                sameSite = normalizedSameSite;
+            }
+        }
     }
 
     public static class Deploy {

@@ -1,4 +1,4 @@
-# WAR Deployment & JSP Testing Guide
+﻿# WAR Deployment & JSP Testing Guide
 
 This document guides you through deploying `test-war` and `test-app.war` in the Velo WAS project and verifying that the Servlet and JSP endpoints function correctly.
 
@@ -33,7 +33,7 @@ mvn clean package -DskipTests
 Start the Velo WAS server in the background or in a new terminal window with the following command:
 
 ```sh
-java -jar was-bootstrap/target/was-bootstrap-0.5.6-jar-with-dependencies.jar
+java -jar was-bootstrap/target/was-bootstrap-0.5.7-jar-with-dependencies.jar
 ```
 
 When the `Hot deploy watcher started` message appears in the server startup logs, the server is successfully monitoring the `deploy` directory for automatic deployments.
@@ -54,7 +54,7 @@ cd test-war
 mvn clean package
 
 # Copy the artifact to the Velo WAS deploy directory
-cp target/test-war-0.5.6.war ../deploy/test.war
+cp target/test-war-0.5.7.war ../deploy/test.war
 ```
 
 Since `hotDeploy` is enabled, a successful deployment message will appear in the server logs almost immediately (within ~2 seconds).
@@ -83,10 +83,10 @@ If the response is properly printed out, it means the Servlet mappings in `test.
 
 ```text
 test-app/
-├── index.jsp         # Starting page
-├── info.jsp          # System information page (contains <%@ page import="..." %>)
-└── WEB-INF/
-    └── web.xml       # Servlet & Deployment definitions
+?쒋?? index.jsp         # Starting page
+?쒋?? info.jsp          # System information page (contains <%@ page import="..." %>)
+?붴?? WEB-INF/
+    ?붴?? web.xml       # Servlet & Deployment definitions
 ```
 
 ### 4.2. Packaging & Deployment
@@ -219,3 +219,4 @@ $ curl -s http://localhost:8080/test-app/api/status
 ```
 
 ![Status API JSON Response](../images/test_app_status.png)
+

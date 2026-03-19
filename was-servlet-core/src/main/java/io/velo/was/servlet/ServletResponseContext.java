@@ -29,33 +29,61 @@ class ServletResponseContext {
                 return;
               }
               window.%1$s = true;
-              if (!window.rwt || !rwt.widgets || !rwt.widgets.Browser) {
-                return;
-              }
-              var Browser = rwt.widgets.Browser;
-              var originalSetInline = Browser.prototype.setInline;
-              if (typeof originalSetInline === "function") {
-                Browser.prototype.setInline = function(value) {
-                  var previous = this.getInline && this.getInline();
-                  var result = originalSetInline.call(this, value);
-                  if (value !== previous && this.isCreated && this.isCreated() && this.getSource && this.getSource()) {
+              function installPatch() {
+                if (!window.rwt || !rwt.widgets || !rwt.widgets.Browser || !rwt.widgets.base || !rwt.widgets.base.Iframe) {
+                  return false;
+                }
+                var Browser = rwt.widgets.Browser;
+                var Iframe = rwt.widgets.base.Iframe;
+                var originalIframeSyncSource = Iframe.prototype._syncSource;
+                if (typeof originalIframeSyncSource === "function" && !Iframe.prototype.__veloSyncSourcePatched) {
+                  Iframe.prototype.__veloSyncSourcePatched = true;
+                  Iframe.prototype._syncSource = function() {
+                    this.__veloLastSourceSyncAt = Date.now();
+                    return originalIframeSyncSource.apply(this, arguments);
+                  };
+                }
+                var originalSetInline = Browser.prototype.setInline;
+                if (typeof originalSetInline === "function" && !Browser.prototype.__veloSetInlinePatched) {
+                  Browser.prototype.__veloSetInlinePatched = true;
+                  Browser.prototype.setInline = function(value) {
+                    var previous = this.getInline && this.getInline();
+                    var result = originalSetInline.call(this, value);
+                    if (value !== previous && this.isCreated && this.isCreated() && this.getSource && this.getSource()) {
+                      var self = this;
+                      window.setTimeout(function() {
+                        if (!(self.isDisposed && self.isDisposed()) && self.syncSource) {
+                          self.syncSource();
+                        }
+                      }, 0);
+                    }
+                    return result;
+                  };
+                }
+                if (typeof Browser.prototype.execute === "function" && !Browser.prototype.__veloExecutePatched) {
+                  Browser.prototype.__veloExecutePatched = true;
+                  var originalExecute = Browser.prototype.execute;
+                  var originalCheckIframeAccess = Browser.prototype._checkIframeAccess;
+                  var originalEval = Browser.prototype._eval;
+                  var originalParseEvalResult = Browser.prototype._parseEvalResult;
+                  Browser.prototype.execute = function(script) {
                     var self = this;
-                    window.setTimeout(function() {
-                      if (!(self.isDisposed && self.isDisposed()) && self.syncSource) {
-                        self.syncSource();
-                      }
-                    }, 0);
-                  }
-                  return result;
-                };
-              }
-              var originalExecute = Browser.prototype.execute;
-              if (typeof originalExecute === "function") {
-                Browser.prototype.execute = function(script) {
-                  var self = this;
-                  function shouldRetry() {
-                    try {
-                      if (self.getInline && self.getInline()) {
+                    var retryDelayMs = 50;
+                    var retryWindowMs = 2000;
+                    function isDisposed() {
+                      return self.isDisposed && self.isDisposed();
+                    }
+                    function inRetryWindow() {
+                      return self.getInline
+                        && self.getInline()
+                        && self.__veloLastSourceSyncAt
+                        && Date.now() - self.__veloLastSourceSyncAt < retryWindowMs;
+                    }
+                    function documentPending() {
+                      try {
+                        if (!self.getInline || !self.getInline()) {
+                          return false;
+                        }
                         if (!self.isLoaded || !self.isLoaded()) {
                           return true;
                         }
@@ -66,21 +94,79 @@ class ServletResponseContext {
                         if (doc.readyState && doc.readyState !== "complete") {
                           return true;
                         }
+                        var href = doc.location && doc.location.href ? String(doc.location.href) : "";
+                        if (href === "about:blank" || href.indexOf("static/html/blank.html") !== -1) {
+                          return true;
+                        }
+                        if (/getElementById\\(\\s*['"]list['"]\\s*\\)/.test(script)
+                            && typeof doc.getElementById === "function"
+                            && !doc.getElementById("list")) {
+                          return true;
+                        }
+                      } catch (ignore) {
+                        return true;
                       }
-                    } catch (ignore) {
+                      return false;
                     }
-                    return false;
-                  }
-                  if (shouldRetry()) {
-                    window.setTimeout(function() {
-                      if (!(self.isDisposed && self.isDisposed())) {
-                        originalExecute.call(self, script);
+                    function sendResult(success, result) {
+                      var connection = rwt.remote.Connection.getInstance();
+                      var id = rwt.remote.ObjectRegistry.getId(self);
+                      var method = success ? "evaluationSucceeded" : "evaluationFailed";
+                      var properties = success ? { "result" : result } : {};
+                      connection.getMessageWriter().appendCall(id, method, properties);
+                      if (self.getExecutedFunctionPending && self.getExecutedFunctionPending()) {
+                        connection.sendImmediate(false);
+                      } else {
+                        connection.send();
                       }
-                    }, 25);
-                    return;
+                    }
+                    function attempt() {
+                      if (isDisposed()) {
+                        return;
+                      }
+                      try {
+                        originalCheckIframeAccess.call(self);
+                      } catch (error) {
+                        if (inRetryWindow()) {
+                          window.setTimeout(attempt, retryDelayMs);
+                          return;
+                        }
+                        sendResult(false, null);
+                        return;
+                      }
+                      if (inRetryWindow() && documentPending()) {
+                        window.setTimeout(attempt, retryDelayMs);
+                        return;
+                      }
+                      var success = true;
+                      var result = null;
+                      try {
+                        result = originalParseEvalResult.call(self, originalEval.call(self, script));
+                      } catch (error) {
+                        if (inRetryWindow()) {
+                          window.setTimeout(attempt, retryDelayMs);
+                          return;
+                        }
+                        success = false;
+                      }
+                      sendResult(success, result);
+                    }
+                    if (!self.getInline || !self.getInline()) {
+                      return originalExecute.call(self, script);
+                    }
+                    attempt();
+                  };
+                }
+                return true;
+              }
+              if (!installPatch()) {
+                var attempts = 0;
+                var installTimer = window.setInterval(function() {
+                  attempts += 1;
+                  if (installPatch() || attempts >= 20) {
+                    window.clearInterval(installTimer);
                   }
-                  return originalExecute.call(this, script);
-                };
+                }, 25);
               }
             })();
             </script>

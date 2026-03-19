@@ -29,6 +29,8 @@ class ServletResponseContextTest {
                 .toString(CharsetUtil.UTF_8);
 
         assertTrue(body.contains("__veloRapBrowserCompatPatched"));
+        assertTrue(body.contains("__veloLastSourceSyncAt"));
+        assertTrue(body.contains("evaluationSucceeded"));
         assertTrue(body.indexOf("__veloRapBrowserCompatPatched") > body.indexOf("rap-client.js"));
         assertTrue(body.indexOf("__veloRapBrowserCompatPatched")
                 < body.indexOf("rwt.remote.MessageProcessor.processMessage"));
@@ -42,5 +44,26 @@ class ServletResponseContextTest {
                 """);
 
         assertFalse(body.contains("__veloRapBrowserCompatPatched"));
+    }
+
+    @Test
+    void doesNotInjectCompatibilityPatchTwice() {
+        String onceInjected = ServletResponseContext.injectRapBrowserCompatibilityPatch("""
+                <!DOCTYPE html>
+                <html>
+                  <body>
+                    <script type="text/javascript" src="rwt-resources/440/rap-client.js"></script>
+                    <script type="text/javascript">
+                      rwt.remote.MessageProcessor.processMessage({});
+                    </script>
+                  </body>
+                </html>
+                """);
+
+        String twiceInjected = ServletResponseContext.injectRapBrowserCompatibilityPatch(onceInjected);
+
+        assertTrue(onceInjected.contains("__veloRapBrowserCompatPatched"));
+        assertTrue(twiceInjected.contains("__veloRapBrowserCompatPatched"));
+        assertTrue(onceInjected.equals(twiceInjected));
     }
 }

@@ -188,6 +188,7 @@ curl http://localhost:8080/app/hello
 | [클러스터 세션 가이드](docs/ko/cluster-session-guide.md) | 저장소 SPI, sticky session, 비동기 복제, TTL/충돌 일관성 |
 | [JNDI / DataSource](docs/ko/jndi-datasource.md) | JNDI 네이밍 + 커넥션 풀 |
 | [Admin CLI](docs/ko/admin-cli.md) | 73개 관리 명령어 레퍼런스 |
+| [Browser WAR 샘플](docs/ko/browser-war-samples.md) | JavaScript, TypeScript, jQuery, React, Vue, Angular 테스트 링크 |
 | [라이프사이클](docs/ko/lifecycle.md) | 서버/앱 생명주기 |
 | [제품화 로드맵](docs/ko/roadmap.md) | 우선순위 재정렬 + 6주 실행 계획 |
 

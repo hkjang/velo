@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Angular WAR Sample</title>
+  <link rel="stylesheet" href="./showcase.css">
+</head>
+<body>
+<main class="page-shell">
+  <section class="hero">
+    <div class="eyebrow">velo-was browser showcase</div>
+    <h1>Angular WAR Sample</h1>
+    <p>Angular standalone component를 브라우저에서 부트스트랩해 정적 자산, JSON fetch, 템플릿 렌더링 흐름을 검증한다.</p>
+    <div class="hero-meta">
+      <span class="pill" data-sample-status>BOOTING</span>
+      <span class="pill muted" data-sample-note>Angular runtime 준비 중</span>
+    </div>
+  </section>
+  <sample-angular-app id="app" class="dashboard">
+    <div class="loading">Angular app bootstrap 준비 중이다.</div>
+  </sample-angular-app>
+</main>
+<script>
+  (function () {
+    function setFailure(message) {
+      var status = document.querySelector("[data-sample-status]");
+      var note = document.querySelector("[data-sample-note]");
+      if (status) status.textContent = "ERROR";
+      if (note) note.textContent = message;
+    }
+    window.addEventListener("error", function (event) {
+      setFailure(event.message || "script error");
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      setFailure(event.reason && event.reason.message ? event.reason.message : "promise rejected");
+    });
+  })();
+</script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "team": "Edge Delivery Guild",
+  "generatedAt": "2026-03-20T09:00:00+09:00",
+  "services": [
+    {
+      "name": "asset-pipeline",
+      "region": "ap-northeast-2",
+      "latencyMs": 38,
+      "errorRate": 0.12,
+      "healthy": true,
+      "deploysToday": 7,
+      "owner": "web-core"
+    },
+    {
+      "name": "session-cluster",
+      "region": "ap-northeast-2",
+      "latencyMs": 61,
+      "errorRate": 0.44,
+      "healthy": true,
+      "deploysToday": 4,
+      "owner": "platform"
+    },
+    {
+      "name": "static-edge",
+      "region": "us-west-2",
+      "latencyMs": 27,
+      "errorRate": 0.07,
+      "healthy": true,
+      "deploysToday": 11,
+      "owner": "frontend-infra"
+    },
+    {
+      "name": "admin-gateway",
+      "region": "eu-central-1",
+      "latencyMs": 94,
+      "errorRate": 1.32,
+      "healthy": false,
+      "deploysToday": 2,
+      "owner": "ops"
+    },
+    {
+      "name": "async-console",
+      "region": "ap-southeast-1",
+      "latencyMs": 53,
+      "errorRate": 0.21,
+      "healthy": true,
+      "deploysToday": 6,
+      "owner": "runtime"
+    }
+  ],
+  "alerts": [
+    {
+      "level": "info",
+      "message": "Brotli pre-compression asset bundle refreshed 18 minutes ago."
+    },
+    {
+      "level": "warn",
+      "message": "One canary rollout is waiting for manual approval."
+    }
+  ]
+}

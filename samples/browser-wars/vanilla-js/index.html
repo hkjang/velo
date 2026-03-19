@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vanilla JavaScript WAR Sample</title>
+  <link rel="stylesheet" href="./showcase.css">
+</head>
+<body>
+<main class="page-shell">
+  <section class="hero">
+    <div class="eyebrow">velo-was browser showcase</div>
+    <h1>Vanilla JavaScript WAR Sample</h1>
+    <p>서버가 제공하는 정적 HTML, CSS, JSON, ES Module JavaScript만으로 운영 대시보드를 구성한다.</p>
+    <div class="hero-meta">
+      <span class="pill" data-sample-status>BOOTING</span>
+      <span class="pill muted" data-sample-note>dashboard.json fetch 대기 중</span>
+    </div>
+  </section>
+  <section id="app" class="dashboard"></section>
+</main>
+<script>
+  (function () {
+    function setFailure(message) {
+      var status = document.querySelector("[data-sample-status]");
+      var note = document.querySelector("[data-sample-note]");
+      if (status) status.textContent = "ERROR";
+      if (note) note.textContent = message;
+    }
+    window.addEventListener("error", function (event) {
+      setFailure(event.message || "script error");
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      setFailure(event.reason && event.reason.message ? event.reason.message : "promise rejected");
+    });
+  })();
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

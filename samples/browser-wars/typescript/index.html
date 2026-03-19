@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeScript WAR Sample</title>
+  <link rel="stylesheet" href="./showcase.css">
+</head>
+<body>
+<main class="page-shell">
+  <section class="hero">
+    <div class="eyebrow">velo-was browser showcase</div>
+    <h1>TypeScript WAR Sample</h1>
+    <p>TypeScript 소스를 ES Module로 컴파일한 뒤 WAR 안에 포함해, 정적 리소스와 JSON fetch 흐름을 같이 검증한다.</p>
+    <div class="hero-meta">
+      <span class="pill" data-sample-status>BOOTING</span>
+      <span class="pill muted" data-sample-note>TypeScript bundle 초기화 중</span>
+    </div>
+  </section>
+  <section id="app" class="dashboard"></section>
+</main>
+<script>
+  (function () {
+    function setFailure(message) {
+      var status = document.querySelector("[data-sample-status]");
+      var note = document.querySelector("[data-sample-note]");
+      if (status) status.textContent = "ERROR";
+      if (note) note.textContent = message;
+    }
+    window.addEventListener("error", function (event) {
+      setFailure(event.message || "script error");
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      setFailure(event.reason && event.reason.message ? event.reason.message : "promise rejected");
+    });
+  })();
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

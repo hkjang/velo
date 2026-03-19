@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>jQuery WAR Sample</title>
+  <link rel="stylesheet" href="./showcase.css">
+</head>
+<body>
+<main class="page-shell">
+  <section class="hero">
+    <div class="eyebrow">velo-was browser showcase</div>
+    <h1>jQuery WAR Sample</h1>
+    <p>jQuery 기반 DOM 조작과 이벤트 바인딩, JSON 로딩이 static resource 엔진과 함께 정상 동작하는지 확인한다.</p>
+    <div class="hero-meta">
+      <span class="pill" data-sample-status>BOOTING</span>
+      <span class="pill muted" data-sample-note>jQuery runtime 준비 중</span>
+    </div>
+  </section>
+  <section id="app" class="dashboard"></section>
+</main>
+<script>
+  (function () {
+    function setFailure(message) {
+      var status = document.querySelector("[data-sample-status]");
+      var note = document.querySelector("[data-sample-note]");
+      if (status) status.textContent = "ERROR";
+      if (note) note.textContent = message;
+    }
+    window.addEventListener("error", function (event) {
+      setFailure(event.message || "script error");
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      setFailure(event.reason && event.reason.message ? event.reason.message : "promise rejected");
+    });
+  })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VueJS WAR Sample</title>
+  <link rel="stylesheet" href="./showcase.css">
+</head>
+<body>
+<main class="page-shell">
+  <section class="hero">
+    <div class="eyebrow">velo-was browser showcase</div>
+    <h1>VueJS WAR Sample</h1>
+    <p>Vue reactivity, computed state, 이벤트 바인딩이 WAR 정적 배포와 함께 자연스럽게 동작하는지 검증한다.</p>
+    <div class="hero-meta">
+      <span class="pill" data-sample-status>BOOTING</span>
+      <span class="pill muted" data-sample-note>Vue runtime 준비 중</span>
+    </div>
+  </section>
+  <section id="app" class="dashboard"></section>
+</main>
+<script>
+  (function () {
+    function setFailure(message) {
+      var status = document.querySelector("[data-sample-status]");
+      var note = document.querySelector("[data-sample-note]");
+      if (status) status.textContent = "ERROR";
+      if (note) note.textContent = message;
+    }
+    window.addEventListener("error", function (event) {
+      setFailure(event.message || "script error");
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      setFailure(event.reason && event.reason.message ? event.reason.message : "promise rejected");
+    });
+  })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

@@ -19,6 +19,73 @@ import java.util.Map;
 
 class ServletResponseContext {
 
+    private static final String RAP_CLIENT_SCRIPT = "rap-client.js";
+    private static final String RAP_BOOTSTRAP_MARKER = "rwt.remote.MessageProcessor.processMessage";
+    private static final String RAP_BROWSER_COMPAT_MARKER = "__veloRapBrowserCompatPatched";
+    private static final String RAP_BROWSER_COMPAT_PATCH = """
+            <script type="text/javascript">
+            (function() {
+              if (window.%1$s) {
+                return;
+              }
+              window.%1$s = true;
+              if (!window.rwt || !rwt.widgets || !rwt.widgets.Browser) {
+                return;
+              }
+              var Browser = rwt.widgets.Browser;
+              var originalSetInline = Browser.prototype.setInline;
+              if (typeof originalSetInline === "function") {
+                Browser.prototype.setInline = function(value) {
+                  var previous = this.getInline && this.getInline();
+                  var result = originalSetInline.call(this, value);
+                  if (value !== previous && this.isCreated && this.isCreated() && this.getSource && this.getSource()) {
+                    var self = this;
+                    window.setTimeout(function() {
+                      if (!(self.isDisposed && self.isDisposed()) && self.syncSource) {
+                        self.syncSource();
+                      }
+                    }, 0);
+                  }
+                  return result;
+                };
+              }
+              var originalExecute = Browser.prototype.execute;
+              if (typeof originalExecute === "function") {
+                Browser.prototype.execute = function(script) {
+                  var self = this;
+                  function shouldRetry() {
+                    try {
+                      if (self.getInline && self.getInline()) {
+                        if (!self.isLoaded || !self.isLoaded()) {
+                          return true;
+                        }
+                        var doc = self.getContentDocument && self.getContentDocument();
+                        if (!doc || !doc.body) {
+                          return true;
+                        }
+                        if (doc.readyState && doc.readyState !== "complete") {
+                          return true;
+                        }
+                      }
+                    } catch (ignore) {
+                    }
+                    return false;
+                  }
+                  if (shouldRetry()) {
+                    window.setTimeout(function() {
+                      if (!(self.isDisposed && self.isDisposed())) {
+                        originalExecute.call(self, script);
+                      }
+                    }, 25);
+                    return;
+                  }
+                  return originalExecute.call(this, script);
+                };
+              }
+            })();
+            </script>
+            """.formatted(RAP_BROWSER_COMPAT_MARKER);
+
     private final ServletBodyOutputStream outputStream = new ServletBodyOutputStream();
     private final Map<String, List<String>> headers = new LinkedHashMap<>();
     private final List<Cookie> cookies = new ArrayList<>();
@@ -118,7 +185,7 @@ class ServletResponseContext {
 
     public FullHttpResponse toNettyResponse(boolean headRequest, boolean setSessionCookie, String sessionId) {
         writer.flush();
-        byte[] body = outputStream.toByteArray();
+        byte[] body = applyCompatibilityPatches(outputStream.toByteArray());
         FullHttpResponse response = new DefaultFullHttpResponse(
                 HttpVersion.HTTP_1_1,
                 HttpResponseStatus.valueOf(status),
@@ -143,5 +210,46 @@ class ServletResponseContext {
 
     private PrintWriter newWriter() {
         return new PrintWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8), true);
+    }
+
+    private byte[] applyCompatibilityPatches(byte[] body) {
+        if (!isHtmlResponse() || body.length == 0) {
+            return body;
+        }
+        Charset charset = responseCharset();
+        String responseBody = new String(body, charset);
+        String patchedBody = injectRapBrowserCompatibilityPatch(responseBody);
+        return patchedBody.equals(responseBody) ? body : patchedBody.getBytes(charset);
+    }
+
+    private boolean isHtmlResponse() {
+        return contentType != null && contentType.toLowerCase(java.util.Locale.ROOT).contains("text/html");
+    }
+
+    private Charset responseCharset() {
+        try {
+            return Charset.forName(characterEncoding);
+        } catch (Exception ignored) {
+            return StandardCharsets.UTF_8;
+        }
+    }
+
+    static String injectRapBrowserCompatibilityPatch(String responseBody) {
+        if (responseBody == null
+                || responseBody.contains(RAP_BROWSER_COMPAT_MARKER)
+                || !responseBody.contains(RAP_CLIENT_SCRIPT)
+                || !responseBody.contains(RAP_BOOTSTRAP_MARKER)) {
+            return responseBody;
+        }
+        int rapScriptIndex = responseBody.indexOf(RAP_CLIENT_SCRIPT);
+        int scriptCloseIndex = responseBody.indexOf("</script>", rapScriptIndex);
+        if (scriptCloseIndex < 0) {
+            return responseBody;
+        }
+        int insertIndex = scriptCloseIndex + "</script>".length();
+        return responseBody.substring(0, insertIndex)
+                + "\n"
+                + RAP_BROWSER_COMPAT_PATCH
+                + responseBody.substring(insertIndex);
     }
 }

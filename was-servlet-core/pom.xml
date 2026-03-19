@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.velo.was</groupId>
         <artifactId>velo-was</artifactId>
-        <version>0.5.3</version>
+        <version>0.5.4</version>
     </parent>
 
     <artifactId>was-servlet-core</artifactId>
@@ -18,6 +18,11 @@
             <groupId>io.velo.was</groupId>
             <artifactId>was-protocol-http</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>

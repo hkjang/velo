@@ -12,7 +12,7 @@
                            "verifiedAt":  "2026-03-19",
                            "sourceArchiveUrl":  "https://dlcdn.apache.org/tomcat/tomcat-11/v11.0.18/src/apache-tomcat-11.0.18-src.tar.gz",
                            "sourceRepositoryUrl":  "https://github.com/apache/tomcat/tree/11.0.x",
-                           "notes":  "URL mapping adapter is wired through ServletPathMapperFactory, filter matching honors Tomcat-style URL-first then servlet-name ordering, named RequestDispatcher forward/include run through the compatibility bridge, forward preserves headers while clearing only the response buffer, and dispatcher/async flows now preserve user-supplied request/response wrappers. Full ApplicationDispatcher attribute parity is still pending."
+                           "notes":  "URL mapping adapter is wired through ServletPathMapperFactory, filter matching honors Tomcat-style URL-first then servlet-name ordering, named RequestDispatcher forward/include run through the compatibility bridge, forward preserves headers while clearing only the response buffer, committed responses reject forward dispatch like Tomcat, forward now disables further caller output after dispatch completion, nested include attributes are restored after dispatch completion, and dispatcher/async flows preserve user-supplied request/response wrappers. Full ApplicationDispatcher attribute parity is still pending."
                        },
                        {
                            "name":  "apache-tomcat-web-resources",

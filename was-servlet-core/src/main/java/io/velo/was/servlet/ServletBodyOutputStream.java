@@ -9,6 +9,7 @@ import java.io.IOException;
 public class ServletBodyOutputStream extends ServletOutputStream {
 
     private final ByteArrayOutputStream delegate = new ByteArrayOutputStream();
+    private boolean closed;
 
     @Override
     public boolean isReady() {
@@ -31,6 +32,9 @@ public class ServletBodyOutputStream extends ServletOutputStream {
 
     @Override
     public void write(int b) throws IOException {
+        if (closed) {
+            throw new IOException("Stream closed");
+        }
         delegate.write(b);
     }
 
@@ -40,5 +44,11 @@ public class ServletBodyOutputStream extends ServletOutputStream {
 
     public void reset() {
         delegate.reset();
+    }
+
+    @Override
+    public void close() throws IOException {
+        closed = true;
+        delegate.close();
     }
 }

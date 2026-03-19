@@ -422,6 +422,102 @@ class SimpleServletContainerTest {
     }
 
     @Test
+    void forwardRejectsCommittedResponse() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("forward-committed-app", "/app")
+                .servlet("/target", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("TARGET");
+                    }
+                })
+                .servlet("/forward-committed", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        try {
+                            req.getRequestDispatcher("/target").forward(req, committedResponse());
+                            resp.getWriter().write("unexpected");
+                        } catch (IllegalStateException exception) {
+                            resp.getWriter().write("ILLEGAL:" + exception.getMessage());
+                        }
+                    }
+                })
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/forward-committed"),
+                null,
+                null));
+
+        assertEquals(200, response.status().code());
+        assertEquals("ILLEGAL:Cannot forward after response has been committed",
+                response.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void namedForwardRejectsCommittedResponse() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("named-forward-committed-app", "/app")
+                .servlet("/target", "NamedTarget", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("TARGET");
+                    }
+                })
+                .servlet("/forward-named-committed", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        RequestDispatcher dispatcher = getServletContext().getNamedDispatcher("NamedTarget");
+                        assertNotNull(dispatcher);
+                        try {
+                            dispatcher.forward(req, committedResponse());
+                            resp.getWriter().write("unexpected");
+                        } catch (IllegalStateException exception) {
+                            resp.getWriter().write("ILLEGAL:" + exception.getMessage());
+                        }
+                    }
+                })
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/forward-named-committed"),
+                null,
+                null));
+
+        assertEquals(200, response.status().code());
+        assertEquals("ILLEGAL:Cannot forward after response has been committed",
+                response.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void forwardDisablesFurtherOutputFromCaller() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("forward-finish-app", "/app")
+                .servlet("/target", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("TARGET");
+                    }
+                })
+                .servlet("/forward-finish", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+                        req.getRequestDispatcher("/target").forward(req, resp);
+                        resp.getWriter().write(":after-forward");
+                    }
+                })
+                .build());
+
+        FullHttpResponse response = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/forward-finish"),
+                null,
+                null));
+
+        assertEquals(200, response.status().code());
+        assertEquals("TARGET", response.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
     void requestDispatcherPreservesWrappedRequestAndResponse() throws Exception {
         SimpleServletContainer container = new SimpleServletContainer();
         container.deploy(SimpleServletApplication.builder("wrapped-dispatch-app", "/app")
@@ -1478,5 +1574,11 @@ class SimpleServletContainerTest {
                 null, null));
         assertEquals(200, resp.status().code());
         assertEquals("HTML:/index.html", resp.content().toString(StandardCharsets.UTF_8));
+    }
+
+    private static HttpServletResponse committedResponse() {
+        ServletResponseContext responseContext = new ServletResponseContext();
+        responseContext.toNettyResponse(false, null);
+        return ServletProxyFactory.createResponse(responseContext);
     }
 }

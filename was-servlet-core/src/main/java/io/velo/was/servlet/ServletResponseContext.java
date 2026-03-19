@@ -288,6 +288,12 @@ class ServletResponseContext {
         return committed;
     }
 
+    public void finish() {
+        writer.flush();
+        writer.close();
+        committed = true;
+    }
+
     public FullHttpResponse toNettyResponse(boolean headRequest, Cookie sessionCookie) {
         writer.flush();
         byte[] body = applyCompatibilityPatches(outputStream.toByteArray());

@@ -21,6 +21,13 @@ Use this directory for integration glue that connects vendored Tomcat code to
   bridge with Tomcat-like filter selection.
 - Forward dispatch now clears only the buffered body and preserves response
   headers, which aligns better with Tomcat's `ApplicationDispatcher`.
+- Forward dispatch now rejects already committed responses instead of trying to
+  reset the buffer, which matches Tomcat's `ApplicationDispatcher` guard.
+- Forward dispatch now closes the effective response for additional output once
+  the target returns, so caller writes after `forward()` no longer leak into
+  the final body.
+- Nested include dispatches now restore the caller's
+  `jakarta.servlet.include.*` attributes after completion.
 - RequestDispatcher and AsyncContext now preserve user-supplied
   request/response wrappers across dispatch boundaries.
 - Full `ApplicationDispatcher` attribute parity is still pending.

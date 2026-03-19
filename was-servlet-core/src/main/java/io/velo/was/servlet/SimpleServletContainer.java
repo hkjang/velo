@@ -417,6 +417,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         ServletRuntime runtime = resolvedServlet.runtime();
 
         if (dispatcherType == DispatcherType.FORWARD) {
+            ensureForwardAllowed(sourceResponse);
             sourceResponse.resetBuffer();
             sourceResponse.clearErrorState();
         }
@@ -445,7 +446,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 servletPath,
                 pathInfo,
                 dispatcherType);
-        dispatch(application,
+        DispatchResult dispatchResult = dispatch(application,
                 runtime,
                 dispatchRequest,
                 sourceResponse,
@@ -456,6 +457,9 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 response,
                 completionAction,
                 false);
+        if (dispatcherType == DispatcherType.FORWARD && !dispatchResult.asyncStarted()) {
+            sourceResponse.finish();
+        }
     }
 
     private void dispatchNamedFromProxy(String contextPath,
@@ -478,6 +482,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
         }
 
         if (dispatcherType == DispatcherType.FORWARD) {
+            ensureForwardAllowed(sourceResponse);
             sourceResponse.resetBuffer();
             sourceResponse.clearErrorState();
         }
@@ -489,7 +494,7 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 sourceRequest.pathInfo(),
                 dispatcherType,
                 null);
-        dispatch(application,
+        DispatchResult dispatchResult = dispatch(application,
                 runtime,
                 dispatchRequest,
                 sourceResponse,
@@ -500,6 +505,9 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 response,
                 null,
                 false);
+        if (dispatcherType == DispatcherType.FORWARD && !dispatchResult.asyncStarted()) {
+            sourceResponse.finish();
+        }
     }
 
     private void asyncDispatchFromContext(String contextPath,
@@ -548,6 +556,12 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 response,
                 null,
                 false);
+    }
+
+    private void ensureForwardAllowed(ServletResponseContext responseContext) {
+        if (responseContext.isCommitted()) {
+            throw new IllegalStateException("Cannot forward after response has been committed");
+        }
     }
 
     private DispatchResult dispatch(DeployedApplication application,

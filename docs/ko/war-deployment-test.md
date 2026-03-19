@@ -33,7 +33,7 @@ mvn clean package -DskipTests
 ?ㅼ쓬 紐낅졊?대? ?듯빐 Velo WAS ?쒕쾭瑜?諛깃렇?쇱슫?쒕굹 ???곕???李쎌뿉???ㅽ뻾?⑸땲??
 
 ```sh
-java -jar was-bootstrap/target/was-bootstrap-0.5.7-jar-with-dependencies.jar
+java -jar was-bootstrap/target/was-bootstrap-0.5.8-jar-with-dependencies.jar
 ```
 
 ?쒕쾭 援щ룞 濡쒓렇??`Hot deploy watcher started` 硫붿떆吏媛 ?쒖떆?섎㈃ ?뺤긽?곸쑝濡??먮룞 諛고룷瑜?紐⑤땲?곕쭅 以묒씤 ?곹깭?낅땲??
@@ -54,7 +54,7 @@ cd test-war
 mvn clean package
 
 # 鍮뚮뱶 寃곌낵臾쇱쓣 Velo WAS??deploy ?붾젆?좊━濡?蹂듭궗
-cp target/test-war-0.5.7.war ../deploy/test.war
+cp target/test-war-0.5.8.war ../deploy/test.war
 ```
 
 `hotDeploy`媛 ?쒖꽦?붾릺???덉쑝誘濡? 蹂듭궗 利됱떆(??2珥??? ?쒕쾭 濡쒓렇??諛고룷 ?꾨즺 硫붿떆吏媛 ?섑??⑸땲??

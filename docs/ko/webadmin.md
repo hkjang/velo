@@ -279,5 +279,6 @@ was-webadmin/
 ## 관련 문서
 
 - [API Documentation (Swagger) 가이드](api-docs.md)
+- [WebAdmin 데이터 저장소 상세](webadmin-data-storage.md)
 - [빌드 / 기동 / 종료 스크립트 가이드](build-scripts.md)
 - [Admin CLI 가이드](admin-cli.md)

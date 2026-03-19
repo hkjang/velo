@@ -34,6 +34,7 @@ class ServletRequestContext {
     private String characterEncoding = StandardCharsets.UTF_8.name();
     private SessionState sessionState;
     private boolean sessionCreated;
+    private volatile ExternalRequestTarget externalRequestTarget;
 
     ServletRequestContext(HttpExchange exchange,
                           ServletContext servletContext,
@@ -270,6 +271,22 @@ class ServletRequestContext {
         return (InetSocketAddress) exchange.localAddress();
     }
 
+    public String requestScheme() {
+        return externalRequestTarget().scheme();
+    }
+
+    public boolean requestSecure() {
+        return "https".equalsIgnoreCase(requestScheme());
+    }
+
+    public String requestServerName() {
+        return externalRequestTarget().host();
+    }
+
+    public int requestServerPort() {
+        return externalRequestTarget().port();
+    }
+
     private static Map<String, List<String>> parseAllParameters(HttpExchange exchange, Charset charset) {
         Map<String, List<String>> params = new LinkedHashMap<>();
 
@@ -336,5 +353,148 @@ class ServletRequestContext {
             return null;
         }
         return uri.substring(queryStart + 1);
+    }
+
+    private ExternalRequestTarget externalRequestTarget() {
+        ExternalRequestTarget target = externalRequestTarget;
+        if (target == null) {
+            target = resolveExternalRequestTarget();
+            externalRequestTarget = target;
+        }
+        return target;
+    }
+
+    /**
+     * Resolves the externally visible scheme/host/port so apps behind reverse
+     * proxies see the same request URL that browsers used.
+     */
+    private ExternalRequestTarget resolveExternalRequestTarget() {
+        String forwardedHeader = header("Forwarded");
+        String scheme = forwardedValue(forwardedHeader, "proto");
+        if (scheme == null) {
+            scheme = firstHeaderValue(header("X-Forwarded-Proto"));
+        }
+        if (scheme == null || scheme.isBlank()) {
+            scheme = exchange.secure() ? "https" : "http";
+        }
+        scheme = scheme.toLowerCase(Locale.ROOT);
+
+        HostPort hostPort = null;
+        String forwardedHost = forwardedValue(forwardedHeader, "host");
+        if (forwardedHost != null) {
+            hostPort = parseHostPort(forwardedHost);
+        }
+        if (hostPort == null) {
+            hostPort = parseHostPort(firstHeaderValue(header("X-Forwarded-Host")));
+        }
+        if (hostPort == null) {
+            hostPort = parseHostPort(firstHeaderValue(header("Host")));
+        }
+        if (hostPort == null) {
+            InetSocketAddress local = localAddress();
+            if (local != null) {
+                hostPort = new HostPort(local.getHostString(), local.getPort());
+            } else {
+                hostPort = new HostPort("localhost", defaultPort(scheme));
+            }
+        }
+
+        Integer forwardedPort = parsePort(firstHeaderValue(header("X-Forwarded-Port")));
+        int port = forwardedPort != null ? forwardedPort : hostPort.port();
+        if (port <= 0) {
+            port = defaultPort(scheme);
+        }
+
+        return new ExternalRequestTarget(scheme, hostPort.host(), port);
+    }
+
+    private static String firstHeaderValue(String headerValue) {
+        if (headerValue == null || headerValue.isBlank()) {
+            return null;
+        }
+        int commaIndex = headerValue.indexOf(',');
+        String first = commaIndex >= 0 ? headerValue.substring(0, commaIndex) : headerValue;
+        return unquote(first.trim());
+    }
+
+    private static String forwardedValue(String forwardedHeader, String key) {
+        String entry = firstHeaderValue(forwardedHeader);
+        if (entry == null) {
+            return null;
+        }
+        for (String segment : entry.split(";")) {
+            String[] pair = segment.split("=", 2);
+            if (pair.length != 2) {
+                continue;
+            }
+            if (key.equalsIgnoreCase(pair[0].trim())) {
+                String value = unquote(pair[1].trim());
+                return value == null || value.isBlank() ? null : value;
+            }
+        }
+        return null;
+    }
+
+    private static HostPort parseHostPort(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+        String value = unquote(rawValue.trim());
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        if (value.startsWith("[")) {
+            int closingBracket = value.indexOf(']');
+            if (closingBracket > 0) {
+                String host = value.substring(1, closingBracket);
+                Integer port = null;
+                if (closingBracket + 1 < value.length() && value.charAt(closingBracket + 1) == ':') {
+                    port = parsePort(value.substring(closingBracket + 2));
+                }
+                return new HostPort(host, port != null ? port : -1);
+            }
+        }
+
+        int lastColon = value.lastIndexOf(':');
+        if (lastColon > 0 && value.indexOf(':') == lastColon) {
+            Integer port = parsePort(value.substring(lastColon + 1));
+            if (port != null) {
+                return new HostPort(value.substring(0, lastColon), port);
+            }
+        }
+
+        return new HostPort(value, -1);
+    }
+
+    private static Integer parsePort(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(rawValue.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static String unquote(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
+    }
+
+    private static int defaultPort(String scheme) {
+        return "https".equalsIgnoreCase(scheme) ? 443 : 80;
+    }
+
+    private record ExternalRequestTarget(String scheme, String host, int port) {
+    }
+
+    private record HostPort(String host, int port) {
     }
 }

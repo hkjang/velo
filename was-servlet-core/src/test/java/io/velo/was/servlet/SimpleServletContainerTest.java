@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
@@ -247,6 +248,69 @@ class SimpleServletContainerTest {
                 null));
         assertEquals(200, parentRelativeForward.status().code());
         assertEquals("REL[FORWARD:/dir/target]", parentRelativeForward.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void requestMetadataHonorsProxyAndHostHeaders() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("proxy-app", "/app")
+                .servlet("/meta", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write(req.getScheme()
+                                + "|" + req.isSecure()
+                                + "|" + req.getServerName()
+                                + "|" + req.getServerPort()
+                                + "|" + req.getRequestURL());
+                    }
+                })
+                .build());
+
+        InetSocketAddress remote = new InetSocketAddress("192.168.120.159", 44580);
+        InetSocketAddress local = new InetSocketAddress("10.0.0.10", 8080);
+
+        DefaultFullHttpRequest forwardedRequest =
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/meta");
+        forwardedRequest.headers().set(HttpHeaderNames.HOST, "internal-was:8080");
+        forwardedRequest.headers().set("X-Forwarded-Proto", "https");
+        forwardedRequest.headers().set("X-Forwarded-Host", "otadpole.koreacb.com");
+        forwardedRequest.headers().set("X-Forwarded-Port", "443");
+
+        FullHttpResponse forwardedResponse = container.handle(new HttpExchange(
+                forwardedRequest,
+                remote,
+                local));
+
+        assertEquals("https|true|otadpole.koreacb.com|443|https://otadpole.koreacb.com/app/meta",
+                forwardedResponse.content().toString(StandardCharsets.UTF_8));
+
+        DefaultFullHttpRequest standardForwardedRequest =
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/meta");
+        standardForwardedRequest.headers().set(HttpHeaderNames.HOST, "internal-was:8080");
+        standardForwardedRequest.headers().set("Forwarded",
+                "for=192.0.2.10;proto=https;host=\"dbhub.example.com:8443\"");
+
+        FullHttpResponse standardForwardedResponse = container.handle(new HttpExchange(
+                standardForwardedRequest,
+                remote,
+                local));
+
+        assertEquals("https|true|dbhub.example.com|8443|https://dbhub.example.com:8443/app/meta",
+                standardForwardedResponse.content().toString(StandardCharsets.UTF_8));
+
+        DefaultFullHttpRequest hostRequest =
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/meta");
+        hostRequest.headers().set(HttpHeaderNames.HOST, "console.example.com:9443");
+
+        FullHttpResponse hostResponse = container.handle(new HttpExchange(
+                hostRequest,
+                remote,
+                new InetSocketAddress("10.0.0.10", 9443),
+                null,
+                true));
+
+        assertEquals("https|true|console.example.com|9443|https://console.example.com:9443/app/meta",
+                hostResponse.content().toString(StandardCharsets.UTF_8));
     }
 
     @Test

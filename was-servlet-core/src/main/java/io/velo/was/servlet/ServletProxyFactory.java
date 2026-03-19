@@ -185,16 +185,16 @@ final class ServletProxyFactory {
             case "getRequestURI" -> requestContext.requestUri();
             case "getRequestURL" -> new StringBuffer(buildRequestUrl(requestContext));
             case "getProtocol" -> requestContext.request().protocolVersion().text();
-            case "getScheme" -> requestContext.exchange().secure() ? "https" : "http";
-            case "getServerName" -> requestContext.localAddress().getHostString();
-            case "getServerPort" -> requestContext.localAddress().getPort();
+            case "getScheme" -> requestContext.requestScheme();
+            case "getServerName" -> requestContext.requestServerName();
+            case "getServerPort" -> requestContext.requestServerPort();
             case "getRemoteAddr" -> requestContext.remoteAddress().getAddress().getHostAddress();
             case "getRemoteHost" -> requestContext.remoteAddress().getHostString();
             case "getRemotePort" -> requestContext.remoteAddress().getPort();
             case "getLocalAddr" -> requestContext.localAddress().getAddress().getHostAddress();
             case "getLocalName" -> requestContext.localAddress().getHostString();
             case "getLocalPort" -> requestContext.localAddress().getPort();
-            case "isSecure" -> requestContext.exchange().secure();
+            case "isSecure" -> requestContext.requestSecure();
             case "getContentType" -> requestContext.header("Content-Type");
             case "getContentLength" -> requestContext.body().length;
             case "getContentLengthLong" -> (long) requestContext.body().length;
@@ -408,8 +408,32 @@ final class ServletProxyFactory {
     }
 
     private static String buildRequestUrl(ServletRequestContext requestContext) {
-        return "http://" + requestContext.localAddress().getHostString() + ":" + requestContext.localAddress().getPort()
-                + requestContext.exchange().path();
+        String scheme = requestContext.requestScheme();
+        String host = requestContext.requestServerName();
+        int port = requestContext.requestServerPort();
+
+        StringBuilder url = new StringBuilder(scheme)
+                .append("://")
+                .append(formatHostForUrl(host));
+        if (!isDefaultPort(scheme, port)) {
+            url.append(':').append(port);
+        }
+        return url.append(requestContext.requestUri()).toString();
+    }
+
+    private static boolean isDefaultPort(String scheme, int port) {
+        return ("http".equalsIgnoreCase(scheme) && port == 80)
+                || ("https".equalsIgnoreCase(scheme) && port == 443);
+    }
+
+    private static String formatHostForUrl(String host) {
+        if (host == null || host.isBlank()) {
+            return "localhost";
+        }
+        if (host.indexOf(':') >= 0 && !(host.startsWith("[") && host.endsWith("]"))) {
+            return "[" + host + "]";
+        }
+        return host;
     }
 
     private static Path resolveWebAppRoot(Map<String, String> initParameters) {

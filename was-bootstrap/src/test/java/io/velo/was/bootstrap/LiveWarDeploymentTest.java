@@ -7,13 +7,17 @@ import io.velo.was.http.HttpResponses;
 import io.velo.was.servlet.SimpleServletContainer;
 import io.velo.was.transport.netty.NettyServer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 
@@ -27,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.*;
  *   4. Verify session persistence, filter headers, listener lifecycle
  */
 class LiveWarDeploymentTest {
+
+    @TempDir
+    Path tempDir;
 
     private static int findFreePort() {
         try (ServerSocket ss = new ServerSocket(0)) {
@@ -50,12 +57,12 @@ class LiveWarDeploymentTest {
         SimpleServletContainer container = new SimpleServletContainer();
 
         // ── 2. Deploy test-war ──
-        Path testWarPath = Path.of("../test-war").toAbsolutePath().normalize();
+        Path testWarPath = createExplodedTestWar();
         System.out.println("Test WAR path: " + testWarPath);
         assertTrue(testWarPath.resolve("WEB-INF/web.xml").toFile().exists(),
                 "test-war/WEB-INF/web.xml should exist at: " + testWarPath);
 
-        WarDeployer deployer = new WarDeployer(Path.of("target/work"));
+        WarDeployer deployer = new WarDeployer(tempDir.resolve("work"));
         WarDeployer.DeploymentResult deployResult = deployer.deploy(testWarPath, "/testapp");
         container.deploy(deployResult.application());
 
@@ -174,5 +181,175 @@ class LiveWarDeploymentTest {
         return client.send(
                 HttpRequest.newBuilder().uri(URI.create(url)).GET().build(),
                 HttpResponse.BodyHandlers.ofString());
+    }
+
+    private Path createExplodedTestWar() throws Exception {
+        Path warRoot = tempDir.resolve("test-war");
+        Path webInf = warRoot.resolve("WEB-INF");
+        Path classesDir = webInf.resolve("classes");
+        Files.createDirectories(classesDir);
+
+        Files.writeString(webInf.resolve("web.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee" version="6.1">
+                    <display-name>velo-test-war</display-name>
+                    <context-param>
+                        <param-name>appVersion</param-name>
+                        <param-value>1.0.0</param-value>
+                    </context-param>
+                    <listener>
+                        <listener-class>io.velo.testwar.AppLifecycleListener</listener-class>
+                    </listener>
+                    <filter>
+                        <filter-name>timingFilter</filter-name>
+                        <filter-class>io.velo.testwar.TimingFilter</filter-class>
+                    </filter>
+                    <filter-mapping>
+                        <filter-name>timingFilter</filter-name>
+                        <url-pattern>/*</url-pattern>
+                    </filter-mapping>
+                    <servlet>
+                        <servlet-name>helloServlet</servlet-name>
+                        <servlet-class>io.velo.testwar.HelloServlet</servlet-class>
+                    </servlet>
+                    <servlet-mapping>
+                        <servlet-name>helloServlet</servlet-name>
+                        <url-pattern>/hello</url-pattern>
+                    </servlet-mapping>
+                    <servlet>
+                        <servlet-name>sessionServlet</servlet-name>
+                        <servlet-class>io.velo.testwar.SessionServlet</servlet-class>
+                    </servlet>
+                    <servlet-mapping>
+                        <servlet-name>sessionServlet</servlet-name>
+                        <url-pattern>/session</url-pattern>
+                    </servlet-mapping>
+                    <servlet>
+                        <servlet-name>infoServlet</servlet-name>
+                        <servlet-class>io.velo.testwar.InfoServlet</servlet-class>
+                    </servlet>
+                    <servlet-mapping>
+                        <servlet-name>infoServlet</servlet-name>
+                        <url-pattern>/info</url-pattern>
+                    </servlet-mapping>
+                </web-app>
+                """, StandardCharsets.UTF_8);
+
+        compileAndPlaceClass(classesDir, "io.velo.testwar.AppLifecycleListener", """
+                package io.velo.testwar;
+                import jakarta.servlet.ServletContextEvent;
+                import jakarta.servlet.ServletContextListener;
+                public class AppLifecycleListener implements ServletContextListener {
+                    @Override
+                    public void contextInitialized(ServletContextEvent sce) {
+                        sce.getServletContext().setAttribute("startedAt", String.valueOf(System.currentTimeMillis()));
+                    }
+                }
+                """);
+
+        compileAndPlaceClass(classesDir, "io.velo.testwar.TimingFilter", """
+                package io.velo.testwar;
+                import jakarta.servlet.Filter;
+                import jakarta.servlet.FilterChain;
+                import jakarta.servlet.ServletException;
+                import jakarta.servlet.ServletRequest;
+                import jakarta.servlet.ServletResponse;
+                import jakarta.servlet.http.HttpServletResponse;
+                import java.io.IOException;
+                public class TimingFilter implements Filter {
+                    @Override
+                    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+                            throws IOException, ServletException {
+                        long started = System.nanoTime();
+                        chain.doFilter(request, response);
+                        long micros = Math.max(1L, (System.nanoTime() - started) / 1000L);
+                        ((HttpServletResponse) response).setHeader("X-Processing-Time-Us", String.valueOf(micros));
+                    }
+                }
+                """);
+
+        compileAndPlaceClass(classesDir, "io.velo.testwar.HelloServlet", """
+                package io.velo.testwar;
+                import jakarta.servlet.http.HttpServlet;
+                import jakarta.servlet.http.HttpServletRequest;
+                import jakarta.servlet.http.HttpServletResponse;
+                import java.io.IOException;
+                public class HelloServlet extends HttpServlet {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        String name = req.getParameter("name");
+                        if (name == null || name.isBlank()) {
+                            name = "World";
+                        }
+                        resp.setContentType("application/json; charset=UTF-8");
+                        resp.getWriter().write("{\\"message\\":\\"Hello, " + name + "!\\",\\"contextPath\\":\\""
+                                + req.getContextPath() + "\\"}");
+                    }
+                }
+                """);
+
+        compileAndPlaceClass(classesDir, "io.velo.testwar.SessionServlet", """
+                package io.velo.testwar;
+                import jakarta.servlet.http.HttpServlet;
+                import jakarta.servlet.http.HttpServletRequest;
+                import jakarta.servlet.http.HttpServletResponse;
+                import jakarta.servlet.http.HttpSession;
+                import java.io.IOException;
+                public class SessionServlet extends HttpServlet {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        HttpSession session = req.getSession(true);
+                        boolean isNew = session.isNew();
+                        Integer count = (Integer) session.getAttribute("count");
+                        int next = count == null ? 1 : count + 1;
+                        session.setAttribute("count", next);
+                        resp.setContentType("application/json; charset=UTF-8");
+                        resp.getWriter().write("{\\"count\\":" + next + ",\\"isNew\\":" + isNew + "}");
+                    }
+                }
+                """);
+
+        compileAndPlaceClass(classesDir, "io.velo.testwar.InfoServlet", """
+                package io.velo.testwar;
+                import jakarta.servlet.http.HttpServlet;
+                import jakarta.servlet.http.HttpServletRequest;
+                import jakarta.servlet.http.HttpServletResponse;
+                import java.io.IOException;
+                public class InfoServlet extends HttpServlet {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        String appVersion = req.getServletContext().getInitParameter("appVersion");
+                        Object startedAt = req.getServletContext().getAttribute("startedAt");
+                        resp.setContentType("application/json; charset=UTF-8");
+                        resp.getWriter().write("{\\"appVersion\\":\\"" + appVersion + "\\",\\"serverInfo\\":\\""
+                                + req.getServletContext().getServerInfo() + "\\",\\"startedAt\\":\\""
+                                + String.valueOf(startedAt) + "\\"}");
+                    }
+                }
+                """);
+
+        return warRoot;
+    }
+
+    private void compileAndPlaceClass(Path classesDir, String className, String source) throws Exception {
+        javax.tools.JavaCompiler compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) {
+            throw new IllegalStateException("No Java compiler available. Run tests with JDK, not JRE.");
+        }
+
+        Path srcDir = tempDir.resolve("src-" + className.replace('.', '-'));
+        Path srcFile = srcDir.resolve(className.replace('.', '/') + ".java");
+        Files.createDirectories(srcFile.getParent());
+        Files.writeString(srcFile, source, StandardCharsets.UTF_8);
+
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        int result = compiler.run(null, null, errors,
+                "-cp", System.getProperty("java.class.path"),
+                "-d", classesDir.toString(),
+                srcFile.toString());
+        if (result != 0) {
+            throw new IllegalStateException("Compilation failed for " + className + ": "
+                    + errors.toString(StandardCharsets.UTF_8));
+        }
     }
 }

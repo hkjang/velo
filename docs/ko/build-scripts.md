@@ -122,7 +122,7 @@ bin\build.bat -c -p
 패키징 완료 후 fat JAR 경로:
 
 ```text
-was-bootstrap/target/was-bootstrap-0.5.9-jar-with-dependencies.jar
+was-bootstrap/target/was-bootstrap-0.5.10-jar-with-dependencies.jar
 ```
 
 ---
@@ -327,3 +327,4 @@ curl http://localhost:8080/admin/api/status
 ./bin/build.sh -p was-webadmin was-bootstrap
 ./bin/start.sh -d
 ```
+

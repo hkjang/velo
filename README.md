@@ -54,7 +54,7 @@ mvn test
 ## 실행
 
 ```bash
-java -jar was-bootstrap/target/was-bootstrap-0.5.9-jar-with-dependencies.jar [config-path]
+java -jar was-bootstrap/target/was-bootstrap-0.5.10-jar-with-dependencies.jar [config-path]
 ```
 
 - `config-path` 미지정 시 `conf/server.yaml` 사용
@@ -200,3 +200,4 @@ curl http://localhost:8080/app/hello
 2. **운영 기능 실데이터화**: CLI/Web Admin이 실제 런타임 상태를 직접 노출
 3. **테스트 자산 확대**: 재배포, 느린 클라이언트, HTTP/2, WebSocket 회귀 테스트
 4. **관측성 표준화**: Prometheus, request id, slow request log, 앱별 메트릭 태깅
+

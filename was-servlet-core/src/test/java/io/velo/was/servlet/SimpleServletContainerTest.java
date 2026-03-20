@@ -1556,6 +1556,33 @@ class SimpleServletContainerTest {
     }
 
     @Test
+    void htmlResponsesWithoutExplicitContentTypeDoNotDefaultToTextPlain() throws Exception {
+        SimpleServletContainer container = new SimpleServletContainer();
+        container.deploy(SimpleServletApplication.builder("html-app", "/app")
+                .servlet("/editor", new HttpServlet() {
+                    @Override
+                    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+                        resp.getWriter().write("""
+                                <!DOCTYPE html>
+                                <html><body><pre id="editor"></pre></body></html>
+                                """);
+                    }
+                })
+                .build());
+
+        FullHttpResponse resp = container.handle(new HttpExchange(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/editor"),
+                null, null));
+
+        assertEquals(200, resp.status().code());
+        assertNull(resp.headers().get(HttpHeaderNames.CONTENT_TYPE));
+        assertEquals("""
+                <!DOCTYPE html>
+                <html><body><pre id="editor"></pre></body></html>
+                """, resp.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
     void welcomeFileSkipsNonMatchingAndPicksFirst() throws Exception {
         SimpleServletContainer container = new SimpleServletContainer();
         container.deploy(SimpleServletApplication.builder("multi-welcome-app", "/app")

@@ -140,4 +140,40 @@ class ServletResponseContextTest {
         assertFalse(responseContext.errorSent());
         assertNull(responseContext.errorMessage());
     }
+
+    @Test
+    void omitsDefaultTextPlainContentTypeForUnspecifiedHtmlResponses() {
+        ServletResponseContext responseContext = new ServletResponseContext();
+        responseContext.writer().write("""
+                <!DOCTYPE html>
+                <html><body><pre id="editor"></pre></body></html>
+                """);
+
+        var response = responseContext.toNettyResponse(false, null);
+
+        assertNull(responseContext.contentType());
+        assertNull(response.headers().get("Content-Type"));
+        assertEquals("""
+                <!DOCTYPE html>
+                <html><body><pre id="editor"></pre></body></html>
+                """, response.content().toString(CharsetUtil.UTF_8));
+    }
+
+    @Test
+    void resetClearsContentTypeAndRestoresDefaultCharacterEncoding() {
+        ServletResponseContext responseContext = new ServletResponseContext();
+        responseContext.setContentType("text/html; charset=EUC-KR");
+        responseContext.setCharacterEncoding("EUC-KR");
+        responseContext.setHeader("X-Test", "yes");
+        responseContext.writer().write("before");
+
+        responseContext.reset();
+
+        var response = responseContext.toNettyResponse(false, null);
+        assertEquals("UTF-8", responseContext.characterEncoding());
+        assertNull(responseContext.contentType());
+        assertNull(response.headers().get("Content-Type"));
+        assertNull(response.headers().get("X-Test"));
+        assertEquals("", response.content().toString(CharsetUtil.UTF_8));
+    }
 }

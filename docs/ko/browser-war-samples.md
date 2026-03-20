@@ -32,7 +32,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-browser-sample-wars.ps1
 ## 실행
 
 ```powershell
-java -jar .\was-bootstrap\target\was-bootstrap-0.5.9-jar-with-dependencies.jar .\conf\server.yaml
+java -jar .\was-bootstrap\target\was-bootstrap-0.5.10-jar-with-dependencies.jar .\conf\server.yaml
 ```
 
 기본 설정 기준으로 `deploy/` 를 hot deploy 하므로, 서버가 떠 있으면 WAR를 덮어쓴 뒤
@@ -49,3 +49,4 @@ java -jar .\was-bootstrap\target\was-bootstrap-0.5.9-jar-with-dependencies.jar .
 
 - jQuery, React, Vue, Angular 런타임은 CDN 자산을 사용한다.
 - Angular 샘플은 zoneless bootstrap 구성을 사용한다.
+

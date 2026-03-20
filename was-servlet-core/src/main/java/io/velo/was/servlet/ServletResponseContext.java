@@ -190,7 +190,7 @@ class ServletResponseContext {
     private final List<Cookie> cookies = new ArrayList<>();
     private int status = 200;
     private String characterEncoding = StandardCharsets.UTF_8.name();
-    private String contentType = "text/plain; charset=UTF-8";
+    private String contentType;
     private boolean errorSent;
     private String errorMessage;
     private boolean committed;
@@ -268,6 +268,8 @@ class ServletResponseContext {
         if (committed) {
             throw new IllegalStateException("Response already committed");
         }
+        characterEncoding = StandardCharsets.UTF_8.name();
+        contentType = null;
         resetBuffer();
         headers.clear();
         cookies.clear();

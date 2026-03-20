@@ -33,7 +33,7 @@ mvn clean package -DskipTests
 새 터미널에서 다음 명령으로 Velo WAS를 실행한다.
 
 ```sh
-java -jar was-bootstrap/target/was-bootstrap-0.5.9-jar-with-dependencies.jar
+java -jar was-bootstrap/target/was-bootstrap-0.5.10-jar-with-dependencies.jar
 ```
 
 서버 로그에 `Hot deploy watcher started` 메시지가 보이면
@@ -55,7 +55,7 @@ cd test-war
 mvn clean package
 
 # 배포 디렉토리로 복사
-cp target/test-war-0.5.9.war ../deploy/test.war
+cp target/test-war-0.5.10.war ../deploy/test.war
 ```
 
 `hotDeploy`가 활성화되어 있다면 복사 직후 약 2초 내에
@@ -258,3 +258,4 @@ Received: Hello Velo TCP!
 ```
 
 보낸 메시지와 받은 메시지가 일치하면 TCP 프레임 디코딩과 라우팅이 정상이다.
+

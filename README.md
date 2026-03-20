@@ -180,6 +180,7 @@ curl http://localhost:8080/app/hello
 |---|---|
 | [아키텍처 개요](docs/ko/architecture.md) | 모듈 구조, 요청 처리 흐름, 설계 결정 |
 | [아키텍처 상세](docs/ko/architecture-detail.md) | 내부 동작 심층 분석 |
+| [Tomcat 10 대비 속도 해석](docs/ko/tomcat10-vs-velo-speed.md) | Java 21, 경량 컨테이너 구조, 기능 범위 차이를 기준으로 체감 성능 차이 해석 |
 | [AsyncContext](docs/ko/async-context.md) | 비동기 서블릿 지원 |
 | [WAR 배포](docs/ko/war-deployment.md) | WAR 배포 + 클래스로더 격리 + 핫 디플로이 |
 | [구조화된 로깅](docs/ko/structured-logging.md) | 액세스/에러/감사 로그 + 메트릭 (JSON) |

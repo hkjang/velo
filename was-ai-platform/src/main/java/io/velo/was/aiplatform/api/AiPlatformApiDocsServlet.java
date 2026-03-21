@@ -42,514 +42,129 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         String host = "0.0.0.0".equals(server.getListener().getHost()) ? "localhost" : server.getListener().getHost();
         String baseUrl = "http://" + host + ":" + server.getListener().getPort() + ai.getConsole().getContextPath();
 
-        String spec = """
-                {
-                  "openapi": "3.0.3",
-                  "info": {
-                    "title": "Velo AI Platform Gateway API",
-                    "description": "Configuration-driven gateway and control plane API for the standalone Velo AI Platform module.",
-                    "version": "0.5.0"
-                  },
-                  "servers": [
-                    {
-                      "url": "%s",
-                      "description": "Current AI Platform base URL"
-                    }
-                  ],
-                  "tags": [
-                    {"name": "Gateway", "description": "Routing, inference, and streaming endpoints"},
-                    {"name": "Control Plane", "description": "Status, registry, and usage endpoints for the standalone AI module"}
-                  ],
-                  "paths": {
-                    "/gateway": {
-                      "get": {
-                        "tags": ["Gateway"],
-                        "summary": "Discover gateway endpoints",
-                        "responses": {
-                          "200": {
-                            "description": "Gateway endpoint list"
-                          }
-                        }
-                      }
-                    },
-                    "/gateway/route": {
-                      "post": {
-                        "tags": ["Gateway"],
-                        "summary": "Resolve request routing",
-                        "description": "Applies prompt routing, route policy matching, and automatic model selection.",
-                        "requestBody": {
-                          "required": false,
-                          "content": {
-                            "application/json": {
-                              "schema": {"$ref": "#/components/schemas/GatewayRequest"}
-                            }
-                          }
-                        },
-                        "responses": {
-                          "200": {
-                            "description": "Routing decision",
-                            "content": {
-                              "application/json": {
-                                "schema": {"$ref": "#/components/schemas/RouteDecision"}
-                              }
-                            }
-                          }
-                        }
-                      },
-                      "get": {
-                        "tags": ["Gateway"],
-                        "summary": "Resolve request routing via query string",
-                        "responses": {
-                          "200": {
-                            "description": "Routing decision"
-                          }
-                        }
-                      }
-                    },
-                    "/gateway/infer": {
-                      "post": {
-                        "tags": ["Gateway"],
-                        "summary": "Run a mock gateway inference",
-                        "description": "Returns a routing decision and a mock inference payload using the selected model profile.",
-                        "requestBody": {
-                          "required": false,
-                          "content": {
-                            "application/json": {
-                              "schema": {"$ref": "#/components/schemas/GatewayRequest"}
-                            }
-                          }
-                        },
-                        "responses": {
-                          "200": {
-                            "description": "Inference envelope",
-                            "content": {
-                              "application/json": {
-                                "schema": {"$ref": "#/components/schemas/InferenceResponse"}
-                              }
-                            }
-                          }
-                        }
-                      },
-                      "get": {
-                        "tags": ["Gateway"],
-                        "summary": "Run a mock gateway inference via query string",
-                        "responses": {
-                          "200": {
-                            "description": "Inference envelope"
-                          }
-                        }
-                      }
-                    },
-                    "/gateway/stream": {
-                      "get": {
-                        "tags": ["Gateway"],
-                        "summary": "Stream a mock inference response",
-                        "description": "Returns server-sent events for token-style streaming when streaming is enabled.",
-                        "responses": {
-                          "200": {
-                            "description": "SSE token stream",
-                            "content": {
-                              "text/event-stream": {
-                                "schema": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    },
-                    "/invoke/{model}": {
-                      "post": {
-                        "tags": ["Gateway"],
-                        "summary": "Invoke a published generated API",
-                        "description": "Public endpoint generated from the active model registry when auto API generation is enabled.",
-                        "responses": {
-                          "200": {
-                            "description": "Published endpoint inference response"
-                          }
-                        }
-                      }
-                    },
-                    "/api/status": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "Get AI Platform status",
-                        "responses": {
-                          "200": {
-                            "description": "Platform health"
-                          }
-                        }
-                      }
-                    },
-                    "/api/overview": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "Get AI Platform overview",
-                        "responses": {
-                          "200": {
-                            "description": "Platform capability summary"
-                          }
-                        }
-                      }
-                    },
-                    "/api/models": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "List registered models",
-                        "description": "Requires an authenticated console session.",
-                        "responses": {
-                          "200": {
-                            "description": "Registry snapshot"
-                          }
-                        }
-                      },
-                      "post": {
-                        "tags": ["Control Plane"],
-                        "summary": "Register or update a model version",
-                        "description": "Requires an authenticated console session and model registration to be enabled.",
-                        "responses": {
-                          "201": {
-                            "description": "Registered model"
-                          }
-                        }
-                      }
-                    },
-                    "/api/models/{name}/versions/{version}/status": {
-                      "post": {
-                        "tags": ["Control Plane"],
-                        "summary": "Change model version status",
-                        "description": "Promote ACTIVE, keep CANARY, or retire a version. Requires an authenticated console session.",
-                        "responses": {
-                          "200": {
-                            "description": "Updated model"
-                          }
-                        }
-                      }
-                    },
-                    "/api/published-apis": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "List published generated APIs",
-                        "description": "Requires an authenticated console session.",
-                        "responses": {
-                          "200": {
-                            "description": "Published endpoint inventory"
-                          }
-                        }
-                      }
-                    },
-                    "/api/billing": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "Get billing preview",
-                        "description": "Requires an authenticated console session.",
-                        "responses": {
-                          "200": {
-                            "description": "Estimated billing snapshot"
-                          }
-                        }
-                      }
-                    },
-                    "/api/usage": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "Get usage and metering counters",
-                        "description": "Requires an authenticated console session.",
-                        "responses": {
-                          "200": {
-                            "description": "Usage snapshot"
-                          }
-                        }
-                      }
-                    },
-                    "/api/metrics": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "Alias for usage counters",
-                        "description": "Requires an authenticated console session.",
-                        "responses": {
-                          "200": {
-                            "description": "Usage snapshot"
-                          }
-                        }
-                      }
-                    },
-                    "/api/fine-tuning/jobs": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "List fine-tuning jobs",
-                        "description": "Requires an authenticated console session and fine-tuning API to be enabled.",
-                        "responses": {
-                          "200": {
-                            "description": "Fine-tuning jobs"
-                          }
-                        }
-                      },
-                      "post": {
-                        "tags": ["Control Plane"],
-                        "summary": "Create a fine-tuning job",
-                        "description": "Requires an authenticated console session and fine-tuning API to be enabled.",
-                        "responses": {
-                          "201": {
-                            "description": "Created job"
-                          }
-                        }
-                      }
-                    },
-                    "/api/fine-tuning/jobs/{id}": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "Get a fine-tuning job",
-                        "responses": {
-                          "200": {
-                            "description": "Fine-tuning job"
-                          }
-                        }
-                      }
-                    },
-                    "/api/fine-tuning/jobs/{id}/cancel": {
-                      "post": {
-                        "tags": ["Control Plane"],
-                        "summary": "Cancel a fine-tuning job",
-                        "responses": {
-                          "200": {
-                            "description": "Cancelled job"
-                          }
-                        }
-                      }
-                    },
-                    "/api/tenants": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "List tenants",
-                        "description": "Requires an authenticated console session with multi-tenant enabled.",
-                        "responses": {
-                          "200": {
-                            "description": "Tenant snapshot",
-                            "content": {
-                              "application/json": {
-                                "schema": {"$ref": "#/components/schemas/TenantSnapshot"}
-                              }
-                            }
-                          }
-                        }
-                      },
-                      "post": {
-                        "tags": ["Control Plane"],
-                        "summary": "Register or update a tenant",
-                        "requestBody": {
-                          "required": true,
-                          "content": {
-                            "application/json": {
-                              "schema": {"$ref": "#/components/schemas/TenantRegistration"}
-                            }
-                          }
-                        },
-                        "responses": {
-                          "201": {
-                            "description": "Registered tenant"
-                          }
-                        }
-                      }
-                    },
-                    "/api/tenants/{id}/keys": {
-                      "post": {
-                        "tags": ["Control Plane"],
-                        "summary": "Issue an API key for a tenant",
-                        "responses": {
-                          "201": {
-                            "description": "Issued API key with secret"
-                          }
-                        }
-                      }
-                    },
-                    "/api/tenants/{id}/usage": {
-                      "get": {
-                        "tags": ["Control Plane"],
-                        "summary": "Get tenant usage metrics",
-                        "responses": {
-                          "200": {
-                            "description": "Tenant usage info"
-                          }
-                        }
-                      }
-                    },
-                    "/v1/chat/completions": {
-                      "post": {
-                        "tags": ["Gateway"],
-                        "summary": "OpenAI-compatible chat completions proxy",
-                        "description": "Accepts OpenAI-format requests and routes them through the AI gateway with failover support.",
-                        "requestBody": {
-                          "required": true,
-                          "content": {
-                            "application/json": {
-                              "schema": {"$ref": "#/components/schemas/ChatCompletionRequest"}
-                            }
-                          }
-                        },
-                        "responses": {
-                          "200": {
-                            "description": "OpenAI-compatible chat completion response",
-                            "content": {
-                              "application/json": {
-                                "schema": {"$ref": "#/components/schemas/ChatCompletionResponse"}
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "components": {
-                    "schemas": {
-                      "GatewayRequest": {
-                        "type": "object",
-                        "properties": {
-                          "requestType": {"type": "string", "example": "CHAT"},
-                          "prompt": {"type": "string", "example": "Recommend three products for a new user"},
-                          "sessionId": {"type": "string", "example": "demo-session"},
-                          "stream": {"type": "boolean", "example": false}
-                        }
-                      },
-                      "RouteDecision": {
-                        "type": "object",
-                        "properties": {
-                          "requestedType": {"type": "string"},
-                          "resolvedType": {"type": "string"},
-                          "model": {
-                            "type": "object",
-                            "properties": {
-                              "name": {"type": "string"},
-                              "category": {"type": "string"},
-                              "provider": {"type": "string"},
-                              "version": {"type": "string"},
-                              "expectedLatencyMs": {"type": "integer"},
-                              "accuracyScore": {"type": "integer"}
-                            }
-                          },
-                          "routePolicy": {"type": "string"},
-                          "strategyApplied": {"type": "string"},
-                          "cache": {
-                            "type": "object",
-                            "properties": {
-                              "enabled": {"type": "boolean"},
-                              "hit": {"type": "boolean"},
-                              "key": {"type": "string"}
-                            }
-                          },
-                          "gateway": {
-                            "type": "object",
-                            "properties": {
-                              "streamingSupported": {"type": "boolean"},
-                              "promptRouted": {"type": "boolean"}
-                            }
-                          },
-                          "observability": {
-                            "type": "object",
-                            "properties": {
-                              "totalRequests": {"type": "integer"},
-                              "modelRequestCount": {"type": "integer"}
-                            }
-                          },
-                          "reasoning": {"type": "string"}
-                        }
-                      },
-                      "InferenceResponse": {
-                        "type": "object",
-                        "properties": {
-                          "decision": {"$ref": "#/components/schemas/RouteDecision"},
-                          "response": {
-                            "type": "object",
-                            "properties": {
-                              "outputText": {"type": "string"},
-                              "estimatedTokens": {"type": "integer"},
-                              "confidence": {"type": "number"}
-                            }
-                          }
-                        }
-                      },
-                      "TenantRegistration": {
-                        "type": "object",
-                        "properties": {
-                          "tenantId": {"type": "string", "example": "tenant-a"},
-                          "displayName": {"type": "string", "example": "Tenant A"},
-                          "plan": {"type": "string", "example": "starter"},
-                          "rateLimitPerMinute": {"type": "integer", "example": 120},
-                          "tokenQuota": {"type": "integer", "example": 250000},
-                          "active": {"type": "boolean", "example": true}
-                        },
-                        "required": ["tenantId"]
-                      },
-                      "TenantSnapshot": {
-                        "type": "object",
-                        "properties": {
-                          "multiTenantEnabled": {"type": "boolean"},
-                          "apiKeyHeader": {"type": "string"},
-                          "totalTenants": {"type": "integer"},
-                          "activeTenants": {"type": "integer"},
-                          "tenants": {"type": "array", "items": {"type": "object"}}
-                        }
-                      },
-                      "ChatCompletionRequest": {
-                        "type": "object",
-                        "properties": {
-                          "model": {"type": "string", "example": "llm-general"},
-                          "messages": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "role": {"type": "string", "enum": ["system","user","assistant"]},
-                                "content": {"type": "string"}
-                              }
-                            }
-                          },
-                          "temperature": {"type": "number", "example": 0.7},
-                          "max_tokens": {"type": "integer", "example": 1024},
-                          "stream": {"type": "boolean", "example": false}
-                        },
-                        "required": ["messages"]
-                      },
-                      "ChatCompletionResponse": {
-                        "type": "object",
-                        "properties": {
-                          "id": {"type": "string"},
-                          "object": {"type": "string", "example": "chat.completion"},
-                          "created": {"type": "integer"},
-                          "model": {"type": "string"},
-                          "choices": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "index": {"type": "integer"},
-                                "message": {
-                                  "type": "object",
-                                  "properties": {
-                                    "role": {"type": "string"},
-                                    "content": {"type": "string"}
-                                  }
-                                },
-                                "finish_reason": {"type": "string"}
-                              }
-                            }
-                          },
-                          "usage": {
-                            "type": "object",
-                            "properties": {
-                              "prompt_tokens": {"type": "integer"},
-                              "completion_tokens": {"type": "integer"},
-                              "total_tokens": {"type": "integer"}
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                """.formatted(baseUrl);
-        resp.getWriter().write(spec.trim());
+        // Use StringBuilder to avoid String.formatted() issues with special characters
+        StringBuilder s = new StringBuilder(8192);
+        s.append("{\n");
+        s.append("  \"openapi\": \"3.0.3\",\n");
+        s.append("  \"info\": {\n");
+        s.append("    \"title\": \"Velo AI Platform Gateway API\",\n");
+        s.append("    \"description\": \"Configuration-driven gateway and control plane API for the standalone Velo AI Platform module.\",\n");
+        s.append("    \"version\": \"0.5.12\"\n");
+        s.append("  },\n");
+        s.append("  \"servers\": [\n");
+        s.append("    {\n");
+        s.append("      \"url\": \"").append(baseUrl).append("\",\n");
+        s.append("      \"description\": \"Current AI Platform base URL\"\n");
+        s.append("    }\n");
+        s.append("  ],\n");
+        s.append("  \"tags\": [\n");
+        s.append("    {\"name\": \"Gateway\", \"description\": \"Routing, inference, and streaming endpoints\"},\n");
+        s.append("    {\"name\": \"Control Plane\", \"description\": \"Status, registry, and usage endpoints for the standalone AI module\"}\n");
+        s.append("  ],\n");
+        s.append("  \"paths\": {\n");
+        // Gateway paths
+        apiPath(s, "/gateway", "get", "Gateway", "Discover gateway endpoints", null, false);
+        s.append(",\n");
+        apiPath(s, "/gateway/route", "post", "Gateway", "Resolve request routing", "Applies prompt routing, route policy matching, and automatic model selection.", true);
+        s.append(",\n");
+        apiPath(s, "/gateway/infer", "post", "Gateway", "Run a mock gateway inference", "Returns a routing decision and a mock inference payload using the selected model profile.", true);
+        s.append(",\n");
+        apiPath(s, "/gateway/stream", "get", "Gateway", "Stream a mock inference response", "Returns server-sent events for token-style streaming.", false);
+        s.append(",\n");
+        apiPath(s, "/gateway/ensemble", "post", "Gateway", "Multi-model ensemble inference", "Sends request to multiple models and combines results.", true);
+        s.append(",\n");
+        apiPath(s, "/invoke/{model}", "post", "Gateway", "Invoke a published generated API", "Public endpoint generated from the active model registry.", false);
+        s.append(",\n");
+        apiPath(s, "/v1/chat/completions", "post", "Gateway", "OpenAI-compatible chat completions proxy", "Accepts OpenAI-format requests and routes them through the AI gateway with failover support.", true);
+        s.append(",\n");
+        apiPath(s, "/v1/completions", "post", "Gateway", "OpenAI-compatible text completions proxy", "Accepts completion requests and routes them through the AI gateway.", true);
+        s.append(",\n");
+        apiPath(s, "/v1/models", "get", "Gateway", "List available models", "Returns models in OpenAI-compatible format.", false);
+        s.append(",\n");
+        // Control Plane paths
+        apiPath(s, "/api/status", "get", "Control Plane", "Get AI Platform status", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/overview", "get", "Control Plane", "Get AI Platform overview", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/models", "get", "Control Plane", "List registered models", "Requires an authenticated console session.", false);
+        s.append(",\n");
+        s.append("    \"/api/models\": {\n");
+        s.append("      \"post\": {\n");
+        s.append("        \"tags\": [\"Control Plane\"],\n");
+        s.append("        \"summary\": \"Register or update a model version\",\n");
+        s.append("        \"responses\": { \"201\": { \"description\": \"Registered model\" } }\n");
+        s.append("      }\n");
+        s.append("    },\n");
+        apiPath(s, "/api/models/{name}/versions/{version}/status", "post", "Control Plane", "Change model version status", "Promote ACTIVE, keep CANARY, or retire a version.", false);
+        s.append(",\n");
+        apiPath(s, "/api/usage", "get", "Control Plane", "Get usage and metering counters", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/billing", "get", "Control Plane", "Get billing preview", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/tenants", "get", "Control Plane", "List tenants", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/tenants/{id}/keys", "post", "Control Plane", "Issue an API key for a tenant", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/tenants/{id}/usage", "get", "Control Plane", "Get tenant usage metrics", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/providers", "get", "Control Plane", "List AI providers", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/plugins", "get", "Control Plane", "List plugins", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/published-apis", "get", "Control Plane", "List published generated APIs", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/fine-tuning/jobs", "get", "Control Plane", "List fine-tuning jobs", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/fine-tuning/jobs", "post", "Control Plane", "Create a fine-tuning job", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/fine-tuning/jobs/{id}/cancel", "post", "Control Plane", "Cancel a fine-tuning job", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/config", "get", "Control Plane", "Get current AI platform configuration", null, false);
+        s.append("\n");
+        s.append("  },\n");
+        // Components
+        s.append("  \"components\": {\n");
+        s.append("    \"schemas\": {\n");
+        s.append("      \"GatewayRequest\": {\n");
+        s.append("        \"type\": \"object\",\n");
+        s.append("        \"properties\": {\n");
+        s.append("          \"requestType\": {\"type\": \"string\", \"example\": \"CHAT\"},\n");
+        s.append("          \"prompt\": {\"type\": \"string\", \"example\": \"Recommend three products\"},\n");
+        s.append("          \"sessionId\": {\"type\": \"string\", \"example\": \"demo-session\"},\n");
+        s.append("          \"stream\": {\"type\": \"boolean\", \"example\": false}\n");
+        s.append("        }\n");
+        s.append("      },\n");
+        s.append("      \"ChatCompletionRequest\": {\n");
+        s.append("        \"type\": \"object\",\n");
+        s.append("        \"required\": [\"messages\"],\n");
+        s.append("        \"properties\": {\n");
+        s.append("          \"model\": {\"type\": \"string\", \"example\": \"llm-general\"},\n");
+        s.append("          \"messages\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"role\": {\"type\": \"string\"}, \"content\": {\"type\": \"string\"}}}},\n");
+        s.append("          \"temperature\": {\"type\": \"number\", \"example\": 0.7},\n");
+        s.append("          \"max_tokens\": {\"type\": \"integer\", \"example\": 1024},\n");
+        s.append("          \"stream\": {\"type\": \"boolean\", \"example\": false}\n");
+        s.append("        }\n");
+        s.append("      }\n");
+        s.append("    }\n");
+        s.append("  }\n");
+        s.append("}");
+        resp.getWriter().write(s.toString());
+    }
+
+    private static void apiPath(StringBuilder s, String path, String method, String tag, String summary, String desc, boolean hasBody) {
+        s.append("    \"").append(path).append("\": {\n");
+        s.append("      \"").append(method).append("\": {\n");
+        s.append("        \"tags\": [\"").append(tag).append("\"],\n");
+        s.append("        \"summary\": \"").append(summary).append("\"");
+        if (desc != null) {
+            s.append(",\n        \"description\": \"").append(desc).append("\"");
+        }
+        if (hasBody) {
+            s.append(",\n        \"requestBody\": { \"required\": false, \"content\": { \"application/json\": { \"schema\": { \"type\": \"object\" } } } }");
+        }
+        s.append(",\n        \"responses\": { \"200\": { \"description\": \"Success\" } }\n");
+        s.append("      }\n");
+        s.append("    }");
     }
 
     private void serveDeveloperPortal(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -559,7 +174,6 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         String cp = req.getContextPath();
         String streamUrl = AiGatewayServlet.buildStreamUrl(cp, "AUTO", "portal-demo", "recommend products for a mobile user");
 
-        // Use StringBuilder to avoid String.formatted() issues with CSS % characters
         StringBuilder b = new StringBuilder(8192);
         b.append("<!DOCTYPE html>\n<html lang=\"ko\">\n<head>\n<meta charset=\"UTF-8\">\n");
         b.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
@@ -594,61 +208,60 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         // Hero
         b.append("<section class=\"hero\">\n");
         b.append("<div class=\"pills\">");
-        b.append("<span class=\"pill\">\uB3C5\uB9BD AI \uBAA8\uB4C8</span>");
-        b.append("<span class=\"pill\">\uAC1C\uBC1C\uC790 \uD3EC\uD138 \uD65C\uC131</span>");
-        b.append("<span class=\"pill\">OpenAPI + \uAC8C\uC774\uD2B8\uC6E8\uC774 \uC0CC\uB4DC\uBC15\uC2A4</span>");
+        b.append("<span class=\"pill\">\ub3c5\ub9bd AI \ubaa8\ub4c8</span>");
+        b.append("<span class=\"pill\">\uac1c\ubc1c\uc790 \ud3ec\ud138 \ud65c\uc131</span>");
+        b.append("<span class=\"pill\">OpenAPI + \uac8c\uc774\ud2b8\uc6e8\uc774 \uc0cc\ub4dc\ubc15\uc2a4</span>");
         b.append("</div>\n");
-        b.append("<h1>Velo AI Platform \uAC1C\uBC1C\uC790 \uD3EC\uD138</h1>\n");
-        b.append("<p>\uC790\uB3D9 \uC0DD\uC131\uB41C OpenAPI \uACC4\uC57D\uC11C\uB97C \uD655\uC778\uD558\uACE0, AI \uAC8C\uC774\uD2B8\uC6E8\uC774\uB97C \uD14C\uC2A4\uD2B8\uD558\uBA70, \uB77C\uC6B0\uD305\u00B7\uCD94\uB860\u00B7\uC2A4\uD2B8\uB9AC\uBC0D \uB3D9\uC791\uC744 \uAD00\uB9AC \uCF58\uC194 \uC5C6\uC774 \uAC80\uC99D\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.</p>\n");
+        b.append("<h1>Velo AI Platform \uac1c\ubc1c\uc790 \ud3ec\ud138</h1>\n");
+        b.append("<p>\uc790\ub3d9 \uc0dd\uc131\ub41c OpenAPI \uacc4\uc57d\uc11c\ub97c \ud655\uc778\ud558\uace0, AI \uac8c\uc774\ud2b8\uc6e8\uc774\ub97c \ud14c\uc2a4\ud2b8\ud558\uba70, \ub77c\uc6b0\ud305/\ucd94\ub860/\uc2a4\ud2b8\ub9ac\ubc0d \ub3d9\uc791\uc744 \uad00\ub9ac \ucf58\uc194 \uc5c6\uc774 \uac80\uc99d\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4.</p>\n");
         b.append("<div class=\"actions\">");
         b.append("<a class=\"btn-p\" href=\"").append(cp).append("/api-docs\">OpenAPI JSON</a>");
-        b.append("<a class=\"btn-s\" href=\"").append(streamUrl).append("\">\uC2A4\uD2B8\uB9AC\uBC0D \uB370\uBAA8</a>");
-        b.append("<a class=\"btn-s\" href=\"").append(cp).append("/\">\uCF58\uC194\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30</a>");
+        b.append("<a class=\"btn-s\" href=\"").append(streamUrl).append("\">\uc2a4\ud2b8\ub9ac\ubc0d \ub370\ubaa8</a>");
+        b.append("<a class=\"btn-s\" href=\"").append(cp).append("/\">\ucf58\uc194\uc73c\ub85c \ub3cc\uc544\uac00\uae30</a>");
         b.append("</div>\n</section>\n");
 
         // Two-column row
         b.append("<div class=\"row\">\n");
-        // Left: OpenAPI spec
         b.append("<div class=\"card\">\n");
-        b.append("<h2>OpenAPI \uACC4\uC57D\uC11C</h2>\n");
-        b.append("<p class=\"sub\">AI \uD50C\uB7AB\uD3FC \uBAA8\uB4C8\uC5D0\uC11C \uC790\uB3D9 \uC0DD\uC131\uB41C \uACF5\uAC1C \uAC8C\uC774\uD2B8\uC6E8\uC774 + \uC6B4\uC601 API \uC2A4\uD399\uC785\uB2C8\uB2E4.</p>\n");
-        b.append("<pre class=\"json\" id=\"openapiSpec\">\uB85C\uB529 \uC911...</pre>\n");
+        b.append("<h2>OpenAPI \uacc4\uc57d\uc11c</h2>\n");
+        b.append("<p class=\"sub\">AI \ud50c\ub7ab\ud3fc \ubaa8\ub4c8\uc5d0\uc11c \uc790\ub3d9 \uc0dd\uc131\ub41c \uacf5\uac1c \uac8c\uc774\ud2b8\uc6e8\uc774 + \uc6b4\uc601 API \uc2a4\ud399\uc785\ub2c8\ub2e4.</p>\n");
+        b.append("<pre class=\"json\" id=\"openapiSpec\">\ub85c\ub529 \uc911...</pre>\n");
         b.append("</div>\n");
         // Right: Quick Start
         b.append("<div class=\"card\">\n");
-        b.append("<h2>\uBE60\uB978 \uC2DC\uC791</h2>\n");
-        b.append("<p class=\"sub\">\uAC8C\uC774\uD2B8\uC6E8\uC774 \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uB294 \uACF5\uAC1C API\uC785\uB2C8\uB2E4. \uBAA8\uB378 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \ub4f1 \uCEE8\uD2B8\uB864 \uD50C\uB808\uC778 API\uB294 \uCF58\uC194 \uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.</p>\n");
+        b.append("<h2>\ube60\ub978 \uc2dc\uc791</h2>\n");
+        b.append("<p class=\"sub\">\uac8c\uc774\ud2b8\uc6e8\uc774 \uc5d4\ub4dc\ud3ec\uc778\ud2b8\ub294 \uacf5\uac1c API\uc785\ub2c8\ub2e4. \ucee8\ud2b8\ub864 \ud50c\ub808\uc778 API\ub294 \ucf58\uc194 \ub85c\uadf8\uc778\uc774 \ud544\uc694\ud569\ub2c8\ub2e4.</p>\n");
         b.append("<div class=\"ep-grid\">\n");
-        endpoint(b, "\uB77C\uC6B0\uD305", "POST", cp + "/gateway/route");
-        endpoint(b, "\uCD94\uB860", "POST", cp + "/gateway/infer");
-        endpoint(b, "\uC2A4\uD2B8\uB9AC\uBC0D", "GET", cp + "/gateway/stream");
-        endpoint(b, "\uBAA8\uB378 \uBAA9\uB85D", "GET", cp + "/api/models");
-        endpoint(b, "\uC0AC\uC6A9\uB7C9", "GET", cp + "/api/usage");
-        endpoint(b, "API \uD638\uCD9C", "POST", cp + "/invoke/{model}");
-        endpoint(b, "\uACFC\uAE08", "GET", cp + "/api/billing");
+        endpoint(b, "\ub77c\uc6b0\ud305", "POST", cp + "/gateway/route");
+        endpoint(b, "\ucd94\ub860", "POST", cp + "/gateway/infer");
+        endpoint(b, "\uc2a4\ud2b8\ub9ac\ubc0d", "GET", cp + "/gateway/stream");
+        endpoint(b, "\ubaa8\ub378 \ubaa9\ub85d", "GET", cp + "/api/models");
+        endpoint(b, "\uc0ac\uc6a9\ub7c9", "GET", cp + "/api/usage");
+        endpoint(b, "API \ud638\ucd9c", "POST", cp + "/invoke/{model}");
+        endpoint(b, "\uacfc\uae08", "GET", cp + "/api/billing");
         endpoint(b, "Chat (OpenAI)", "POST", cp + "/v1/chat/completions");
         endpoint(b, "Completions", "POST", cp + "/v1/completions");
-        endpoint(b, "\uC559\uC0C1\uBE14", "POST", cp + "/gateway/ensemble");
-        endpoint(b, "\uD14C\uB10C\uD2B8", "GET", cp + "/api/tenants");
-        endpoint(b, "\uD50C\uB7EC\uADF8\uC778", "GET", cp + "/api/plugins");
+        endpoint(b, "\uc559\uc0c1\ube14", "POST", cp + "/gateway/ensemble");
+        endpoint(b, "\ud14c\ub10c\ud2b8", "GET", cp + "/api/tenants");
+        endpoint(b, "\ud504\ub85c\ubc14\uc774\ub354", "GET", cp + "/api/providers");
         b.append("</div>\n");
         b.append("<pre class=\"code\">curl -X POST ").append(cp).append("/gateway/infer \\\n");
         b.append("  -H \"Content-Type: application/json\" \\\n");
-        b.append("  -d '{\n    \"requestType\": \"AUTO\",\n    \"sessionId\": \"portal-demo\",\n    \"prompt\": \"\uBAA8\uBC14\uC77C \uACE0\uAC1D\uC5D0\uAC8C \uCD94\uCC9C\uD560 \uC0C1\uD488 3\uAC1C\"\n  }'</pre>\n");
+        b.append("  -d '{\"requestType\":\"AUTO\",\"sessionId\":\"demo\",\"prompt\":\"\ubaa8\ubc14\uc77c \uace0\uac1d \ucd94\ucc9c \uc0c1\ud488 3\uac1c\"}'</pre>\n");
         b.append("</div>\n</div>\n");
 
-        // Full-width: What This Exposes
+        // Full-width: Features
         b.append("<div class=\"card\">\n");
-        b.append("<h2>\uC8FC\uC694 \uAE30\uB2A5 \uC694\uC57D</h2>\n");
+        b.append("<h2>\uc8fc\uc694 \uae30\ub2a5 \uc694\uc57d</h2>\n");
         b.append("<ul>\n");
-        b.append("<li>\uD504\uB86C\uD504\uD2B8 \uB77C\uC6B0\uD305: <code>server.aiPlatform.advanced.promptRoutingEnabled</code> \uC124\uC815\uC73C\uB85C \uC81C\uC5B4</li>\n");
-        b.append("<li>\uBAA8\uB378 \uC120\uD0DD: \uB77C\uC6B0\uD2B8 \uC815\uCC45, \uCE74\uD14C\uACE0\uB9AC \uB9E4\uCE6D, \uAE30\uBCF8 \uC804\uB7B5 \uAE30\uBC18 \uC790\uB3D9 \uC120\uD0DD</li>\n");
-        b.append("<li>\uCEE8\uD14D\uC2A4\uD2B8 \uCE90\uC2DC: \uC138\uC158\uACFC \uD504\uB86C\uD504\uD2B8 \uD551\uAC70\uD504\uB9B0\uD2B8 \uAE30\uBC18 \uCE90\uC2DC \uD0A4 \uC0DD\uC131</li>\n");
-        b.append("<li>\uC2A4\uD2B8\uB9AC\uBC0D: <code>server.aiPlatform.differentiation.streamingResponseEnabled</code> \uD65C\uC131 \uC2DC SSE \uD1A0\uD070 \uC2A4\uD2B8\uB9BC</li>\n");
-        b.append("<li>OpenAI \uD638\uD658 \uD504\uB85D\uC2DC: <code>/v1/chat/completions</code>, <code>/v1/completions</code> \uC790\uB3D9 Failover \uC9C0\uC6D0</li>\n");
-        b.append("<li>\uC559\uC0C1\uBE14 \uC11C\uBE59: <code>/gateway/ensemble</code>\uC5D0\uC11C \uBA40\uD2F0 \uBAA8\uB378 \uACB0\uACFC \uACB0\uD569</li>\n");
-        b.append("<li>\uBA40\uD2F0 \uD14C\uB10C\uD2B8: \uC694\uCCAD \uC81C\uD55C, \uD1A0\uD070 \uCFFC\uD130, API \uD0A4 \uBC1C\uAE09 \uAD00\uB9AC</li>\n");
-        b.append("<li>\uD50C\uB7EC\uADF8\uC778 \uD504\uB808\uC784\uC6CC\uD06C: \uCD94\uB860 \uC694\uCCAD\uC758 \uC804\uCC98\uB9AC/\uD6C4\uCC98\uB9AC \uCEE4\uC2A4\uD140 \uD50C\uB7EC\uADF8\uC778</li>\n");
+        b.append("<li>\ud504\ub86c\ud504\ud2b8 \ub77c\uc6b0\ud305: \ud504\ub86c\ud504\ud2b8 \ubd84\uc11d \ud6c4 \uc801\ud569\ud55c \ubaa8\ub378\uc744 \uc790\ub3d9 \uc120\ud0dd</li>\n");
+        b.append("<li>\ubaa8\ub378 \uc120\ud0dd: \ub77c\uc6b0\ud2b8 \uc815\ucc45, \uce74\ud14c\uace0\ub9ac \ub9e4\uce6d, \uae30\ubcf8 \uc804\ub7b5 \uae30\ubc18 \uc790\ub3d9 \uc120\ud0dd</li>\n");
+        b.append("<li>\ucee8\ud14d\uc2a4\ud2b8 \uce90\uc2dc: \uc138\uc158\uacfc \ud504\ub86c\ud504\ud2b8 \ud551\uac70\ud504\ub9b0\ud2b8 \uae30\ubc18 \uce90\uc2dc \ud0a4 \uc0dd\uc131</li>\n");
+        b.append("<li>\uc2a4\ud2b8\ub9ac\ubc0d: SSE \ud1a0\ud070 \uc2a4\ud2b8\ub9bc \uc9c0\uc6d0</li>\n");
+        b.append("<li>OpenAI \ud638\ud658 \ud504\ub85d\uc2dc: /v1/chat/completions, /v1/completions \uc790\ub3d9 Failover \uc9c0\uc6d0</li>\n");
+        b.append("<li>\uc559\uc0c1\ube14 \uc11c\ube59: /gateway/ensemble\uc5d0\uc11c \uba40\ud2f0 \ubaa8\ub378 \uacb0\uacfc \uacb0\ud569</li>\n");
+        b.append("<li>\uba40\ud2f0 \ud14c\ub10c\ud2b8: \uc694\uccad \uc81c\ud55c, \ud1a0\ud070 \ucffc\ud130, API \ud0a4 \ubc1c\uae09 \uad00\ub9ac</li>\n");
+        b.append("<li>\ud50c\ub7ec\uadf8\uc778: \ucd94\ub860 \uc694\uccad\uc758 \uc804\ucc98\ub9ac/\ud6c4\ucc98\ub9ac \ucee4\uc2a4\ud140 \ud50c\ub7ec\uadf8\uc778</li>\n");
         b.append("</ul>\n</div>\n");
 
         // Script
@@ -656,7 +269,7 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         b.append("fetch('").append(cp).append("/api-docs')\n");
         b.append("  .then(function(r){return r.json();})\n");
         b.append("  .then(function(s){document.getElementById('openapiSpec').textContent=JSON.stringify(s,null,2);})\n");
-        b.append("  .catch(function(e){document.getElementById('openapiSpec').textContent='\uC2A4\uD399 \uB85C\uB4DC \uC2E4\uD328: '+e;});\n");
+        b.append("  .catch(function(e){document.getElementById('openapiSpec').textContent='\uc2a4\ud399 \ub85c\ub4dc \uc2e4\ud328: '+e;});\n");
         b.append("</script>\n");
         b.append("</div>\n</body>\n</html>");
         resp.getWriter().write(b.toString());

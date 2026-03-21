@@ -89,6 +89,17 @@ public class AiTenantService {
         return snapshotTenant(tenant);
     }
 
+    public synchronized void removeTenant(String tenantId) {
+        MutableTenant removed = tenants.remove(normalizeKey(tenantId));
+        if (removed == null) {
+            throw new NoSuchElementException("테넌트를 찾을 수 없습니다: " + tenantId);
+        }
+        // Clean up API key index entries for this tenant
+        for (MutableApiKey key : removed.apiKeys.values()) {
+            apiKeyIndex.remove(key.secret);
+        }
+    }
+
     public synchronized AiTenantIssuedKey issueApiKey(String tenantId, String label) {
         MutableTenant tenant = tenants.get(normalizeKey(tenantId));
         if (tenant == null) {

@@ -198,7 +198,49 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(AiPlatformExtendedJson.fineTuningJob(fineTuningService.getJob(jobId)));
             return;
         }
+        if ("/config".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/config");
+            resp.getWriter().write(buildConfigJson());
+            return;
+        }
         notFound(resp, "Not Found");
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        prepare(resp);
+        String path = normalizePath(req.getPathInfo());
+        try {
+            if (path.startsWith("/models/")) {
+                String modelName = path.substring("/models/".length());
+                if (modelName.isBlank()) {
+                    badRequest(resp, "Model name is required");
+                    return;
+                }
+                AiRegisteredModel model = registryService.findModel(modelName);
+                if (model == null) {
+                    notFound(resp, "모델을 찾을 수 없습니다: " + modelName);
+                    return;
+                }
+                registryService.removeModel(modelName);
+                usageService.recordRegistryMutation("delete");
+                resp.getWriter().write("{\"deleted\":true,\"model\":\"" + AiGatewayServlet.escapeJson(modelName) + "\"}");
+                return;
+            }
+            if (path.startsWith("/tenants/")) {
+                String tenantId = path.substring("/tenants/".length());
+                if (tenantId.isBlank()) {
+                    badRequest(resp, "Tenant ID is required");
+                    return;
+                }
+                tenantService.removeTenant(tenantId);
+                resp.getWriter().write("{\"deleted\":true,\"tenantId\":\"" + AiGatewayServlet.escapeJson(tenantId) + "\"}");
+                return;
+            }
+            notFound(resp, "Not Found");
+        } catch (NoSuchElementException e) {
+            notFound(resp, e.getMessage() != null ? e.getMessage() : "Not Found");
+        }
     }
 
     @Override
@@ -454,6 +496,58 @@ public class AiPlatformApiServlet extends HttpServlet {
     private static String unescape(String value) {
         return value.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t")
                 .replace("\\\"", "\"").replace("\\\\", "\\");
+    }
+
+    private String buildConfigJson() {
+        ServerConfiguration.AiPlatform ai = configuration.getServer().getAiPlatform();
+        StringBuilder sb = new StringBuilder(2048);
+        sb.append("{");
+        sb.append("\"enabled\":").append(ai.isEnabled()).append(",");
+        sb.append("\"mode\":\"").append(AiGatewayServlet.escapeJson(ai.getMode())).append("\",");
+        sb.append("\"contextPath\":\"").append(AiGatewayServlet.escapeJson(ai.getConsole().getContextPath())).append("\",");
+        // serving
+        sb.append("\"serving\":{");
+        sb.append("\"modelRouterEnabled\":").append(ai.getServing().isModelRouterEnabled()).append(",");
+        sb.append("\"abTestingEnabled\":").append(ai.getServing().isAbTestingEnabled()).append(",");
+        sb.append("\"autoModelSelectionEnabled\":").append(ai.getServing().isAutoModelSelectionEnabled()).append(",");
+        sb.append("\"ensembleServingEnabled\":").append(ai.getServing().isEnsembleServingEnabled()).append(",");
+        sb.append("\"edgeAiEnabled\":").append(ai.getServing().isEdgeAiEnabled()).append(",");
+        sb.append("\"defaultStrategy\":\"").append(AiGatewayServlet.escapeJson(ai.getServing().getDefaultStrategy())).append("\",");
+        sb.append("\"targetP99LatencyMs\":").append(ai.getServing().getTargetP99LatencyMs()).append(",");
+        sb.append("\"routerTimeoutMillis\":").append(ai.getServing().getRouterTimeoutMillis()).append(",");
+        sb.append("\"modelCount\":").append(ai.getServing().getModels().size()).append(",");
+        sb.append("\"routePolicyCount\":").append(ai.getServing().getRoutePolicies().size());
+        sb.append("},");
+        // platform
+        sb.append("\"platform\":{");
+        sb.append("\"modelRegistrationEnabled\":").append(ai.getPlatform().isModelRegistrationEnabled()).append(",");
+        sb.append("\"autoApiGenerationEnabled\":").append(ai.getPlatform().isAutoApiGenerationEnabled()).append(",");
+        sb.append("\"versionManagementEnabled\":").append(ai.getPlatform().isVersionManagementEnabled()).append(",");
+        sb.append("\"billingEnabled\":").append(ai.getPlatform().isBillingEnabled()).append(",");
+        sb.append("\"developerPortalEnabled\":").append(ai.getPlatform().isDeveloperPortalEnabled()).append(",");
+        sb.append("\"multiTenantEnabled\":").append(ai.getPlatform().isMultiTenantEnabled());
+        sb.append("},");
+        // advanced
+        sb.append("\"advanced\":{");
+        sb.append("\"promptRoutingEnabled\":").append(ai.getAdvanced().isPromptRoutingEnabled()).append(",");
+        sb.append("\"contextCacheEnabled\":").append(ai.getAdvanced().isContextCacheEnabled()).append(",");
+        sb.append("\"contextCacheTtlSeconds\":").append(ai.getAdvanced().getContextCacheTtlSeconds()).append(",");
+        sb.append("\"aiGatewayEnabled\":").append(ai.getAdvanced().isAiGatewayEnabled()).append(",");
+        sb.append("\"observabilityEnabled\":").append(ai.getAdvanced().isObservabilityEnabled()).append(",");
+        sb.append("\"fineTuningApiEnabled\":").append(ai.getAdvanced().isFineTuningApiEnabled());
+        sb.append("},");
+        // differentiation
+        sb.append("\"differentiation\":{");
+        sb.append("\"aiOptimizedWasEnabled\":").append(ai.getDifferentiation().isAiOptimizedWasEnabled()).append(",");
+        sb.append("\"requestRoutingEnabled\":").append(ai.getDifferentiation().isRequestRoutingEnabled()).append(",");
+        sb.append("\"streamingResponseEnabled\":").append(ai.getDifferentiation().isStreamingResponseEnabled()).append(",");
+        sb.append("\"pluginFrameworkEnabled\":").append(ai.getDifferentiation().isPluginFrameworkEnabled()).append(",");
+        sb.append("\"runtimeEngine\":\"").append(AiGatewayServlet.escapeJson(ai.getDifferentiation().getRuntimeEngine())).append("\"");
+        sb.append("},");
+        // roadmap
+        sb.append("\"roadmapStage\":").append(ai.getRoadmap().getCurrentStage());
+        sb.append("}");
+        return sb.toString();
     }
 
     private static String errorJson(String message) {

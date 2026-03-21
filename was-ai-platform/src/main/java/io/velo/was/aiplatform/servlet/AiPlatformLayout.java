@@ -156,6 +156,24 @@ public final class AiPlatformLayout {
             /* status */
             .status-on{color:var(--primary);font-weight:600;}
             .status-off{color:#94a3b8;}
+            /* danger button */
+            .btn-danger{background:#dc2626;color:#fff;}
+            .btn-danger:hover{background:#b91c1c;}
+            /* guide card */
+            .guide-card{border-left:4px solid var(--primary);background:#f0fdfa;}
+            /* chart */
+            .chart-bars{min-height:120px;}
+            .chart-legend{display:flex;gap:16px;margin-bottom:8px;font-size:12px;color:var(--soft);}
+            .chart-legend span{display:flex;align-items:center;gap:4px;}
+            .chart-legend span::before{content:'';display:inline-block;width:12px;height:12px;border-radius:3px;}
+            .cl-route::before{background:var(--primary);}
+            .cl-infer::before{background:#f59e0b;}
+            .cl-stream::before{background:#8b5cf6;}
+            .chart-row{display:flex;align-items:flex-end;gap:6px;height:100px;padding:4px 0;border-bottom:1px solid var(--border);}
+            .chart-bar{flex:1;min-width:20px;border-radius:4px 4px 0 0;display:flex;flex-direction:column;overflow:hidden;cursor:help;transition:height 0.3s;}
+            .cb-route{background:var(--primary);}
+            .cb-infer{background:#f59e0b;}
+            .cb-stream{background:#8b5cf6;}
             /* responsive */
             @media(max-width:768px){
                 .sidebar{transform:translateX(-100%);transition:transform 0.25s;}

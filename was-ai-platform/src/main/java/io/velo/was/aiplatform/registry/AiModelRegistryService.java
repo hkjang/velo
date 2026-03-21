@@ -88,6 +88,13 @@ public class AiModelRegistryService {
         return snapshot(model);
     }
 
+    public synchronized void removeModel(String modelName) {
+        MutableRegisteredModel removed = models.remove(normalizeKey(modelName));
+        if (removed == null) {
+            throw new NoSuchElementException("모델을 찾을 수 없습니다: " + modelName);
+        }
+    }
+
     public synchronized List<ServerConfiguration.ModelProfile> routingModels() {
         List<ServerConfiguration.ModelProfile> routed = new ArrayList<>();
         for (MutableRegisteredModel model : models.values()) {

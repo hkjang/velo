@@ -36,6 +36,7 @@
         <netty.version>4.1.131.Final</netty.version>
         <slf4j.version>2.0.17</slf4j.version>
         <snakeyaml.version>2.5</snakeyaml.version>
+        <jackson.version>2.18.3</jackson.version>
         <jakarta.servlet.version>6.1.0</jakarta.servlet.version>
         <jakarta.pages.version>4.0.0</jakarta.pages.version>
         <jakarta.el.version>6.0.1</jakarta.el.version>

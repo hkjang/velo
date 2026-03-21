@@ -1,5 +1,7 @@
 package io.velo.was.aiplatform.registry;
 
+import io.velo.was.aiplatform.persistence.AiPlatformDataStore;
+import io.velo.was.aiplatform.persistence.ModelData;
 import io.velo.was.config.ServerConfiguration;
 
 import java.util.ArrayList;
@@ -12,10 +14,26 @@ import java.util.concurrent.ConcurrentMap;
 
 public class AiModelRegistryService {
 
+    private static final String MODELS_FILE = "models.json";
+
     private final ConcurrentMap<String, MutableRegisteredModel> models = new ConcurrentHashMap<>();
+    private volatile AiPlatformDataStore dataStore;
+    private volatile boolean bootstrapping = true;
 
     public AiModelRegistryService(ServerConfiguration configuration) {
         bootstrap(configuration.getServer().getAiPlatform().getServing().getModels());
+        bootstrapping = false;
+    }
+
+    public AiModelRegistryService(ServerConfiguration configuration, AiPlatformDataStore dataStore) {
+        this.dataStore = dataStore;
+        bootstrap(configuration.getServer().getAiPlatform().getServing().getModels());
+        bootstrapping = false;
+        loadRuntimeModelsFromDisk();
+    }
+
+    public void setDataStore(AiPlatformDataStore dataStore) {
+        this.dataStore = dataStore;
     }
 
     public synchronized List<AiRegisteredModel> listModels() {
@@ -64,6 +82,7 @@ public class AiModelRegistryService {
             rebalanceActiveVersion(model);
         }
         model.enabled = model.versions.values().stream().anyMatch(versionInfo -> versionInfo.enabled);
+        persistRuntimeModels();
         return snapshot(model);
     }
 
@@ -85,6 +104,7 @@ public class AiModelRegistryService {
             rebalanceActiveVersion(model);
         }
         model.enabled = model.versions.values().stream().anyMatch(versionInfo -> versionInfo.enabled);
+        persistRuntimeModels();
         return snapshot(model);
     }
 
@@ -93,6 +113,7 @@ public class AiModelRegistryService {
         if (removed == null) {
             throw new NoSuchElementException("모델을 찾을 수 없습니다: " + modelName);
         }
+        persistRuntimeModels();
     }
 
     public synchronized List<ServerConfiguration.ModelProfile> routingModels() {
@@ -353,6 +374,63 @@ public class AiModelRegistryService {
         private MutableVersion(String version, long registeredAtEpochMillis) {
             this.version = version;
             this.registeredAtEpochMillis = registeredAtEpochMillis;
+        }
+    }
+
+    // ── 영속화 (Jackson) ──
+
+    private void loadRuntimeModelsFromDisk() {
+        if (dataStore == null || !dataStore.exists(MODELS_FILE)) return;
+        try {
+            List<ModelData> saved = dataStore.getMapper().readValue(
+                    dataStore.getDataDir().resolve(MODELS_FILE).toFile(),
+                    dataStore.getMapper().getTypeFactory().constructCollectionType(List.class, ModelData.class));
+            if (saved == null || saved.isEmpty()) return;
+            for (ModelData md : saved) {
+                MutableRegisteredModel model = models.computeIfAbsent(normalizeKey(md.name()), k -> new MutableRegisteredModel(md.name(), md.registeredAt()));
+                model.name = md.name();
+                model.category = md.category();
+                model.provider = md.provider();
+                model.source = md.source() != null ? md.source() : "runtime";
+                if (md.versions() != null) {
+                    for (ModelData.VersionData vd : md.versions()) {
+                        MutableVersion ver = model.versions.computeIfAbsent(normalizeKey(vd.version()), k -> new MutableVersion(vd.version(), vd.registeredAt()));
+                        ver.version = vd.version();
+                        ver.latencyTier = vd.latencyTier();
+                        ver.latencyMs = vd.latencyMs();
+                        ver.accuracyScore = vd.accuracyScore();
+                        ver.defaultSelected = vd.defaultSelected();
+                        ver.enabled = vd.enabled();
+                        ver.status = vd.status();
+                    }
+                    rebalanceActiveVersion(model);
+                }
+                model.enabled = model.versions.values().stream().anyMatch(v -> v.enabled);
+            }
+        } catch (Exception e) {
+            java.util.logging.Logger.getLogger(AiModelRegistryService.class.getName())
+                    .log(java.util.logging.Level.WARNING, "Failed to load runtime models from disk", e);
+        }
+    }
+
+    private void persistRuntimeModels() {
+        if (dataStore == null || bootstrapping) return;
+        try {
+            // runtime 소스 모델만 저장 (bundled 모델은 YAML에서 매번 부트스트랩되므로 제외)
+            List<ModelData> data = new ArrayList<>();
+            for (MutableRegisteredModel m : models.values()) {
+                if ("bundled".equals(m.source)) {
+                    continue; // YAML 부트스트랩 모델은 저장 불필요
+                }
+                List<ModelData.VersionData> versions = m.versions.values().stream()
+                        .map(v -> new ModelData.VersionData(v.version, v.latencyTier, v.latencyMs, v.accuracyScore, v.defaultSelected, v.enabled, v.status, v.registeredAtEpochMillis))
+                        .toList();
+                data.add(new ModelData(m.name, m.category, m.provider, m.source, m.registeredAtEpochMillis, versions));
+            }
+            dataStore.save(MODELS_FILE, data);
+        } catch (Exception e) {
+            java.util.logging.Logger.getLogger(AiModelRegistryService.class.getName())
+                    .log(java.util.logging.Level.WARNING, "Failed to persist models", e);
         }
     }
 }

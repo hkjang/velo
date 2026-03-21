@@ -1,22 +1,29 @@
 package io.velo.was.aiplatform.intent;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import io.velo.was.aiplatform.persistence.AiPlatformDataStore;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Logger;
 
 /**
  * 의도 기반 라우팅 정책 서비스.
  * 키워드, 라우팅 정책의 CRUD와 메모리 캐시 관리를 담당.
- *
- * 1단계: ConcurrentHashMap 기반 메모리 저장소
- * 2단계 확장: Redis 연동 시 이 클래스를 래핑
+ * JSON 파일 기반 영속화로 서버 재시작 시에도 설정 유지.
  */
 public class IntentRoutingPolicyService {
+
+    private static final Logger LOG = Logger.getLogger(IntentRoutingPolicyService.class.getName());
+    private static final String KEYWORDS_FILE = "keywords.json";
+    private static final String POLICIES_FILE = "policies.json";
 
     private final ConcurrentHashMap<String, IntentKeyword> keywords = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RoutingPolicy> policies = new ConcurrentHashMap<>();
     private final AtomicLong keywordSeq = new AtomicLong();
     private final AtomicLong policySeq = new AtomicLong();
+    private volatile AiPlatformDataStore dataStore;
 
     // 캐시: 의도별 정책 (의도 변경 시 무효화)
     private volatile Map<IntentType, List<RoutingPolicy>> policyCache = Map.of();
@@ -27,6 +34,21 @@ public class IntentRoutingPolicyService {
         rebuildCache();
     }
 
+    public IntentRoutingPolicyService(AiPlatformDataStore dataStore) {
+        this.dataStore = dataStore;
+        if (!loadFromDisk()) {
+            bootstrapDefaults();
+            LOG.info("Intent routing: bootstrapped defaults (no saved data found)");
+        } else {
+            LOG.info("Intent routing: loaded " + keywords.size() + " keywords, " + policies.size() + " policies from disk");
+        }
+        rebuildCache();
+    }
+
+    public void setDataStore(AiPlatformDataStore dataStore) {
+        this.dataStore = dataStore;
+    }
+
     // ── 키워드 CRUD ──
 
     public synchronized IntentKeyword addKeyword(String primaryKeyword, List<String> synonyms,
@@ -35,6 +57,7 @@ public class IntentRoutingPolicyService {
         IntentKeyword keyword = new IntentKeyword(id, primaryKeyword, synonyms, intent, priority, true, System.currentTimeMillis());
         keywords.put(id, keyword);
         rebuildCache();
+        persistKeywords();
         return keyword;
     }
 
@@ -47,6 +70,7 @@ public class IntentRoutingPolicyService {
         IntentKeyword updated = new IntentKeyword(keywordId, primaryKeyword, synonyms, intent, priority, enabled, existing.createdAt());
         keywords.put(keywordId, updated);
         rebuildCache();
+        persistKeywords();
         return updated;
     }
 
@@ -55,6 +79,7 @@ public class IntentRoutingPolicyService {
             throw new NoSuchElementException("키워드를 찾을 수 없습니다: " + keywordId);
         }
         rebuildCache();
+        persistKeywords();
     }
 
     public List<IntentKeyword> listKeywords() {
@@ -79,6 +104,7 @@ public class IntentRoutingPolicyService {
                 streamingPreferred, true, tenantOverride, maxInputTokens, System.currentTimeMillis());
         policies.put(id, policy);
         rebuildCache();
+        persistPolicies();
         return policy;
     }
 
@@ -94,6 +120,7 @@ public class IntentRoutingPolicyService {
                 streamingPreferred, enabled, tenantOverride, maxInputTokens, existing.createdAt());
         policies.put(policyId, updated);
         rebuildCache();
+        persistPolicies();
         return updated;
     }
 
@@ -102,6 +129,7 @@ public class IntentRoutingPolicyService {
             throw new NoSuchElementException("정책을 찾을 수 없습니다: " + policyId);
         }
         rebuildCache();
+        persistPolicies();
     }
 
     public List<RoutingPolicy> listPolicies() {
@@ -186,5 +214,63 @@ public class IntentRoutingPolicyService {
 
         keywordSeq.set(20);
         policySeq.set(20);
+    }
+
+    // ── 영속화 (Jackson) ──
+
+    private boolean loadFromDisk() {
+        if (dataStore == null) return false;
+        boolean loaded = false;
+        try {
+            List<IntentKeyword> savedKeywords = dataStore.loadList(KEYWORDS_FILE, new TypeReference<>() {});
+            if (savedKeywords != null && !savedKeywords.isEmpty()) {
+                for (IntentKeyword kw : savedKeywords) {
+                    keywords.put(kw.keywordId(), kw);
+                }
+                long maxSeq = savedKeywords.stream()
+                        .map(kw -> kw.keywordId().replace("kw-", ""))
+                        .mapToLong(s -> { try { return Long.parseLong(s, 36); } catch (NumberFormatException e) { return 0; } })
+                        .max().orElse(20);
+                keywordSeq.set(Math.max(maxSeq + 1, 20));
+                loaded = true;
+            }
+        } catch (Exception e) {
+            LOG.log(java.util.logging.Level.WARNING, "Failed to load keywords", e);
+        }
+        try {
+            List<RoutingPolicy> savedPolicies = dataStore.loadList(POLICIES_FILE, new TypeReference<>() {});
+            if (savedPolicies != null && !savedPolicies.isEmpty()) {
+                for (RoutingPolicy pol : savedPolicies) {
+                    policies.put(pol.policyId(), pol);
+                }
+                long maxSeq = savedPolicies.stream()
+                        .map(p -> p.policyId().replace("pol-", ""))
+                        .mapToLong(s -> { try { return Long.parseLong(s, 36); } catch (NumberFormatException e) { return 0; } })
+                        .max().orElse(20);
+                policySeq.set(Math.max(maxSeq + 1, 20));
+                loaded = loaded || true;
+            }
+        } catch (Exception e) {
+            LOG.log(java.util.logging.Level.WARNING, "Failed to load policies", e);
+        }
+        return loaded;
+    }
+
+    private void persistKeywords() {
+        if (dataStore == null) return;
+        try {
+            dataStore.save(KEYWORDS_FILE, new ArrayList<>(keywords.values()));
+        } catch (Exception e) {
+            LOG.log(java.util.logging.Level.WARNING, "Failed to persist keywords", e);
+        }
+    }
+
+    private void persistPolicies() {
+        if (dataStore == null) return;
+        try {
+            dataStore.save(POLICIES_FILE, new ArrayList<>(policies.values()));
+        } catch (Exception e) {
+            LOG.log(java.util.logging.Level.WARNING, "Failed to persist policies", e);
+        }
     }
 }

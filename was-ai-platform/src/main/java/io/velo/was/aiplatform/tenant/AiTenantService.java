@@ -1,5 +1,8 @@
 package io.velo.was.aiplatform.tenant;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import io.velo.was.aiplatform.persistence.AiPlatformDataStore;
+import io.velo.was.aiplatform.persistence.TenantData;
 import io.velo.was.config.ServerConfiguration;
 
 import java.security.SecureRandom;
@@ -16,8 +19,10 @@ public class AiTenantService {
 
     private static final String DEMO_TENANT_ID = "tenant-demo";
     private static final String DEMO_API_KEY = "velo-demo-key";
+    private static final String TENANTS_FILE = "tenants.json";
 
     private final ServerConfiguration configuration;
+    private volatile AiPlatformDataStore dataStore;
     private final ConcurrentMap<String, MutableTenant> tenants = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ApiKeyRef> apiKeyIndex = new ConcurrentHashMap<>();
     private final AtomicLong issuedKeySequence = new AtomicLong();
@@ -26,6 +31,18 @@ public class AiTenantService {
     public AiTenantService(ServerConfiguration configuration) {
         this.configuration = configuration;
         bootstrapDemoTenant();
+    }
+
+    public AiTenantService(ServerConfiguration configuration, AiPlatformDataStore dataStore) {
+        this.configuration = configuration;
+        this.dataStore = dataStore;
+        if (!loadFromDisk()) {
+            bootstrapDemoTenant();
+        }
+    }
+
+    public void setDataStore(AiPlatformDataStore dataStore) {
+        this.dataStore = dataStore;
     }
 
     public boolean isMultiTenantEnabled() {
@@ -86,6 +103,7 @@ public class AiTenantService {
         tenant.active = request.active();
         tenant.rateLimitPerMinute = rateLimit;
         tenant.tokenQuota = tokenQuota;
+        persistTenants();
         return snapshotTenant(tenant);
     }
 
@@ -98,6 +116,7 @@ public class AiTenantService {
         for (MutableApiKey key : removed.apiKeys.values()) {
             apiKeyIndex.remove(key.secret);
         }
+        persistTenants();
     }
 
     public synchronized AiTenantIssuedKey issueApiKey(String tenantId, String label) {
@@ -114,6 +133,7 @@ public class AiTenantService {
         MutableApiKey apiKey = new MutableApiKey(keyId, normalizedLabel, secret, now);
         tenant.apiKeys.put(normalizeKey(keyId), apiKey);
         apiKeyIndex.put(secret, new ApiKeyRef(normalizeKey(tenant.tenantId), normalizeKey(keyId)));
+        persistTenants();
         return new AiTenantIssuedKey(tenant.tenantId, tenant.displayName, tenant.plan, keyId, normalizedLabel, secret, now);
     }
 
@@ -308,6 +328,52 @@ public class AiTenantService {
             this.label = label;
             this.secret = secret;
             this.createdAtEpochMillis = createdAtEpochMillis;
+        }
+    }
+
+    // ── 영속화 (Jackson) ──
+
+    private boolean loadFromDisk() {
+        if (dataStore == null) return false;
+        try {
+            List<TenantData> saved = dataStore.loadList(TENANTS_FILE, new TypeReference<>() {});
+            if (saved == null || saved.isEmpty()) return false;
+            for (TenantData td : saved) {
+                long now = td.createdAt() > 0 ? td.createdAt() : System.currentTimeMillis();
+                MutableTenant tenant = new MutableTenant(td.tenantId(), now);
+                tenant.displayName = td.displayName();
+                tenant.plan = td.plan();
+                tenant.active = td.active();
+                tenant.rateLimitPerMinute = td.rateLimitPerMinute();
+                tenant.tokenQuota = td.tokenQuota();
+                tenants.put(normalizeKey(td.tenantId()), tenant);
+                if (td.apiKeys() != null) {
+                    for (TenantData.ApiKeyData akd : td.apiKeys()) {
+                        MutableApiKey apiKey = new MutableApiKey(akd.keyId(), akd.label(), akd.secret(), akd.createdAt());
+                        apiKey.active = akd.active();
+                        tenant.apiKeys.put(normalizeKey(akd.keyId()), apiKey);
+                        apiKeyIndex.put(akd.secret(), new ApiKeyRef(normalizeKey(td.tenantId()), normalizeKey(akd.keyId())));
+                    }
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void persistTenants() {
+        if (dataStore == null) return;
+        try {
+            List<TenantData> data = new java.util.ArrayList<>();
+            for (MutableTenant t : tenants.values()) {
+                List<TenantData.ApiKeyData> keys = t.apiKeys.values().stream()
+                        .map(k -> new TenantData.ApiKeyData(k.keyId, k.label, k.secret, k.active, k.createdAtEpochMillis))
+                        .toList();
+                data.add(new TenantData(t.tenantId, t.displayName, t.plan, t.active, t.rateLimitPerMinute, t.tokenQuota, t.createdAtEpochMillis, keys));
+            }
+            dataStore.save(TENANTS_FILE, data);
+        } catch (Exception ignored) {
         }
     }
 }

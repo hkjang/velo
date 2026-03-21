@@ -64,3 +64,4 @@ temp/
 work/
 third_party/reports/*
 !third_party/reports/.gitkeep
+data/

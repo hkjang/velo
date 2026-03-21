@@ -12,6 +12,7 @@ import io.velo.was.aiplatform.provider.AiProviderRegistry;
 import io.velo.was.aiplatform.intent.IntentRoutingPolicyService;
 import io.velo.was.aiplatform.intent.RouteAuditLogger;
 import io.velo.was.aiplatform.intent.RouteDecisionEngine;
+import io.velo.was.aiplatform.persistence.AiPlatformDataStore;
 import io.velo.was.aiplatform.gateway.AiChatCompletionServlet;
 import io.velo.was.aiplatform.gateway.AiGatewayService;
 import io.velo.was.aiplatform.gateway.AiGatewayServlet;
@@ -38,9 +39,13 @@ public final class AiPlatformApplication {
     public static SimpleServletApplication create(ServerConfiguration configuration) {
         String contextPath = configuration.getServer().getAiPlatform().getConsole().getContextPath();
         AdminClient adminClient = new LocalAdminClient(configuration);
-        AiModelRegistryService registryService = new AiModelRegistryService(configuration);
+
+        // 영속화 레이어 (Jackson 기반 JSON 파일)
+        AiPlatformDataStore dataStore = new AiPlatformDataStore(java.nio.file.Path.of("."));
+
+        AiModelRegistryService registryService = new AiModelRegistryService(configuration, dataStore);
         AiPlatformUsageService usageService = new AiPlatformUsageService();
-        AiTenantService tenantService = new AiTenantService(configuration);
+        AiTenantService tenantService = new AiTenantService(configuration, dataStore);
         AiPublishedApiService publishedApiService = new AiPublishedApiService(configuration, registryService);
         AiBillingService billingService = new AiBillingService(publishedApiService, registryService);
         AiFineTuningService fineTuningService = new AiFineTuningService(registryService);
@@ -51,8 +56,8 @@ public final class AiPlatformApplication {
         AiProviderRegistry providerRegistry = new AiProviderRegistry();
         AiGatewayService gatewayService = new AiGatewayService(configuration, registryService, providerRegistry);
 
-        // 의도 기반 라우팅 엔진 설정
-        IntentRoutingPolicyService intentPolicyService = new IntentRoutingPolicyService();
+        // 의도 기반 라우팅 엔진 설정 (영속화 연결)
+        IntentRoutingPolicyService intentPolicyService = new IntentRoutingPolicyService(dataStore);
         RouteAuditLogger auditLogger = new RouteAuditLogger();
         String defaultModel = configuration.getServer().getAiPlatform().getServing().getModels().stream()
                 .filter(ServerConfiguration.ModelProfile::isDefaultSelected)

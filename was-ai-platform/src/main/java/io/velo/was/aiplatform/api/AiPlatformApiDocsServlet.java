@@ -556,151 +556,113 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         resp.setContentType("text/html; charset=UTF-8");
         resp.setCharacterEncoding("UTF-8");
 
-        String contextPath = req.getContextPath();
-        String streamUrl = AiGatewayServlet.buildStreamUrl(contextPath, "AUTO", "portal-demo", "recommend products for a mobile user");
+        String cp = req.getContextPath();
+        String streamUrl = AiGatewayServlet.buildStreamUrl(cp, "AUTO", "portal-demo", "recommend products for a mobile user");
 
-        String page = """
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Velo AI Platform Developer Portal</title>
-                <style>
-                  :root { --bg:#f5ede0; --card:rgba(255,255,255,0.84); --ink:#192923; --soft:#5d6d67; --teal:#0f766e; --deep:#12342f; --line:rgba(25,41,35,0.10); }
-                  * { box-sizing:border-box; }
-                  body { margin:0; font-family:"IBM Plex Sans","Segoe UI",sans-serif; background:radial-gradient(circle at top left, rgba(15,118,110,0.16), transparent 26%%), linear-gradient(180deg,#faf5eb,#efe4d4); color:var(--ink); }
-                  .shell { width:min(1180px, calc(100vw - 32px)); margin:24px auto 48px; display:grid; gap:18px; }
-                  .hero, .panel { border-radius:28px; border:1px solid rgba(255,255,255,0.50); background:var(--card); box-shadow:0 24px 64px rgba(18,52,47,0.12); backdrop-filter:blur(18px); }
-                  .hero { padding:34px; background:linear-gradient(135deg, rgba(15,118,110,0.98), rgba(18,52,47,0.94)); color:#f8f3e8; }
-                  .hero h1 { margin:12px 0; font-size:clamp(34px, 5vw, 56px); line-height:1.02; letter-spacing:-0.06em; }
-                  .hero p { max-width:780px; line-height:1.8; color:rgba(248,243,232,0.84); }
-                  .hero-row, .actions, .card-grid { display:flex; flex-wrap:wrap; gap:12px; }
-                  .hero-pill, .actions a { border-radius:999px; }
-                  .hero-pill { padding:10px 14px; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.18); font-size:12px; }
-                  .grid { display:grid; gap:18px; grid-template-columns:repeat(12, minmax(0, 1fr)); }
-                  .panel { padding:24px; }
-                  .span-7 { grid-column:span 7; } .span-5 { grid-column:span 5; } .span-12 { grid-column:span 12; }
-                  h2 { margin:0 0 8px; font-size:24px; letter-spacing:-0.04em; }
-                  p, li, code, pre, textarea, input, select, button { font:inherit; }
-                  .sub { color:var(--soft); line-height:1.7; font-size:14px; }
-                  .actions a, button { display:inline-flex; align-items:center; justify-content:center; padding:11px 16px; border:0; cursor:pointer; text-decoration:none; background:var(--deep); color:#fff7ea; font-weight:700; }
-                  .actions a.alt, button.alt { background:rgba(15,118,110,0.10); color:var(--teal); }
-                  .card-grid > div { flex:1 1 220px; padding:16px 18px; border-radius:18px; border:1px solid var(--line); background:rgba(255,255,255,0.55); }
-                  .card-grid strong { display:block; margin-bottom:6px; }
-                  .code { margin:0; padding:18px; border-radius:18px; background:#14231f; color:#e6ddcf; overflow:auto; white-space:pre-wrap; line-height:1.75; font-size:12px; }
-                  .json { margin:0; padding:18px; border-radius:18px; background:rgba(255,255,255,0.55); border:1px solid var(--line); min-height:280px; overflow:auto; white-space:pre-wrap; line-height:1.7; font-size:12px; }
-                  ul { margin:0; padding-left:18px; color:var(--soft); }
-                  @media (max-width:1024px) { .span-7, .span-5 { grid-column:span 12; } .shell { width:min(100vw - 18px, 1180px); } }
-                </style>
-                </head>
-                <body>
-                  <div class="shell">
-                    <section class="hero">
-                      <div class="hero-row">
-                        <span class="hero-pill">Standalone AI module</span>
-                        <span class="hero-pill">Developer portal enabled</span>
-                        <span class="hero-pill">OpenAPI + Gateway sandbox</span>
-                      </div>
-                      <h1>Velo AI Platform Developer Portal</h1>
-                      <p>Use this page to inspect the generated OpenAPI contract, test the built-in AI gateway, and verify routing, inference, and streaming behavior without going through the admin console.</p>
-                      <div class="actions">
-                        <a href="%s/api-docs">OpenAPI JSON</a>
-                        <a class="alt" href="%s">Streaming demo</a>
-                        <a class="alt" href="%s/">Back to console</a>
-                      </div>
-                    </section>
-                    <section class="grid">
-                      <div class="panel span-7">
-                        <h2>OpenAPI Contract</h2>
-                        <p class="sub">The specification is generated directly from the AI Platform module and documents the public gateway plus operational API surface.</p>
-                        <pre class="json" id="openapiSpec">Loading specification...</pre>
-                      </div>
-                      <div class="panel span-5">
-                        <h2>Quick Start</h2>
-                        <p class="sub">Gateway endpoints are public service APIs. Control plane endpoints such as model registry and usage counters require an authenticated console session.</p>
-                        <div class="card-grid">
-                          <div>
-                            <strong>Route</strong>
-                            POST <code>%s/gateway/route</code>
-                          </div>
-                          <div>
-                            <strong>Infer</strong>
-                            POST <code>%s/gateway/infer</code>
-                          </div>
-                          <div>
-                            <strong>Stream</strong>
-                            GET <code>%s/gateway/stream</code>
-                          </div>
-                          <div>
-                            <strong>Models</strong>
-                            GET <code>%s/api/models</code>
-                          </div>
-                          <div>
-                            <strong>Usage</strong>
-                            GET <code>%s/api/usage</code>
-                          </div>
-                          <div>
-                            <strong>Invoke</strong>
-                            POST <code>%s/invoke/{model}</code>
-                          </div>
-                          <div>
-                            <strong>Billing</strong>
-                            GET <code>%s/api/billing</code>
-                          </div>
-                          <div>
-                            <strong>Chat (OpenAI)</strong>
-                            POST <code>%s/v1/chat/completions</code>
-                          </div>
-                          <div>
-                            <strong>Completions</strong>
-                            POST <code>%s/v1/completions</code>
-                          </div>
-                          <div>
-                            <strong>Ensemble</strong>
-                            POST <code>%s/gateway/ensemble</code>
-                          </div>
-                          <div>
-                            <strong>Tenants</strong>
-                            GET <code>%s/api/tenants</code>
-                          </div>
-                          <div>
-                            <strong>Plugins</strong>
-                            GET <code>%s/api/plugins</code>
-                          </div>
-                        </div>
-                        <pre class="code">curl -X POST %s/gateway/infer \
-  -H "Content-Type: application/json" \
-  -d '{
-    "requestType": "AUTO",
-    "sessionId": "portal-demo",
-    "prompt": "recommend products for a mobile user"
-  }'</pre>
-                      </div>
-                    </section>
-                    <section class="panel span-12">
-                      <h2>What This Exposes</h2>
-                      <ul>
-                        <li>Prompt routing driven by <code>server.aiPlatform.advanced.promptRoutingEnabled</code>.</li>
-                        <li>Model selection driven by route policies, category matching, and the default strategy.</li>
-                        <li>Context cache keys derived from session and prompt fingerprints.</li>
-                        <li>Streaming output when <code>server.aiPlatform.differentiation.streamingResponseEnabled</code> is true.</li><li>Model registry, version promotion, and usage APIs for the authenticated control plane.</li><li>Auto-generated published endpoints, billing preview, and fine-tuning job APIs.</li>
-                        <li>OpenAI-compatible proxy at <code>/v1/chat/completions</code> and <code>/v1/completions</code> with automatic failover.</li>
-                        <li>Ensemble serving at <code>/gateway/ensemble</code> for multi-model accuracy improvement.</li>
-                        <li>Multi-tenant management with rate limits, token quotas, and API key issuance.</li>
-                        <li>Plugin framework for custom pre/post processing of inference requests.</li>
-                      </ul>
-                    </section>
-                  </div>
-                  <script>
-                    fetch('%s/api-docs')
-                      .then(function(response) { return response.json(); })
-                      .then(function(spec) { document.getElementById('openapiSpec').textContent = JSON.stringify(spec, null, 2); })
-                      .catch(function(error) { document.getElementById('openapiSpec').textContent = 'Failed to load OpenAPI spec: ' + error; });
-                  </script>
-                </body>
-                </html>
-                """.formatted(contextPath, streamUrl, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath);
-        resp.getWriter().write(page);
+        // Use StringBuilder to avoid String.formatted() issues with CSS % characters
+        StringBuilder b = new StringBuilder(8192);
+        b.append("<!DOCTYPE html>\n<html lang=\"ko\">\n<head>\n<meta charset=\"UTF-8\">\n");
+        b.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
+        b.append("<title>Velo AI Platform \uAC1C\uBC1C\uC790 \uD3EC\uD138</title>\n<style>\n");
+        b.append(":root{--bg:#f4efe6;--card:#fff;--ink:#192923;--soft:#5d6d67;--teal:#0f766e;--deep:#12342f;--line:rgba(25,41,35,0.10);}\n");
+        b.append("*{box-sizing:border-box;margin:0;padding:0;}\n");
+        b.append("body{font-family:'Pretendard','Noto Sans KR','IBM Plex Sans',system-ui,sans-serif;background:var(--bg);color:var(--ink);}\n");
+        b.append(".shell{max-width:1180px;margin:24px auto 48px;padding:0 16px;}\n");
+        b.append(".hero{border-radius:20px;padding:34px;background:linear-gradient(135deg,var(--teal),var(--deep));color:#f8f3e8;margin-bottom:18px;}\n");
+        b.append(".hero h1{font-size:clamp(26px,4vw,42px);font-weight:800;margin:12px 0;letter-spacing:-0.04em;}\n");
+        b.append(".hero p{max-width:780px;line-height:1.8;color:rgba(248,243,232,0.84);font-size:14px;}\n");
+        b.append(".pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}\n");
+        b.append(".pill{padding:6px 14px;border-radius:20px;font-size:12px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.9);}\n");
+        b.append(".actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;}\n");
+        b.append(".actions a{display:inline-flex;align-items:center;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;}\n");
+        b.append(".btn-p{background:var(--card);color:var(--deep);}\n");
+        b.append(".btn-s{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2);}\n");
+        b.append(".row{display:grid;grid-template-columns:7fr 5fr;gap:18px;margin-bottom:18px;}\n");
+        b.append(".card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,0.06);}\n");
+        b.append("h2{font-size:20px;font-weight:700;margin-bottom:6px;}\n");
+        b.append(".sub{color:var(--soft);font-size:13px;line-height:1.7;margin-bottom:12px;}\n");
+        b.append(".ep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:14px;}\n");
+        b.append(".ep{padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:#f8fafc;}\n");
+        b.append(".ep strong{display:block;font-size:13px;margin-bottom:2px;}\n");
+        b.append(".ep code{font-size:11px;color:var(--soft);}\n");
+        b.append("pre.json{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:16px;font-family:'JetBrains Mono',Consolas,monospace;font-size:12px;line-height:1.6;overflow:auto;max-height:400px;white-space:pre-wrap;}\n");
+        b.append("pre.code{background:#1e293b;color:#e2e8f0;border-radius:12px;padding:16px;font-family:'JetBrains Mono',Consolas,monospace;font-size:12px;line-height:1.7;overflow:auto;white-space:pre-wrap;margin-top:12px;}\n");
+        b.append("ul{padding-left:18px;color:var(--soft);font-size:13px;line-height:1.8;}\n");
+        b.append("@media(max-width:900px){.row{grid-template-columns:1fr;}}\n");
+        b.append("</style>\n</head>\n<body>\n<div class=\"shell\">\n");
+
+        // Hero
+        b.append("<section class=\"hero\">\n");
+        b.append("<div class=\"pills\">");
+        b.append("<span class=\"pill\">\uB3C5\uB9BD AI \uBAA8\uB4C8</span>");
+        b.append("<span class=\"pill\">\uAC1C\uBC1C\uC790 \uD3EC\uD138 \uD65C\uC131</span>");
+        b.append("<span class=\"pill\">OpenAPI + \uAC8C\uC774\uD2B8\uC6E8\uC774 \uC0CC\uB4DC\uBC15\uC2A4</span>");
+        b.append("</div>\n");
+        b.append("<h1>Velo AI Platform \uAC1C\uBC1C\uC790 \uD3EC\uD138</h1>\n");
+        b.append("<p>\uC790\uB3D9 \uC0DD\uC131\uB41C OpenAPI \uACC4\uC57D\uC11C\uB97C \uD655\uC778\uD558\uACE0, AI \uAC8C\uC774\uD2B8\uC6E8\uC774\uB97C \uD14C\uC2A4\uD2B8\uD558\uBA70, \uB77C\uC6B0\uD305\u00B7\uCD94\uB860\u00B7\uC2A4\uD2B8\uB9AC\uBC0D \uB3D9\uC791\uC744 \uAD00\uB9AC \uCF58\uC194 \uC5C6\uC774 \uAC80\uC99D\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.</p>\n");
+        b.append("<div class=\"actions\">");
+        b.append("<a class=\"btn-p\" href=\"").append(cp).append("/api-docs\">OpenAPI JSON</a>");
+        b.append("<a class=\"btn-s\" href=\"").append(streamUrl).append("\">\uC2A4\uD2B8\uB9AC\uBC0D \uB370\uBAA8</a>");
+        b.append("<a class=\"btn-s\" href=\"").append(cp).append("/\">\uCF58\uC194\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30</a>");
+        b.append("</div>\n</section>\n");
+
+        // Two-column row
+        b.append("<div class=\"row\">\n");
+        // Left: OpenAPI spec
+        b.append("<div class=\"card\">\n");
+        b.append("<h2>OpenAPI \uACC4\uC57D\uC11C</h2>\n");
+        b.append("<p class=\"sub\">AI \uD50C\uB7AB\uD3FC \uBAA8\uB4C8\uC5D0\uC11C \uC790\uB3D9 \uC0DD\uC131\uB41C \uACF5\uAC1C \uAC8C\uC774\uD2B8\uC6E8\uC774 + \uC6B4\uC601 API \uC2A4\uD399\uC785\uB2C8\uB2E4.</p>\n");
+        b.append("<pre class=\"json\" id=\"openapiSpec\">\uB85C\uB529 \uC911...</pre>\n");
+        b.append("</div>\n");
+        // Right: Quick Start
+        b.append("<div class=\"card\">\n");
+        b.append("<h2>\uBE60\uB978 \uC2DC\uC791</h2>\n");
+        b.append("<p class=\"sub\">\uAC8C\uC774\uD2B8\uC6E8\uC774 \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uB294 \uACF5\uAC1C API\uC785\uB2C8\uB2E4. \uBAA8\uB378 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \ub4f1 \uCEE8\uD2B8\uB864 \uD50C\uB808\uC778 API\uB294 \uCF58\uC194 \uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.</p>\n");
+        b.append("<div class=\"ep-grid\">\n");
+        endpoint(b, "\uB77C\uC6B0\uD305", "POST", cp + "/gateway/route");
+        endpoint(b, "\uCD94\uB860", "POST", cp + "/gateway/infer");
+        endpoint(b, "\uC2A4\uD2B8\uB9AC\uBC0D", "GET", cp + "/gateway/stream");
+        endpoint(b, "\uBAA8\uB378 \uBAA9\uB85D", "GET", cp + "/api/models");
+        endpoint(b, "\uC0AC\uC6A9\uB7C9", "GET", cp + "/api/usage");
+        endpoint(b, "API \uD638\uCD9C", "POST", cp + "/invoke/{model}");
+        endpoint(b, "\uACFC\uAE08", "GET", cp + "/api/billing");
+        endpoint(b, "Chat (OpenAI)", "POST", cp + "/v1/chat/completions");
+        endpoint(b, "Completions", "POST", cp + "/v1/completions");
+        endpoint(b, "\uC559\uC0C1\uBE14", "POST", cp + "/gateway/ensemble");
+        endpoint(b, "\uD14C\uB10C\uD2B8", "GET", cp + "/api/tenants");
+        endpoint(b, "\uD50C\uB7EC\uADF8\uC778", "GET", cp + "/api/plugins");
+        b.append("</div>\n");
+        b.append("<pre class=\"code\">curl -X POST ").append(cp).append("/gateway/infer \\\n");
+        b.append("  -H \"Content-Type: application/json\" \\\n");
+        b.append("  -d '{\n    \"requestType\": \"AUTO\",\n    \"sessionId\": \"portal-demo\",\n    \"prompt\": \"\uBAA8\uBC14\uC77C \uACE0\uAC1D\uC5D0\uAC8C \uCD94\uCC9C\uD560 \uC0C1\uD488 3\uAC1C\"\n  }'</pre>\n");
+        b.append("</div>\n</div>\n");
+
+        // Full-width: What This Exposes
+        b.append("<div class=\"card\">\n");
+        b.append("<h2>\uC8FC\uC694 \uAE30\uB2A5 \uC694\uC57D</h2>\n");
+        b.append("<ul>\n");
+        b.append("<li>\uD504\uB86C\uD504\uD2B8 \uB77C\uC6B0\uD305: <code>server.aiPlatform.advanced.promptRoutingEnabled</code> \uC124\uC815\uC73C\uB85C \uC81C\uC5B4</li>\n");
+        b.append("<li>\uBAA8\uB378 \uC120\uD0DD: \uB77C\uC6B0\uD2B8 \uC815\uCC45, \uCE74\uD14C\uACE0\uB9AC \uB9E4\uCE6D, \uAE30\uBCF8 \uC804\uB7B5 \uAE30\uBC18 \uC790\uB3D9 \uC120\uD0DD</li>\n");
+        b.append("<li>\uCEE8\uD14D\uC2A4\uD2B8 \uCE90\uC2DC: \uC138\uC158\uACFC \uD504\uB86C\uD504\uD2B8 \uD551\uAC70\uD504\uB9B0\uD2B8 \uAE30\uBC18 \uCE90\uC2DC \uD0A4 \uC0DD\uC131</li>\n");
+        b.append("<li>\uC2A4\uD2B8\uB9AC\uBC0D: <code>server.aiPlatform.differentiation.streamingResponseEnabled</code> \uD65C\uC131 \uC2DC SSE \uD1A0\uD070 \uC2A4\uD2B8\uB9BC</li>\n");
+        b.append("<li>OpenAI \uD638\uD658 \uD504\uB85D\uC2DC: <code>/v1/chat/completions</code>, <code>/v1/completions</code> \uC790\uB3D9 Failover \uC9C0\uC6D0</li>\n");
+        b.append("<li>\uC559\uC0C1\uBE14 \uC11C\uBE59: <code>/gateway/ensemble</code>\uC5D0\uC11C \uBA40\uD2F0 \uBAA8\uB378 \uACB0\uACFC \uACB0\uD569</li>\n");
+        b.append("<li>\uBA40\uD2F0 \uD14C\uB10C\uD2B8: \uC694\uCCAD \uC81C\uD55C, \uD1A0\uD070 \uCFFC\uD130, API \uD0A4 \uBC1C\uAE09 \uAD00\uB9AC</li>\n");
+        b.append("<li>\uD50C\uB7EC\uADF8\uC778 \uD504\uB808\uC784\uC6CC\uD06C: \uCD94\uB860 \uC694\uCCAD\uC758 \uC804\uCC98\uB9AC/\uD6C4\uCC98\uB9AC \uCEE4\uC2A4\uD140 \uD50C\uB7EC\uADF8\uC778</li>\n");
+        b.append("</ul>\n</div>\n");
+
+        // Script
+        b.append("<script>\n");
+        b.append("fetch('").append(cp).append("/api-docs')\n");
+        b.append("  .then(function(r){return r.json();})\n");
+        b.append("  .then(function(s){document.getElementById('openapiSpec').textContent=JSON.stringify(s,null,2);})\n");
+        b.append("  .catch(function(e){document.getElementById('openapiSpec').textContent='\uC2A4\uD399 \uB85C\uB4DC \uC2E4\uD328: '+e;});\n");
+        b.append("</script>\n");
+        b.append("</div>\n</body>\n</html>");
+        resp.getWriter().write(b.toString());
+    }
+
+    private static void endpoint(StringBuilder b, String label, String method, String path) {
+        b.append("<div class=\"ep\"><strong>").append(label).append("</strong><code>").append(method).append(" ").append(path).append("</code></div>\n");
     }
 }

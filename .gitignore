@@ -11,6 +11,7 @@ deploy
 .claude/settings.json
 .claude/skills.json
 *.pid
+.m2
 
 # BlueJ files
 *.ctxt

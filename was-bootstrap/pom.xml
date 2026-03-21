@@ -56,6 +56,11 @@
         </dependency>
         <dependency>
             <groupId>io.velo.was</groupId>
+            <artifactId>was-ai-platform</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.velo.was</groupId>
             <artifactId>was-observability</artifactId>
             <version>${project.version}</version>
         </dependency>

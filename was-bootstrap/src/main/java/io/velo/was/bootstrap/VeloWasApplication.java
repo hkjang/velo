@@ -2,6 +2,7 @@ package io.velo.was.bootstrap;
 
 import io.velo.was.admin.client.AdminClient;
 import io.velo.was.admin.client.LocalAdminClient;
+import io.velo.was.aiplatform.AiPlatformApplication;
 import io.velo.was.config.ServerConfiguration;
 import io.velo.was.deploy.DeploymentRegistry;
 import io.velo.was.deploy.HotDeployWatcher;
@@ -57,6 +58,16 @@ public final class VeloWasApplication {
             log.info("Web Admin deployed at context path: {}", webAdminConfig.getContextPath());
         } else {
             log.info("Web Admin is disabled");
+        }
+
+        ServerConfiguration.AiPlatform aiPlatformConfig = configuration.getServer().getAiPlatform();
+        if (aiPlatformConfig.isEnabled() && aiPlatformConfig.getConsole().isEnabled()) {
+            SimpleServletApplication aiPlatformApp = AiPlatformApplication.create(configuration);
+            servletContainer.deploy(aiPlatformApp);
+            log.info("AI Platform console deployed at context path: {}",
+                    aiPlatformConfig.getConsole().getContextPath());
+        } else {
+            log.info("AI Platform console is disabled");
         }
 
         // Register JSP servlet for *.jsp handling

@@ -39,6 +39,125 @@ server:
     contextPath: /admin
     apiDocsEnabled: true
 
+  aiPlatform:
+    enabled: true
+    mode: PLATFORM
+    console:
+      enabled: true
+      contextPath: /ai-platform
+    serving:
+      modelRouterEnabled: true
+      abTestingEnabled: true
+      autoModelSelectionEnabled: true
+      ensembleServingEnabled: false
+      edgeAiEnabled: false
+      defaultStrategy: BALANCED
+      routerTimeoutMillis: 1500
+      targetP99LatencyMs: 1200
+      models:
+        - name: llm-general
+          category: LLM
+          provider: builtin
+          version: v1
+          latencyTier: standard
+          latencyMs: 650
+          accuracyScore: 86
+          defaultSelected: true
+          enabled: true
+        - name: vision-edge
+          category: CV
+          provider: edge
+          version: v1
+          latencyTier: low-latency
+          latencyMs: 180
+          accuracyScore: 79
+          defaultSelected: false
+          enabled: true
+        - name: reco-personalization
+          category: RECOMMENDER
+          provider: builtin
+          version: v1
+          latencyTier: balanced
+          latencyMs: 95
+          accuracyScore: 81
+          defaultSelected: false
+          enabled: true
+      routePolicies:
+        - name: chat-router
+          requestType: CHAT
+          targetModel: llm-general
+          priority: 100
+        - name: vision-router
+          requestType: VISION
+          targetModel: vision-edge
+          priority: 90
+        - name: recommendation-router
+          requestType: RECOMMENDATION
+          targetModel: reco-personalization
+          priority: 80
+        - name: fallback-router
+          requestType: DEFAULT
+          targetModel: llm-general
+          priority: 10
+    platform:
+      modelRegistrationEnabled: true
+      autoApiGenerationEnabled: true
+      versionManagementEnabled: true
+      billingEnabled: false      defaultTenantRateLimitPerMinute: 120
+      defaultTenantTokenQuota: 250000
+      apiKeyHeader: X-AI-API-Key
+      versioningStrategy: CANARY
+    differentiation:
+      aiOptimizedWasEnabled: true
+      requestRoutingEnabled: true
+      streamingResponseEnabled: true
+      pluginFrameworkEnabled: true
+      runtimeEngine: NETTY_ASYNC
+    advanced:
+      promptRoutingEnabled: true
+      promptRoutingMode: HYBRID
+      contextCacheEnabled: true
+      contextCacheTtlSeconds: 300
+      aiGatewayEnabled: true
+      fineTuningApiEnabled: false
+      observabilityEnabled: true
+      gpuSchedulingEnabled: false
+    commercialization:
+      coreDirection: WAS_TO_AI_PLATFORM
+      differentiators:
+        - MODEL_ROUTING
+        - LOW_LATENCY
+        - CUSTOMIZATION
+      revenueStreams:
+        - API_BILLING
+        - SAAS
+    roadmap:
+      currentStage: 2
+      stages:
+        - stage: 1
+          goal: Basic Serving
+          capabilities:
+            - Single model API
+        - stage: 2
+          goal: Expansion
+          capabilities:
+            - Multi-model routing
+            - Context cache
+        - stage: 3
+          goal: Platformization
+          capabilities:
+            - Model registry
+            - Version management
+        - stage: 4
+          goal: Optimization
+          capabilities:
+            - GPU scheduling
+        - stage: 5
+          goal: Commercialization
+          capabilities:
+            - Billing
+            - Multi-tenant SaaS
+
   servlet:
     mappingStrategy: TOMCAT_COMPAT
 

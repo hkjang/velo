@@ -40,7 +40,7 @@ find_fat_jar() {
 ALL_MODULES=(
     was-config was-observability was-protocol-http was-transport-netty
     was-servlet-core was-classloader was-deploy was-jndi was-admin
-    was-jsp was-tcp-listener was-webadmin was-bootstrap
+    was-jsp was-tcp-listener was-webadmin was-ai-platform was-bootstrap
 )
 
 # ── Functions ────────────────────────────────────────────────
@@ -84,7 +84,7 @@ resolve_modules() {
         modules+=("$m")
     done
     if [[ ${#modules[@]} -gt 0 ]]; then
-        echo "-pl $(IFS=,; echo "${modules[*]}") -am"
+        printf '%s\n' "${modules[@]}"
     fi
 }
 
@@ -108,7 +108,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-PL_OPTION=$(resolve_modules "${MODULE_ARGS[@]:-}")
+mapfile -t RESOLVED_MODULES < <(resolve_modules "${MODULE_ARGS[@]:-}")
+PL_ARGS=()
+if [[ ${#RESOLVED_MODULES[@]} -gt 0 ]]; then
+    PL_ARGS=(-pl "$(IFS=,; echo "${RESOLVED_MODULES[*]}")" -am)
+fi
 
 # ── Build ────────────────────────────────────────────────────
 echo "════════════════════════════════════════════════════════"
@@ -121,7 +125,7 @@ echo "════════════════════════�
 
 cd "$PROJECT_ROOT"
 # shellcheck disable=SC2086
-"$MVN" $CLEAN $GOAL $SKIP_TESTS $QUIET $PL_OPTION
+"$MVN" $CLEAN $GOAL $SKIP_TESTS $QUIET "${PL_ARGS[@]}"
 
 echo ""
 echo "✓ Build completed successfully."

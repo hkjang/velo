@@ -37,7 +37,7 @@ Options:
 
 Modules:
   all          Build all modules (default)
-  <name>       e.g. was-admin, was-webadmin, bootstrap
+  <name>       e.g. was-admin, was-webadmin, was-ai-platform, bootstrap
 
 Examples:
   .\bin\build.ps1                       # Build all
@@ -82,13 +82,13 @@ $CleanGoal = if ($Clean) { "clean" } else { "" }
 $SkipArg = if ($Test) { "" } else { "-DskipTests" }
 $QuietArg = if ($Quiet) { "-q" } else { "" }
 
-$PlOption = ""
+$PlOptionArgs = @()
 $ModuleDisplay = "all"
 if ($Modules -and $Modules.Count -gt 0 -and $Modules[0] -ne "all") {
     $normalized = $Modules | ForEach-Object {
         if ($_ -notlike "was-*") { "was-$_" } else { $_ }
     }
-    $PlOption = "-pl $($normalized -join ',') -am"
+    $PlOptionArgs = @("-pl", ($normalized -join ','), "-am")
     $ModuleDisplay = $normalized -join ", "
 }
 
@@ -102,7 +102,8 @@ Write-Host "══════════════════════�
 
 Push-Location $ProjectRoot
 try {
-    $args = @($CleanGoal, $Goal, $SkipArg, $QuietArg, $PlOption) | Where-Object { $_ }
+    $args = @($CleanGoal, $Goal, $SkipArg, $QuietArg) | Where-Object { $_ }
+    $args += $PlOptionArgs
     & $Mvn @args
     if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
 } finally {

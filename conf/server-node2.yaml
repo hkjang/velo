@@ -39,6 +39,22 @@ server:
     contextPath: /admin
     apiDocsEnabled: true
 
+  aiPlatform:
+    enabled: true
+    mode: PLATFORM
+    console:
+      enabled: true
+      contextPath: /ai-platform
+    serving:
+      modelRouterEnabled: true
+      abTestingEnabled: true
+      autoModelSelectionEnabled: true
+      ensembleServingEnabled: false
+      edgeAiEnabled: false
+      defaultStrategy: BALANCED
+      routerTimeoutMillis: 1500
+      targetP99LatencyMs: 1200
+
   compression:
     enabled: false
     minResponseSizeBytes: 1024

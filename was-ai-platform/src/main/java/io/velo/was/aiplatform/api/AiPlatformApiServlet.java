@@ -6,8 +6,7 @@ import io.velo.was.aiplatform.plugin.AiPluginRegistry;
 import io.velo.was.aiplatform.provider.AiProviderRegistry;
 import io.velo.was.aiplatform.billing.AiBillingService;
 import io.velo.was.aiplatform.billing.AiBillingSnapshot;
-import io.velo.was.aiplatform.finetuning.AiFineTuningJobRequest;
-import io.velo.was.aiplatform.finetuning.AiFineTuningService;
+// Fine-tuning feature removed
 import io.velo.was.aiplatform.gateway.AiGatewayService;
 import io.velo.was.aiplatform.gateway.AiGatewayServlet;
 import io.velo.was.aiplatform.observability.AiPlatformUsageService;
@@ -44,7 +43,7 @@ public class AiPlatformApiServlet extends HttpServlet {
     private final AiPlatformUsageService usageService;
     private final AiPublishedApiService publishedApiService;
     private final AiBillingService billingService;
-    private final AiFineTuningService fineTuningService;
+    // Fine-tuning removed
     private final AiTenantService tenantService;
     private final AiPluginRegistry pluginRegistry;
     private final AiProviderRegistry providerRegistry;
@@ -59,10 +58,9 @@ public class AiPlatformApiServlet extends HttpServlet {
                                 AiPlatformUsageService usageService,
                                 AiPublishedApiService publishedApiService,
                                 AiBillingService billingService,
-                                AiFineTuningService fineTuningService,
                                 AiTenantService tenantService) {
         this(configuration, registryService, gatewayService, usageService, publishedApiService, billingService,
-                fineTuningService, tenantService, new AiPluginRegistry(), new AiProviderRegistry(), new AiEdgeService());
+                tenantService, new AiPluginRegistry(), new AiProviderRegistry(), new AiEdgeService());
     }
 
     public AiPlatformApiServlet(ServerConfiguration configuration,
@@ -71,12 +69,11 @@ public class AiPlatformApiServlet extends HttpServlet {
                                 AiPlatformUsageService usageService,
                                 AiPublishedApiService publishedApiService,
                                 AiBillingService billingService,
-                                AiFineTuningService fineTuningService,
                                 AiTenantService tenantService,
                                 AiPluginRegistry pluginRegistry,
                                 AiProviderRegistry providerRegistry) {
         this(configuration, registryService, gatewayService, usageService, publishedApiService, billingService,
-                fineTuningService, tenantService, pluginRegistry, providerRegistry, new AiEdgeService());
+                tenantService, pluginRegistry, providerRegistry, new AiEdgeService());
     }
 
     public AiPlatformApiServlet(ServerConfiguration configuration,
@@ -85,13 +82,12 @@ public class AiPlatformApiServlet extends HttpServlet {
                                 AiPlatformUsageService usageService,
                                 AiPublishedApiService publishedApiService,
                                 AiBillingService billingService,
-                                AiFineTuningService fineTuningService,
                                 AiTenantService tenantService,
                                 AiPluginRegistry pluginRegistry,
                                 AiProviderRegistry providerRegistry,
                                 AiEdgeService edgeService) {
         this(configuration, registryService, gatewayService, usageService, publishedApiService, billingService,
-                fineTuningService, tenantService, pluginRegistry, providerRegistry, edgeService, null, null, null);
+                tenantService, pluginRegistry, providerRegistry, edgeService, null, null, null);
     }
 
     public AiPlatformApiServlet(ServerConfiguration configuration,
@@ -100,7 +96,6 @@ public class AiPlatformApiServlet extends HttpServlet {
                                 AiPlatformUsageService usageService,
                                 AiPublishedApiService publishedApiService,
                                 AiBillingService billingService,
-                                AiFineTuningService fineTuningService,
                                 AiTenantService tenantService,
                                 AiPluginRegistry pluginRegistry,
                                 AiProviderRegistry providerRegistry,
@@ -114,7 +109,6 @@ public class AiPlatformApiServlet extends HttpServlet {
         this.usageService = usageService;
         this.publishedApiService = publishedApiService;
         this.billingService = billingService;
-        this.fineTuningService = fineTuningService;
         this.tenantService = tenantService;
         this.pluginRegistry = pluginRegistry;
         this.providerRegistry = providerRegistry;
@@ -204,23 +198,8 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(AiPlatformExtendedJson.edgeDevices(edgeService.listDevices()));
             return;
         }
-        if ("/fine-tuning/jobs".equals(path)) {
-            if (!configuration.getServer().getAiPlatform().getAdvanced().isFineTuningApiEnabled()) {
-                unavailable(resp, "Fine-tuning API is disabled in configuration");
-                return;
-            }
-            usageService.recordControlPlaneAccess("/api/fine-tuning/jobs");
-            resp.getWriter().write(AiPlatformExtendedJson.fineTuningJobs(fineTuningService.listJobs()));
-            return;
-        }
-        if (path.startsWith("/fine-tuning/jobs/")) {
-            if (!configuration.getServer().getAiPlatform().getAdvanced().isFineTuningApiEnabled()) {
-                unavailable(resp, "Fine-tuning API is disabled in configuration");
-                return;
-            }
-            usageService.recordControlPlaneAccess("/api/fine-tuning/jobs/{id}");
-            String jobId = path.substring("/fine-tuning/jobs/".length());
-            resp.getWriter().write(AiPlatformExtendedJson.fineTuningJob(fineTuningService.getJob(jobId)));
+        if ("/fine-tuning/jobs".equals(path) || path.startsWith("/fine-tuning/jobs/")) {
+            unavailable(resp, "\ud30c\uc778\ud29c\ub2dd \uae30\ub2a5\uc774 \uc81c\uac70\ub418\uc5c8\uc2b5\ub2c8\ub2e4.");
             return;
         }
         if ("/config".equals(path)) {
@@ -284,7 +263,65 @@ public class AiPlatformApiServlet extends HttpServlet {
                 resp.getWriter().write("{\"deleted\":true,\"tenantId\":\"" + AiGatewayServlet.escapeJson(tenantId) + "\"}");
                 return;
             }
+            // 의도 키워드 삭제
+            if (path.startsWith("/intent/keywords/") && intentPolicyService != null) {
+                String keywordId = path.substring("/intent/keywords/".length());
+                intentPolicyService.removeKeyword(keywordId);
+                resp.getWriter().write("{\"deleted\":true,\"keywordId\":\"" + esc(keywordId) + "\"}");
+                return;
+            }
+            // 의도 정책 삭제
+            if (path.startsWith("/intent/policies/") && intentPolicyService != null) {
+                String policyId = path.substring("/intent/policies/".length());
+                intentPolicyService.removePolicy(policyId);
+                resp.getWriter().write("{\"deleted\":true,\"policyId\":\"" + esc(policyId) + "\"}");
+                return;
+            }
             notFound(resp, "Not Found");
+        } catch (NoSuchElementException e) {
+            notFound(resp, e.getMessage() != null ? e.getMessage() : "Not Found");
+        }
+    }
+
+    @Override
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        prepare(resp);
+        String path = normalizePath(req.getPathInfo());
+        String body = req.getReader().lines().collect(Collectors.joining("\n"));
+        try {
+            // 의도 키워드 수정
+            if (path.startsWith("/intent/keywords/") && intentPolicyService != null) {
+                String keywordId = path.substring("/intent/keywords/".length());
+                String primaryKeyword = firstNonBlank(req.getParameter("primaryKeyword"), extractJsonString(body, "primaryKeyword"));
+                String synonymsStr = firstNonBlank(req.getParameter("synonyms"), extractJsonString(body, "synonyms"));
+                String intentStr = firstNonBlank(req.getParameter("intent"), extractJsonString(body, "intent"));
+                int priority = parseInteger(firstNonBlank(req.getParameter("priority"), extractJsonNumber(body, "priority")), 50);
+                boolean enabled = parseBoolean(firstNonBlank(req.getParameter("enabled"), extractJsonBoolean(body, "enabled")), true);
+                java.util.List<String> synonyms = synonymsStr.isBlank() ? java.util.List.of()
+                        : java.util.Arrays.stream(synonymsStr.split("[,;|]")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+                IntentKeyword updated = intentPolicyService.updateKeyword(keywordId, primaryKeyword, synonyms, IntentType.fromString(intentStr), priority, enabled);
+                resp.getWriter().write(buildKeywordJson(updated));
+                return;
+            }
+            // 의도 정책 수정
+            if (path.startsWith("/intent/policies/") && intentPolicyService != null) {
+                String policyId = path.substring("/intent/policies/".length());
+                String intentStr = firstNonBlank(req.getParameter("intent"), extractJsonString(body, "intent"));
+                int priority = parseInteger(firstNonBlank(req.getParameter("priority"), extractJsonNumber(body, "priority")), 50);
+                String routeTarget = firstNonBlank(req.getParameter("routeTarget"), extractJsonString(body, "routeTarget"));
+                String modelName = firstNonBlank(req.getParameter("modelName"), extractJsonString(body, "modelName"));
+                String fallback = firstNonBlank(req.getParameter("fallbackModel"), extractJsonString(body, "fallbackModel"));
+                boolean streaming = parseBoolean(firstNonBlank(req.getParameter("streamingPreferred"), extractJsonBoolean(body, "streamingPreferred")), false);
+                boolean enabled = parseBoolean(firstNonBlank(req.getParameter("enabled"), extractJsonBoolean(body, "enabled")), true);
+                String tenantOverride = firstNonBlank(req.getParameter("tenantOverride"), extractJsonString(body, "tenantOverride"));
+                int maxTokens = parseInteger(firstNonBlank(req.getParameter("maxInputTokens"), extractJsonNumber(body, "maxInputTokens")), 0);
+                RoutingPolicy updated = intentPolicyService.updatePolicy(policyId, IntentType.fromString(intentStr), priority, routeTarget, modelName, fallback, streaming, enabled, tenantOverride, maxTokens);
+                resp.getWriter().write(buildPolicyJson(updated));
+                return;
+            }
+            notFound(resp, "Not Found");
+        } catch (IllegalArgumentException e) {
+            badRequest(resp, e.getMessage());
         } catch (NoSuchElementException e) {
             notFound(resp, e.getMessage() != null ? e.getMessage() : "Not Found");
         }
@@ -348,24 +385,8 @@ public class AiPlatformApiServlet extends HttpServlet {
                 )));
                 return;
             }
-            if ("/fine-tuning/jobs".equals(path)) {
-                if (!configuration.getServer().getAiPlatform().getAdvanced().isFineTuningApiEnabled()) {
-                    unavailable(resp, "Fine-tuning API is disabled in configuration");
-                    return;
-                }
-                usageService.recordControlPlaneAccess("/api/fine-tuning/jobs");
-                resp.setStatus(HttpServletResponse.SC_CREATED);
-                resp.getWriter().write(AiPlatformExtendedJson.fineTuningJob(fineTuningService.createJob(readFineTuningRequest(req, body))));
-                return;
-            }
-            if (path.startsWith("/fine-tuning/jobs/") && path.endsWith("/cancel")) {
-                if (!configuration.getServer().getAiPlatform().getAdvanced().isFineTuningApiEnabled()) {
-                    unavailable(resp, "Fine-tuning API is disabled in configuration");
-                    return;
-                }
-                usageService.recordControlPlaneAccess("/api/fine-tuning/jobs/{id}/cancel");
-                String jobId = path.substring("/fine-tuning/jobs/".length(), path.length() - "/cancel".length());
-                resp.getWriter().write(AiPlatformExtendedJson.fineTuningJob(fineTuningService.cancelJob(jobId)));
+            if ("/fine-tuning/jobs".equals(path) || (path.startsWith("/fine-tuning/jobs/") && path.endsWith("/cancel"))) {
+                unavailable(resp, "\ud30c\uc778\ud29c\ub2dd \uae30\ub2a5\uc774 \uc81c\uac70\ub418\uc5c8\uc2b5\ub2c8\ub2e4.");
                 return;
             }
             // 의도 기반 라우팅 API
@@ -515,16 +536,6 @@ public class AiPlatformApiServlet extends HttpServlet {
         );
     }
 
-    private AiFineTuningJobRequest readFineTuningRequest(HttpServletRequest req, String body) {
-        return new AiFineTuningJobRequest(
-                firstNonBlank(req.getParameter("baseModel"), extractJsonString(body, "baseModel")),
-                firstNonBlank(req.getParameter("datasetUri"), extractJsonString(body, "datasetUri")),
-                firstNonBlank(req.getParameter("tenant"), extractJsonString(body, "tenant")),
-                firstNonBlank(req.getParameter("objective"), extractJsonString(body, "objective")),
-                parseInteger(firstNonBlank(req.getParameter("epochs"), extractJsonNumber(body, "epochs")), 3)
-        );
-    }
-
     private static void prepare(HttpServletResponse resp) {
         resp.setContentType("application/json; charset=UTF-8");
         resp.setCharacterEncoding("UTF-8");
@@ -636,8 +647,7 @@ public class AiPlatformApiServlet extends HttpServlet {
         sb.append("\"contextCacheEnabled\":").append(ai.getAdvanced().isContextCacheEnabled()).append(",");
         sb.append("\"contextCacheTtlSeconds\":").append(ai.getAdvanced().getContextCacheTtlSeconds()).append(",");
         sb.append("\"aiGatewayEnabled\":").append(ai.getAdvanced().isAiGatewayEnabled()).append(",");
-        sb.append("\"observabilityEnabled\":").append(ai.getAdvanced().isObservabilityEnabled()).append(",");
-        sb.append("\"fineTuningApiEnabled\":").append(ai.getAdvanced().isFineTuningApiEnabled());
+        sb.append("\"observabilityEnabled\":").append(ai.getAdvanced().isObservabilityEnabled());
         sb.append("},");
         // differentiation
         sb.append("\"differentiation\":{");

@@ -358,6 +358,17 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("<pre class=\"code-box\">").append(h(buildYamlPreview(ai))).append("</pre></div>\n");
         b.append("</div>\n");
 
+        // ===== TAB: plugins — 플러그인 =====
+        b.append("<div class=\"tab-panel\" id=\"tab-plugins\">\n");
+        b.append("<div class=\"card\"><div class=\"card-header\">\ud50c\ub7ec\uadf8\uc778 \uad00\ub9ac</div>");
+        b.append("<div class=\"card-desc\">\ub4f1\ub85d\ub41c \ucd94\ub860 \uc804\ucc98\ub9ac/\ud6c4\ucc98\ub9ac \ud50c\ub7ec\uadf8\uc778 \ubaa9\ub85d</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshPlugins()\">\uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div>");
+        b.append("<pre class=\"json-box\" id=\"pluginsJson\">\ub85c\ub529 \uc911...</pre>");
+        b.append("</div>\n");
+        b.append("</div>\n");
+
         // ===== TAB: roadmap =====
         b.append("<div class=\"tab-panel\" id=\"tab-roadmap\">\n");
         b.append("<div class=\"card\"><div class=\"card-header\">\uc9c4\ud654 \ub85c\ub4dc\ub9f5</div><div class=\"card-desc\">\uae30\ubcf8 \uc11c\ube59\uc5d0\uc11c \ud50c\ub7ab\ud3fc \uc0c1\uc6a9\ud654\uae4c\uc9c0</div>");
@@ -442,8 +453,14 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("async function refreshIntentStats(){showJson('intentStatsJson',await api('/api/intent/stats'))}\n");
         b.append("async function refreshAuditLog(){showJson('auditLogJson',await api('/api/intent/audit?limit=20'))}\n");
 
+        // Plugin functions
+        b.append("async function refreshPlugins(){showJson('pluginsJson',await api('/api/plugins'))}\n");
+        // Intent keyword/policy delete functions
+        b.append("async function deleteKeyword(id){if(!confirm('\\ud0a4\\uc6cc\\ub4dc '+id+'\\ub97c \\uc0ad\\uc81c\\ud558\\uc2dc\\uaca0\\uc2b5\\ub2c8\\uae4c?'))return;showJson('keywordResult',await api('/api/intent/keywords/'+encodeURIComponent(id),{method:'DELETE'}));refreshKeywords()}\n");
+        b.append("async function deletePolicy(id){if(!confirm('\\uc815\\ucc45 '+id+'\\ub97c \\uc0ad\\uc81c\\ud558\\uc2dc\\uaca0\\uc2b5\\ub2c8\\uae4c?'))return;showJson('keywordResult',await api('/api/intent/policies/'+encodeURIComponent(id),{method:'DELETE'}));refreshPolicies()}\n");
+
         // Init
-        b.append("refreshOverview();refreshRegistry();refreshUsage();refreshPublishedApis();refreshBilling();refreshTenants();refreshConfig();refreshKeywords();refreshPolicies();refreshIntentStats();\n");
+        b.append("refreshOverview();refreshRegistry();refreshUsage();refreshPublishedApis();refreshBilling();refreshTenants();refreshConfig();refreshKeywords();refreshPolicies();refreshIntentStats();refreshPlugins();\n");
         b.append("updateLiveDashboard();\n");
         b.append("setInterval(updateLiveDashboard,5000);\n");
         b.append("</script>\n");

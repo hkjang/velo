@@ -113,12 +113,6 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append(",\n");
         apiPath(s, "/api/published-apis", "get", "Control Plane", "List published generated APIs", null, false);
         s.append(",\n");
-        apiPath(s, "/api/fine-tuning/jobs", "get", "Control Plane", "List fine-tuning jobs", null, false);
-        s.append(",\n");
-        apiPath(s, "/api/fine-tuning/jobs", "post", "Control Plane", "Create a fine-tuning job", null, false);
-        s.append(",\n");
-        apiPath(s, "/api/fine-tuning/jobs/{id}/cancel", "post", "Control Plane", "Cancel a fine-tuning job", null, false);
-        s.append(",\n");
         apiPath(s, "/api/config", "get", "Control Plane", "Get current AI platform configuration", null, false);
         s.append("\n");
         s.append("  },\n");

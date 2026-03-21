@@ -5,7 +5,6 @@ import io.velo.was.admin.client.LocalAdminClient;
 import io.velo.was.aiplatform.api.AiPlatformApiDocsServlet;
 import io.velo.was.aiplatform.api.AiPlatformApiServlet;
 import io.velo.was.aiplatform.billing.AiBillingService;
-import io.velo.was.aiplatform.finetuning.AiFineTuningService;
 import io.velo.was.aiplatform.plugin.AiContentFilterPlugin;
 import io.velo.was.aiplatform.plugin.AiPluginRegistry;
 import io.velo.was.aiplatform.provider.AiProviderRegistry;
@@ -48,7 +47,6 @@ public final class AiPlatformApplication {
         AiTenantService tenantService = new AiTenantService(configuration, dataStore);
         AiPublishedApiService publishedApiService = new AiPublishedApiService(configuration, registryService);
         AiBillingService billingService = new AiBillingService(publishedApiService, registryService);
-        AiFineTuningService fineTuningService = new AiFineTuningService(registryService);
         AiPluginRegistry pluginRegistry = new AiPluginRegistry();
         if (configuration.getServer().getAiPlatform().getDifferentiation().isPluginFrameworkEnabled()) {
             pluginRegistry.register(new AiContentFilterPlugin());
@@ -73,7 +71,7 @@ public final class AiPlatformApplication {
                 .servlet("/login", new AiPlatformLoginServlet(configuration, adminClient))
                 .servlet("/logout", new AiPlatformLogoutServlet())
                 .servlet("/api/*", new AiPlatformApiServlet(configuration, registryService, gatewayService, usageService,
-                        publishedApiService, billingService, fineTuningService, tenantService, pluginRegistry, providerRegistry,
+                        publishedApiService, billingService, tenantService, pluginRegistry, providerRegistry,
                         new io.velo.was.aiplatform.edge.AiEdgeService(), intentPolicyService, auditLogger, intentEngine))
                 .servlet("/gateway/*", new AiGatewayServlet(configuration, gatewayService, usageService, tenantService))
                 .servlet("/invoke/*", new AiPublishedApiServlet(publishedApiService, usageService, tenantService))

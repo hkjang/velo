@@ -5,7 +5,7 @@ import io.velo.was.aiplatform.plugin.AiPluginRegistry;
 import io.velo.was.aiplatform.provider.AiProviderRegistry;
 import io.velo.was.aiplatform.billing.AiBillingLineItem;
 import io.velo.was.aiplatform.billing.AiBillingSnapshot;
-import io.velo.was.aiplatform.finetuning.AiFineTuningJob;
+// Fine-tuning feature removed
 import io.velo.was.aiplatform.publishing.AiPublishedEndpoint;
 import io.velo.was.aiplatform.publishing.AiPublishedInvocationResult;
 import io.velo.was.aiplatform.tenant.AiTenantApiKeyInfo;
@@ -140,36 +140,7 @@ public final class AiPlatformExtendedJson {
                 "}";
     }
 
-    public static String fineTuningJobs(List<AiFineTuningJob> jobs) {
-        StringBuilder json = new StringBuilder(1024).append('{')
-                .append(q("count")).append(':').append(jobs.size()).append(',')
-                .append(q("jobs")).append(':').append('[');
-        boolean first = true;
-        for (AiFineTuningJob job : jobs) {
-            if (!first) {
-                json.append(',');
-            }
-            first = false;
-            json.append(fineTuningJob(job));
-        }
-        return json.append("]}").toString();
-    }
-
-    public static String fineTuningJob(AiFineTuningJob job) {
-        return "{" +
-                q("jobId") + ":" + q(job.jobId()) + "," +
-                q("baseModel") + ":" + q(job.baseModel()) + "," +
-                q("datasetUri") + ":" + q(job.datasetUri()) + "," +
-                q("tenant") + ":" + q(job.tenant()) + "," +
-                q("objective") + ":" + q(job.objective()) + "," +
-                q("epochs") + ":" + job.epochs() + "," +
-                q("status") + ":" + q(job.status()) + "," +
-                q("progressPercent") + ":" + job.progressPercent() + "," +
-                q("tunedModelName") + ":" + q(job.tunedModelName()) + "," +
-                q("createdAt") + ":" + q(Instant.ofEpochMilli(job.createdAtEpochMillis()).toString()) + "," +
-                q("updatedAt") + ":" + q(Instant.ofEpochMilli(job.updatedAtEpochMillis()).toString()) +
-                "}";
-    }
+    // Fine-tuning methods removed
 
     public static String edgeDevices(List<AiEdgeDevice> devices) {
         StringBuilder json = new StringBuilder(1024).append('{')

@@ -40,6 +40,7 @@ public final class AiPlatformLayout {
         html.append("    <a href=\"#tenants\" class=\"nav-item\" onclick=\"showTab(event,'tenants')\">\ud83c\udfe2 \ud14c\ub10c\ud2b8</a>\n");
         html.append("    <a href=\"#published\" class=\"nav-item\" onclick=\"showTab(event,'published')\">\ud83d\ude80 API \ubc1c\ud589</a>\n");
         html.append("    <a href=\"#developer\" class=\"nav-item\" onclick=\"showTab(event,'developer')\">\ud83d\udcd6 \uac1c\ubc1c\uc790 \ud3ec\ud138</a>\n");
+        html.append("    <a href=\"#plugins\" class=\"nav-item\" onclick=\"showTab(event,'plugins')\">\ud83d\udd0c \ud50c\ub7ec\uadf8\uc778</a>\n");
         html.append("    <div class=\"nav-label\">\uc124\uc815</div>\n");
         html.append("    <a href=\"#platform\" class=\"nav-item\" onclick=\"showTab(event,'platform')\">\ud83c\udfdb\ufe0f \ud50c\ub7ab\ud3fc</a>\n");
         html.append("    <a href=\"#config\" class=\"nav-item\" onclick=\"showTab(event,'config')\">\ud83d\udcdd YAML \uc124\uc815</a>\n");

@@ -9,6 +9,9 @@ import io.velo.was.aiplatform.finetuning.AiFineTuningService;
 import io.velo.was.aiplatform.plugin.AiContentFilterPlugin;
 import io.velo.was.aiplatform.plugin.AiPluginRegistry;
 import io.velo.was.aiplatform.provider.AiProviderRegistry;
+import io.velo.was.aiplatform.intent.IntentRoutingPolicyService;
+import io.velo.was.aiplatform.intent.RouteAuditLogger;
+import io.velo.was.aiplatform.intent.RouteDecisionEngine;
 import io.velo.was.aiplatform.gateway.AiChatCompletionServlet;
 import io.velo.was.aiplatform.gateway.AiGatewayService;
 import io.velo.was.aiplatform.gateway.AiGatewayServlet;
@@ -48,13 +51,25 @@ public final class AiPlatformApplication {
         AiProviderRegistry providerRegistry = new AiProviderRegistry();
         AiGatewayService gatewayService = new AiGatewayService(configuration, registryService, providerRegistry);
 
+        // 의도 기반 라우팅 엔진 설정
+        IntentRoutingPolicyService intentPolicyService = new IntentRoutingPolicyService();
+        RouteAuditLogger auditLogger = new RouteAuditLogger();
+        String defaultModel = configuration.getServer().getAiPlatform().getServing().getModels().stream()
+                .filter(ServerConfiguration.ModelProfile::isDefaultSelected)
+                .findFirst()
+                .map(ServerConfiguration.ModelProfile::getName)
+                .orElse("llm-general");
+        RouteDecisionEngine intentEngine = new RouteDecisionEngine(intentPolicyService, defaultModel);
+        gatewayService.setIntentEngine(intentEngine);
+
         var builder = SimpleServletApplication.builder(APP_NAME, contextPath)
                 .filter(new AiPlatformAuthFilter())
                 .servlet("/", new AiPlatformDashboardServlet(configuration, registryService, gatewayService, usageService, tenantService))
                 .servlet("/login", new AiPlatformLoginServlet(configuration, adminClient))
                 .servlet("/logout", new AiPlatformLogoutServlet())
                 .servlet("/api/*", new AiPlatformApiServlet(configuration, registryService, gatewayService, usageService,
-                        publishedApiService, billingService, fineTuningService, tenantService, pluginRegistry, providerRegistry))
+                        publishedApiService, billingService, fineTuningService, tenantService, pluginRegistry, providerRegistry,
+                        new io.velo.was.aiplatform.edge.AiEdgeService(), intentPolicyService, auditLogger, intentEngine))
                 .servlet("/gateway/*", new AiGatewayServlet(configuration, gatewayService, usageService, tenantService))
                 .servlet("/invoke/*", new AiPublishedApiServlet(publishedApiService, usageService, tenantService))
                 .servlet("/v1/chat/completions", new AiChatCompletionServlet(configuration, gatewayService, usageService, tenantService))

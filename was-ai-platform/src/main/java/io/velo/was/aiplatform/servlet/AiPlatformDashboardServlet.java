@@ -189,6 +189,60 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("</pre></div>\n");
         b.append("</div>\n");
 
+        // ===== TAB: intent — 의도 기반 라우팅 =====
+        b.append("<div class=\"tab-panel\" id=\"tab-intent\">\n");
+        b.append("<div class=\"card guide-card\">");
+        b.append("<div class=\"card-header\">\ud83c\udfaf \uc758\ub3c4 \uae30\ubc18 \ub77c\uc6b0\ud305 (Intent-Based Routing)</div>");
+        b.append("<div class=\"card-desc\" style=\"line-height:1.8;\">");
+        b.append("<strong>\uac1c\ub150:</strong> \ud504\ub86c\ud504\ud2b8\uc5d0\uc11c \ud0a4\uc6cc\ub4dc\ub97c \ucd94\ucd9c\ud558\uc5ec \uc758\ub3c4\ub97c \ud30c\uc545\ud558\uace0, \uc758\ub3c4\uc5d0 \ub9de\ub294 \ucd5c\uc801 \ubaa8\ub378\ub85c \ub77c\uc6b0\ud305<br>");
+        b.append("<strong>\ucc98\ub9ac \ud750\ub984:</strong> \uc694\uccad \uc218\uc2e0 \u2192 \ud14d\uc2a4\ud2b8 \uc815\uaddc\ud654 \u2192 \ud0a4\uc6cc\ub4dc \ud0d0\uc9c0 \u2192 \uc758\ub3c4 \uacb0\uc815 \u2192 \uc815\ucc45 \uc870\ud68c \u2192 \ub77c\uc6b0\ud305 \uc2e4\ud589<br>");
+        b.append("<strong>\uc774\uc810:</strong> \uc694\uc57d\u2192long-context \ubaa8\ub378, \ucf54\ub4dc\u2192\ucf54\ub4dc \ud2b9\ud654 \ubaa8\ub378, \ubc88\uc5ed\u2192\uacbd\ub7c9 \ubc88\uc5ed \ubaa8\ub378 \ub4f1 \uc758\ub3c4\ubcc4 \ucd5c\uc801 \ubaa8\ub378 \uc120\ud0dd");
+        b.append("</div></div>\n");
+        // 테스트 폼
+        b.append("<div class=\"card\"><div class=\"card-header\">\uc758\ub3c4 \ub77c\uc6b0\ud305 \ud14c\uc2a4\ud2b8</div>");
+        b.append("<div class=\"card-desc\">\ud504\ub86c\ud504\ud2b8\ub97c \uc785\ub825\ud558\uba74 \ud0a4\uc6cc\ub4dc \ubd84\uc11d \u2192 \uc758\ub3c4 \ud30c\uc545 \u2192 \ub77c\uc6b0\ud305 \uacb0\uc815 \uacfc\uc815\uc744 \ud655\uc778</div>");
+        b.append("<div class=\"form-grid cols-2\">");
+        b.append("<textarea id=\"intentPrompt\" class=\"form-textarea\" style=\"min-height:60px;\">\uc774\ubc88 \ub2ec \ub9e4\ucd9c \ubcf4\uace0\uc11c\ub97c \uc694\uc57d\ud574 \uc8fc\uc138\uc694</textarea>");
+        input(b, "intentTenantId", "", "\ud14c\ub10c\ud2b8 ID (\uc120\ud0dd)");
+        b.append("</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-primary\" onclick=\"testIntentRoute()\">\uc758\ub3c4 \ub77c\uc6b0\ud305 \ud14c\uc2a4\ud2b8</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"previewIntent()\">\ud0a4\uc6cc\ub4dc \ubd84\uc11d \ubbf8\ub9ac\ubcf4\uae30</button>");
+        b.append("</div>");
+        b.append("<pre class=\"json-box\" id=\"intentResult\">\ud504\ub86c\ud504\ud2b8\ub97c \uc785\ub825\ud558\uace0 \ud14c\uc2a4\ud2b8\ud558\uba74 \ub77c\uc6b0\ud305 \uacb0\uacfc\uac00 \ud45c\uc2dc\ub429\ub2c8\ub2e4.</pre></div>\n");
+        // 키워드 관리
+        b.append("<div class=\"card\"><div class=\"card-header\">\ud0a4\uc6cc\ub4dc \uad00\ub9ac</div>");
+        b.append("<div class=\"card-desc\">\uc758\ub3c4 \ubd84\ub958\uc6a9 \ud0a4\uc6cc\ub4dc \ub4f1\ub85d/\uc870\ud68c. \ub3d9\uc758\uc5b4\ub294 \uc27c\ud45c(,)\ub85c \uad6c\ubd84</div>");
+        b.append("<div class=\"form-grid cols-3\">");
+        input(b, "kwPrimary", "", "\uc8fc \ud0a4\uc6cc\ub4dc *");
+        input(b, "kwSynonyms", "", "\ub3d9\uc758\uc5b4 (\uc27c\ud45c \uad6c\ubd84)");
+        b.append("<select id=\"kwIntent\" class=\"form-select\">");
+        b.append("<option value=\"SUMMARIZATION\">\uc694\uc57d</option><option value=\"GENERATION\">\uc0dd\uc131</option>");
+        b.append("<option value=\"CODE\">\ucf54\ub4dc</option><option value=\"CLASSIFICATION\">\ubd84\ub958</option>");
+        b.append("<option value=\"EXTRACTION\">\ucd94\ucd9c</option><option value=\"SEARCH\">\uac80\uc0c9</option>");
+        b.append("<option value=\"VALIDATION\">\uac80\uc99d</option><option value=\"TRANSLATION\">\ubc88\uc5ed</option>");
+        b.append("<option value=\"CONVERSATION\">\ub300\ud654</option><option value=\"GENERAL\">\uc77c\ubc18</option></select>");
+        input(b, "kwPriority", "50", "\uc6b0\uc120\uc21c\uc704 (0-100)");
+        b.append("</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-primary\" onclick=\"addKeyword()\">\ud0a4\uc6cc\ub4dc \ub4f1\ub85d</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshKeywords()\">\ud0a4\uc6cc\ub4dc \uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div>");
+        b.append("<pre class=\"json-box\" id=\"keywordResult\">\ud0a4\uc6cc\ub4dc \ub4f1\ub85d \uacb0\uacfc</pre>");
+        b.append("<pre class=\"json-box\" id=\"keywordsJson\">\ub85c\ub529 \uc911...</pre></div>\n");
+        // 정책 & 감사 로그
+        b.append("<div class=\"card\"><div class=\"card-header\">\ub77c\uc6b0\ud305 \uc815\ucc45 \ubc0f \uac10\uc0ac \ub85c\uadf8</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshPolicies()\">\uc815\ucc45 \uc0c8\ub85c\uace0\uce68</button>");
+        b.append("<button class=\"btn btn-primary\" onclick=\"refreshIntentStats()\">\ud1b5\uacc4</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshAuditLog()\">\uac10\uc0ac \ub85c\uadf8</button>");
+        b.append("</div>");
+        b.append("<pre class=\"json-box\" id=\"policiesJson\">\ub85c\ub529 \uc911...</pre>");
+        b.append("<pre class=\"json-box\" id=\"intentStatsJson\">\ud1b5\uacc4 \ub85c\ub529 \uc911...</pre>");
+        b.append("<pre class=\"json-box\" id=\"auditLogJson\">\uac10\uc0ac \ub85c\uadf8 \ub85c\ub529 \uc911...</pre>");
+        b.append("</div>\n");
+        b.append("</div>\n");
+
         // ===== TAB: sandbox — 게이트웨이 테스트 =====
         b.append("<div class=\"tab-panel\" id=\"tab-sandbox\">\n");
         b.append("<div class=\"card\"><div class=\"card-header\">\uac8c\uc774\ud2b8\uc6e8\uc774 \ud14c\uc2a4\ud2b8</div><div class=\"card-desc\">\ub77c\uc6b0\ud305/\ucd94\ub860/\uc559\uc0c1\ube14/\uc2a4\ud2b8\ub9ac\ubc0d \ub3d9\uc791\uc744 \uc9c1\uc811 \ud655\uc778\ud569\ub2c8\ub2e4.</div>");
@@ -379,8 +433,17 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("  html+='</div>';c.innerHTML=html;\n");
         b.append("}\n");
 
+        // Intent routing functions
+        b.append("async function testIntentRoute(){const p=document.getElementById('intentPrompt').value,t=document.getElementById('intentTenantId').value;if(!p){showJson('intentResult','{\"error\":\"\\ud504\\ub86c\\ud504\\ud2b8\\ub97c \\uc785\\ub825\\ud558\\uc138\\uc694.\"}');return;}showJson('intentResult',await api('/api/intent/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p,tenantId:t})}))}\n");
+        b.append("async function previewIntent(){const p=document.getElementById('intentPrompt').value;if(!p){showJson('intentResult','{\"error\":\"\\ud504\\ub86c\\ud504\\ud2b8\\ub97c \\uc785\\ub825\\ud558\\uc138\\uc694.\"}');return;}showJson('intentResult',await api('/api/intent/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p})}))}\n");
+        b.append("async function addKeyword(){const p={primaryKeyword:document.getElementById('kwPrimary').value,synonyms:document.getElementById('kwSynonyms').value,intent:document.getElementById('kwIntent').value,priority:Number(document.getElementById('kwPriority').value||50)};showJson('keywordResult',await api('/api/intent/keywords',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}));refreshKeywords()}\n");
+        b.append("async function refreshKeywords(){showJson('keywordsJson',await api('/api/intent/keywords'))}\n");
+        b.append("async function refreshPolicies(){showJson('policiesJson',await api('/api/intent/policies'))}\n");
+        b.append("async function refreshIntentStats(){showJson('intentStatsJson',await api('/api/intent/stats'))}\n");
+        b.append("async function refreshAuditLog(){showJson('auditLogJson',await api('/api/intent/audit?limit=20'))}\n");
+
         // Init
-        b.append("refreshOverview();refreshRegistry();refreshUsage();refreshPublishedApis();refreshBilling();refreshTenants();refreshConfig();\n");
+        b.append("refreshOverview();refreshRegistry();refreshUsage();refreshPublishedApis();refreshBilling();refreshTenants();refreshConfig();refreshKeywords();refreshPolicies();refreshIntentStats();\n");
         b.append("updateLiveDashboard();\n");
         b.append("setInterval(updateLiveDashboard,5000);\n");
         b.append("</script>\n");

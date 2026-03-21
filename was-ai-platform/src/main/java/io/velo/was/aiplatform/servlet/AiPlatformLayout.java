@@ -34,6 +34,7 @@ public final class AiPlatformLayout {
         html.append("    <a href=\"#serving\" class=\"nav-item\" onclick=\"showTab(event,'serving')\">\u2699\ufe0f \uc11c\ube59 \uc124\uc815</a>\n");
         html.append("    <a href=\"#registry\" class=\"nav-item\" onclick=\"showTab(event,'registry')\">\ud83d\uddc2\ufe0f \ubaa8\ub378 \ub808\uc9c0\uc2a4\ud2b8\ub9ac</a>\n");
         html.append("    <a href=\"#providers\" class=\"nav-item\" onclick=\"showTab(event,'providers')\">\ud83d\udd17 \ud504\ub85c\ubc14\uc774\ub354</a>\n");
+        html.append("    <a href=\"#intent\" class=\"nav-item\" onclick=\"showTab(event,'intent')\">\ud83c\udfaf \uc758\ub3c4 \ub77c\uc6b0\ud305</a>\n");
         html.append("    <div class=\"nav-label\">\uc6b4\uc601</div>\n");
         html.append("    <a href=\"#sandbox\" class=\"nav-item\" onclick=\"showTab(event,'sandbox')\">\ud83e\uddea \uac8c\uc774\ud2b8\uc6e8\uc774 \ud14c\uc2a4\ud2b8</a>\n");
         html.append("    <a href=\"#tenants\" class=\"nav-item\" onclick=\"showTab(event,'tenants')\">\ud83c\udfe2 \ud14c\ub10c\ud2b8</a>\n");

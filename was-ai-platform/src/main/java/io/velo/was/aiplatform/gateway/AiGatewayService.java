@@ -1,5 +1,7 @@
 package io.velo.was.aiplatform.gateway;
 
+import io.velo.was.aiplatform.intent.IntentRouteDecision;
+import io.velo.was.aiplatform.intent.RouteDecisionEngine;
 import io.velo.was.aiplatform.provider.AiProviderRegistry;
 import io.velo.was.aiplatform.provider.AiProviderRequest;
 import io.velo.was.aiplatform.provider.AiProviderResponse;
@@ -34,6 +36,8 @@ public class AiGatewayService {
     private final AtomicLong cacheHits = new AtomicLong();
     private final AtomicLong failoverCount = new AtomicLong();
     private final AtomicLong ensembleCount = new AtomicLong();
+    private final AtomicLong intentRouteCount = new AtomicLong();
+    private volatile RouteDecisionEngine intentEngine;
 
     public AiGatewayService(ServerConfiguration configuration) {
         this(configuration, new AiModelRegistryService(configuration), new AiProviderRegistry());
@@ -145,6 +149,33 @@ public class AiGatewayService {
                     routePolicyName, serving.getDefaultStrategy(), resolution.promptRouted(), reasoning, expiresAt));
         }
         return decision;
+    }
+
+    /**
+     * 의도 기반 라우팅 엔진을 설정.
+     */
+    public void setIntentEngine(RouteDecisionEngine engine) {
+        this.intentEngine = engine;
+    }
+
+    /**
+     * 의도 기반 라우팅을 수행.
+     * 프롬프트를 분석하여 키워드 기반으로 최적 모델/엔드포인트를 결정.
+     *
+     * @param prompt   사용자 프롬프트
+     * @param tenantId 테넌트 ID (null 가능)
+     * @return 의도 기반 라우팅 결정
+     */
+    public IntentRouteDecision intentRoute(String prompt, String tenantId) {
+        if (intentEngine == null) {
+            throw new IllegalStateException("의도 기반 라우팅 엔진이 설정되지 않았습니다.");
+        }
+        intentRouteCount.incrementAndGet();
+        return intentEngine.decide(prompt, tenantId);
+    }
+
+    public long getIntentRouteCount() {
+        return intentRouteCount.get();
     }
 
     public AiGatewayInferenceResult infer(AiGatewayRequest request) {

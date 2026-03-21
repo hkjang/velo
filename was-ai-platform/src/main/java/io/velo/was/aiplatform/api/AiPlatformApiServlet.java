@@ -1,6 +1,7 @@
 package io.velo.was.aiplatform.api;
 
 import io.velo.was.aiplatform.edge.AiEdgeService;
+import io.velo.was.aiplatform.intent.*;
 import io.velo.was.aiplatform.plugin.AiPluginRegistry;
 import io.velo.was.aiplatform.provider.AiProviderRegistry;
 import io.velo.was.aiplatform.billing.AiBillingService;
@@ -48,6 +49,9 @@ public class AiPlatformApiServlet extends HttpServlet {
     private final AiPluginRegistry pluginRegistry;
     private final AiProviderRegistry providerRegistry;
     private final AiEdgeService edgeService;
+    private final IntentRoutingPolicyService intentPolicyService;
+    private final RouteAuditLogger auditLogger;
+    private final RouteDecisionEngine intentEngine;
 
     public AiPlatformApiServlet(ServerConfiguration configuration,
                                 AiModelRegistryService registryService,
@@ -86,6 +90,24 @@ public class AiPlatformApiServlet extends HttpServlet {
                                 AiPluginRegistry pluginRegistry,
                                 AiProviderRegistry providerRegistry,
                                 AiEdgeService edgeService) {
+        this(configuration, registryService, gatewayService, usageService, publishedApiService, billingService,
+                fineTuningService, tenantService, pluginRegistry, providerRegistry, edgeService, null, null, null);
+    }
+
+    public AiPlatformApiServlet(ServerConfiguration configuration,
+                                AiModelRegistryService registryService,
+                                AiGatewayService gatewayService,
+                                AiPlatformUsageService usageService,
+                                AiPublishedApiService publishedApiService,
+                                AiBillingService billingService,
+                                AiFineTuningService fineTuningService,
+                                AiTenantService tenantService,
+                                AiPluginRegistry pluginRegistry,
+                                AiProviderRegistry providerRegistry,
+                                AiEdgeService edgeService,
+                                IntentRoutingPolicyService intentPolicyService,
+                                RouteAuditLogger auditLogger,
+                                RouteDecisionEngine intentEngine) {
         this.configuration = configuration;
         this.registryService = registryService;
         this.gatewayService = gatewayService;
@@ -97,6 +119,9 @@ public class AiPlatformApiServlet extends HttpServlet {
         this.pluginRegistry = pluginRegistry;
         this.providerRegistry = providerRegistry;
         this.edgeService = edgeService;
+        this.intentPolicyService = intentPolicyService;
+        this.auditLogger = auditLogger;
+        this.intentEngine = intentEngine;
     }
 
     @Override
@@ -201,6 +226,28 @@ public class AiPlatformApiServlet extends HttpServlet {
         if ("/config".equals(path)) {
             usageService.recordControlPlaneAccess("/api/config");
             resp.getWriter().write(buildConfigJson());
+            return;
+        }
+        // 의도 기반 라우팅 API
+        if ("/intent/keywords".equals(path) && intentPolicyService != null) {
+            usageService.recordControlPlaneAccess("/api/intent/keywords");
+            resp.getWriter().write(buildIntentKeywordsJson());
+            return;
+        }
+        if ("/intent/policies".equals(path) && intentPolicyService != null) {
+            usageService.recordControlPlaneAccess("/api/intent/policies");
+            resp.getWriter().write(buildIntentPoliciesJson());
+            return;
+        }
+        if ("/intent/audit".equals(path) && auditLogger != null) {
+            usageService.recordControlPlaneAccess("/api/intent/audit");
+            int limit = parseInteger(req.getParameter("limit"), 50);
+            resp.getWriter().write(buildAuditJson(limit));
+            return;
+        }
+        if ("/intent/stats".equals(path) && auditLogger != null) {
+            usageService.recordControlPlaneAccess("/api/intent/stats");
+            resp.getWriter().write(buildIntentStatsJson());
             return;
         }
         notFound(resp, "Not Found");
@@ -319,6 +366,62 @@ public class AiPlatformApiServlet extends HttpServlet {
                 usageService.recordControlPlaneAccess("/api/fine-tuning/jobs/{id}/cancel");
                 String jobId = path.substring("/fine-tuning/jobs/".length(), path.length() - "/cancel".length());
                 resp.getWriter().write(AiPlatformExtendedJson.fineTuningJob(fineTuningService.cancelJob(jobId)));
+                return;
+            }
+            // 의도 기반 라우팅 API
+            if ("/intent/test".equals(path) && intentEngine != null) {
+                usageService.recordControlPlaneAccess("/api/intent/test");
+                String prompt = firstNonBlank(req.getParameter("prompt"), extractJsonString(body, "prompt"));
+                String tenant = firstNonBlank(req.getParameter("tenantId"), extractJsonString(body, "tenantId"));
+                if (prompt.isBlank()) {
+                    badRequest(resp, "prompt is required");
+                    return;
+                }
+                IntentRouteDecision decision = intentEngine.decide(prompt, tenant.isBlank() ? null : tenant);
+                if (auditLogger != null) {
+                    String normalized = RequestNormalizer.normalize(prompt);
+                    auditLogger.log(tenant.isBlank() ? "console" : tenant, prompt, normalized, decision, false, 0);
+                }
+                resp.getWriter().write(buildIntentDecisionJson(decision));
+                return;
+            }
+            if ("/intent/preview".equals(path) && intentEngine != null) {
+                usageService.recordControlPlaneAccess("/api/intent/preview");
+                String prompt = firstNonBlank(req.getParameter("prompt"), extractJsonString(body, "prompt"));
+                if (prompt.isBlank()) {
+                    badRequest(resp, "prompt is required");
+                    return;
+                }
+                RouteDecisionEngine.PreviewResult preview = intentEngine.preview(prompt);
+                resp.getWriter().write(buildPreviewJson(preview));
+                return;
+            }
+            if ("/intent/keywords".equals(path) && intentPolicyService != null) {
+                usageService.recordControlPlaneAccess("/api/intent/keywords");
+                String primaryKeyword = firstNonBlank(req.getParameter("primaryKeyword"), extractJsonString(body, "primaryKeyword"));
+                String synonymsStr = firstNonBlank(req.getParameter("synonyms"), extractJsonString(body, "synonyms"));
+                String intentStr = firstNonBlank(req.getParameter("intent"), extractJsonString(body, "intent"));
+                int priority = parseInteger(firstNonBlank(req.getParameter("priority"), extractJsonNumber(body, "priority")), 50);
+                java.util.List<String> synonyms = synonymsStr.isBlank() ? java.util.List.of()
+                        : java.util.Arrays.stream(synonymsStr.split("[,;|]")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+                IntentKeyword kw = intentPolicyService.addKeyword(primaryKeyword, synonyms, IntentType.fromString(intentStr), priority);
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+                resp.getWriter().write(buildKeywordJson(kw));
+                return;
+            }
+            if ("/intent/policies".equals(path) && intentPolicyService != null) {
+                usageService.recordControlPlaneAccess("/api/intent/policies");
+                String intentStr = firstNonBlank(req.getParameter("intent"), extractJsonString(body, "intent"));
+                int priority = parseInteger(firstNonBlank(req.getParameter("priority"), extractJsonNumber(body, "priority")), 50);
+                String routeTarget = firstNonBlank(req.getParameter("routeTarget"), extractJsonString(body, "routeTarget"));
+                String modelName = firstNonBlank(req.getParameter("modelName"), extractJsonString(body, "modelName"));
+                String fallback = firstNonBlank(req.getParameter("fallbackModel"), extractJsonString(body, "fallbackModel"));
+                boolean streaming = parseBoolean(firstNonBlank(req.getParameter("streamingPreferred"), extractJsonBoolean(body, "streamingPreferred")), false);
+                String tenantOverride = firstNonBlank(req.getParameter("tenantOverride"), extractJsonString(body, "tenantOverride"));
+                int maxTokens = parseInteger(firstNonBlank(req.getParameter("maxInputTokens"), extractJsonNumber(body, "maxInputTokens")), 0);
+                RoutingPolicy pol = intentPolicyService.addPolicy(IntentType.fromString(intentStr), priority, routeTarget, modelName, fallback, streaming, tenantOverride, maxTokens);
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+                resp.getWriter().write(buildPolicyJson(pol));
                 return;
             }
             notFound(resp, "Not Found");
@@ -548,6 +651,164 @@ public class AiPlatformApiServlet extends HttpServlet {
         sb.append("\"roadmapStage\":").append(ai.getRoadmap().getCurrentStage());
         sb.append("}");
         return sb.toString();
+    }
+
+    // ── Intent routing JSON builders ──
+
+    private String buildIntentKeywordsJson() {
+        var keywords = intentPolicyService.listKeywords();
+        StringBuilder sb = new StringBuilder(2048);
+        sb.append("{\"totalKeywords\":").append(keywords.size()).append(",\"keywords\":[");
+        boolean first = true;
+        for (IntentKeyword kw : keywords) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append(buildKeywordJson(kw));
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    private static String buildKeywordJson(IntentKeyword kw) {
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("{\"keywordId\":\"").append(esc(kw.keywordId())).append("\"");
+        sb.append(",\"primaryKeyword\":\"").append(esc(kw.primaryKeyword())).append("\"");
+        sb.append(",\"synonyms\":[");
+        boolean first = true;
+        for (String s : kw.synonyms()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(esc(s)).append("\"");
+        }
+        sb.append("],\"intent\":\"").append(kw.intent().name()).append("\"");
+        sb.append(",\"intentLabel\":\"").append(esc(kw.intent().label())).append("\"");
+        sb.append(",\"priority\":").append(kw.priority());
+        sb.append(",\"enabled\":").append(kw.enabled());
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private String buildIntentPoliciesJson() {
+        var policies = intentPolicyService.listPolicies();
+        StringBuilder sb = new StringBuilder(2048);
+        sb.append("{\"totalPolicies\":").append(policies.size()).append(",\"policies\":[");
+        boolean first = true;
+        for (RoutingPolicy pol : policies) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append(buildPolicyJson(pol));
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    private static String buildPolicyJson(RoutingPolicy pol) {
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("{\"policyId\":\"").append(esc(pol.policyId())).append("\"");
+        sb.append(",\"intent\":\"").append(pol.intent().name()).append("\"");
+        sb.append(",\"intentLabel\":\"").append(esc(pol.intent().label())).append("\"");
+        sb.append(",\"priority\":").append(pol.priority());
+        sb.append(",\"routeTarget\":\"").append(esc(pol.routeTarget())).append("\"");
+        sb.append(",\"modelName\":\"").append(esc(pol.modelName())).append("\"");
+        sb.append(",\"fallbackModel\":\"").append(esc(pol.fallbackModel())).append("\"");
+        sb.append(",\"streamingPreferred\":").append(pol.streamingPreferred());
+        sb.append(",\"enabled\":").append(pol.enabled());
+        sb.append(",\"tenantOverride\":\"").append(esc(pol.tenantOverride() != null ? pol.tenantOverride() : "")).append("\"");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private static String buildIntentDecisionJson(IntentRouteDecision d) {
+        StringBuilder sb = new StringBuilder(512);
+        sb.append("{\"resolvedIntent\":\"").append(d.resolvedIntent().name()).append("\"");
+        sb.append(",\"intentLabel\":\"").append(esc(d.resolvedIntent().label())).append("\"");
+        sb.append(",\"matchedKeyword\":").append(d.matchedKeyword() != null ? "\"" + esc(d.matchedKeyword()) + "\"" : "null");
+        sb.append(",\"policyId\":\"").append(esc(d.policyId())).append("\"");
+        sb.append(",\"routeTarget\":\"").append(esc(d.routeTarget())).append("\"");
+        sb.append(",\"modelName\":\"").append(esc(d.modelName())).append("\"");
+        sb.append(",\"fallbackModel\":\"").append(esc(d.fallbackModel())).append("\"");
+        sb.append(",\"streamingPreferred\":").append(d.streamingPreferred());
+        sb.append(",\"priority\":").append(d.priority());
+        sb.append(",\"reasoning\":\"").append(esc(d.reasoning())).append("\"");
+        sb.append(",\"candidateKeywords\":[");
+        boolean first = true;
+        for (String k : d.candidateKeywords()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(esc(k)).append("\"");
+        }
+        sb.append("],\"processingTimeMicros\":").append(d.processingTimeNanos() / 1000);
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private static String buildPreviewJson(RouteDecisionEngine.PreviewResult p) {
+        StringBuilder sb = new StringBuilder(512);
+        sb.append("{\"normalizedText\":\"").append(esc(p.normalizedText())).append("\"");
+        sb.append(",\"estimatedTokens\":").append(p.estimatedTokens());
+        sb.append(",\"matchedKeywords\":[");
+        boolean first = true;
+        for (KeywordMatcher.MatchResult mr : p.matchResults()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("{\"matchedText\":\"").append(esc(mr.matchedText())).append("\"");
+            sb.append(",\"intent\":\"").append(mr.keyword().intent().name()).append("\"");
+            sb.append(",\"priority\":").append(mr.keyword().priority()).append("}");
+        }
+        sb.append("],\"resolvedIntent\":\"").append(p.resolvedIntent().intent().name()).append("\"");
+        sb.append(",\"intentLabel\":\"").append(esc(p.resolvedIntent().intent().label())).append("\"");
+        sb.append(",\"reasoning\":\"").append(esc(p.resolvedIntent().reasoning())).append("\"");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private String buildAuditJson(int limit) {
+        var entries = auditLogger.recentEntries(limit);
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("{\"totalEntries\":").append(entries.size()).append(",\"entries\":[");
+        boolean first = true;
+        for (RouteAuditEntry e : entries) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("{\"requestId\":\"").append(esc(e.requestId())).append("\"");
+            sb.append(",\"tenantId\":\"").append(esc(e.tenantId())).append("\"");
+            sb.append(",\"prompt\":\"").append(esc(e.prompt())).append("\"");
+            sb.append(",\"intent\":\"").append(e.resolvedIntent().name()).append("\"");
+            sb.append(",\"matchedKeyword\":").append(e.matchedKeyword() != null ? "\"" + esc(e.matchedKeyword()) + "\"" : "null");
+            sb.append(",\"policyId\":\"").append(esc(e.policyId())).append("\"");
+            sb.append(",\"routeTarget\":\"").append(esc(e.routeTarget())).append("\"");
+            sb.append(",\"modelName\":\"").append(esc(e.modelName())).append("\"");
+            sb.append(",\"usedFallback\":").append(e.usedFallback());
+            sb.append(",\"processingTimeMicros\":").append(e.processingTimeNanos() / 1000);
+            sb.append(",\"timestamp\":").append(e.timestamp());
+            sb.append("}");
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    private String buildIntentStatsJson() {
+        RouteAuditLogger.IntentStats stats = auditLogger.stats();
+        StringBuilder sb = new StringBuilder(512);
+        sb.append("{\"totalRoutes\":").append(stats.totalRoutes());
+        sb.append(",\"fallbackRoutes\":").append(stats.fallbackRoutes());
+        sb.append(",\"avgProcessingMicros\":").append(String.format("%.1f", stats.avgProcessingMicros()));
+        sb.append(",\"auditLogSize\":").append(stats.auditLogSize());
+        sb.append(",\"keywordCount\":").append(intentPolicyService.keywordCount());
+        sb.append(",\"policyCount\":").append(intentPolicyService.policyCount());
+        sb.append(",\"intentDistribution\":{");
+        boolean first = true;
+        for (var entry : stats.intentDistribution().entrySet()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(entry.getKey().name()).append("\":").append(entry.getValue());
+        }
+        sb.append("}}");
+        return sb.toString();
+    }
+
+    private static String esc(String s) {
+        return AiGatewayServlet.escapeJson(s != null ? s : "");
     }
 
     private static String errorJson(String message) {

@@ -1,5 +1,8 @@
 package io.velo.was.aiplatform.gateway;
 
+import io.velo.was.aiplatform.provider.AiProviderRegistry;
+import io.velo.was.aiplatform.provider.AiProviderRequest;
+import io.velo.was.aiplatform.provider.AiProviderResponse;
 import io.velo.was.aiplatform.registry.AiModelRegistryService;
 import io.velo.was.config.ServerConfiguration;
 
@@ -15,24 +18,39 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class AiGatewayService {
 
     private final ServerConfiguration configuration;
     private final AiModelRegistryService registryService;
+    private final AiProviderRegistry providerRegistry;
     private final ConcurrentMap<String, CacheEntry> contextCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, AtomicLong> modelRequestCounts = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, AtomicLong> abTestGroupA = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, AtomicLong> abTestGroupB = new ConcurrentHashMap<>();
     private final AtomicLong totalRequests = new AtomicLong();
     private final AtomicLong cacheHits = new AtomicLong();
+    private final AtomicLong failoverCount = new AtomicLong();
+    private final AtomicLong ensembleCount = new AtomicLong();
 
     public AiGatewayService(ServerConfiguration configuration) {
-        this(configuration, new AiModelRegistryService(configuration));
+        this(configuration, new AiModelRegistryService(configuration), new AiProviderRegistry());
     }
 
     public AiGatewayService(ServerConfiguration configuration, AiModelRegistryService registryService) {
+        this(configuration, registryService, new AiProviderRegistry());
+    }
+
+    public AiGatewayService(ServerConfiguration configuration, AiModelRegistryService registryService, AiProviderRegistry providerRegistry) {
         this.configuration = configuration;
         this.registryService = registryService;
+        this.providerRegistry = providerRegistry;
+    }
+
+    public AiProviderRegistry getProviderRegistry() {
+        return providerRegistry;
     }
 
     public AiGatewayRouteDecision route(AiGatewayRequest request) {
@@ -84,10 +102,20 @@ public class AiGatewayService {
                 : null;
 
         List<ServerConfiguration.ModelProfile> candidates = candidatesForRequest(enabledModels, resolution.resolvedType(), preferredModel);
-        ServerConfiguration.ModelProfile selectedModel = selectModel(candidates, enabledModels, preferredModel, serving.getDefaultStrategy(), serving.isAutoModelSelectionEnabled());
+        ServerConfiguration.ModelProfile selectedModel;
+        boolean abTestApplied = false;
+        if (serving.isAbTestingEnabled() && candidates.size() >= 2) {
+            selectedModel = abTestSelect(candidates, enabledModels, preferredModel, serving.getDefaultStrategy(), serving.isAutoModelSelectionEnabled());
+            abTestApplied = true;
+        } else {
+            selectedModel = selectModel(candidates, enabledModels, preferredModel, serving.getDefaultStrategy(), serving.isAutoModelSelectionEnabled());
+        }
 
         String routePolicyName = policyMatch.policy() != null ? policyMatch.policy().getName() : "auto-selection";
         String reasoning = buildReasoning(resolution, policyMatch, preferredModel, selectedModel, serving.getDefaultStrategy(), serving.isAutoModelSelectionEnabled());
+        if (abTestApplied) {
+            reasoning += " A/B test was applied between candidate models.";
+        }
         long modelCount = incrementModelCounter(selectedModel.getName());
 
         AiGatewayRouteDecision decision = new AiGatewayRouteDecision(
@@ -121,10 +149,71 @@ public class AiGatewayService {
 
     public AiGatewayInferenceResult infer(AiGatewayRequest request) {
         AiGatewayRouteDecision decision = route(request);
-        String outputText = generateOutput(decision, normalizePrompt(request.prompt()));
-        int estimatedTokens = Math.max(32, outputText.length() / 4);
-        double confidence = Math.min(0.99d, Math.max(0.55d, decision.accuracyScore() / 100.0d));
+        String prompt = normalizePrompt(request.prompt());
+
+        // Try real provider adapter first
+        AiProviderResponse providerResponse = null;
+        try {
+            providerResponse = providerRegistry.tryInfer(
+                    decision.provider(),
+                    AiProviderRequest.chat(decision.modelName(), prompt));
+        } catch (Exception ignored) {
+            // Provider failed — fall back to mock
+        }
+
+        String outputText;
+        int estimatedTokens;
+        double confidence;
+        if (providerResponse != null && providerResponse.content() != null && !providerResponse.content().isBlank()) {
+            outputText = providerResponse.content();
+            estimatedTokens = providerResponse.totalTokens();
+            confidence = Math.min(0.99d, Math.max(0.55d, decision.accuracyScore() / 100.0d));
+        } else {
+            outputText = generateOutput(decision, prompt);
+            estimatedTokens = Math.max(32, outputText.length() / 4);
+            confidence = Math.min(0.99d, Math.max(0.55d, decision.accuracyScore() / 100.0d));
+        }
         return new AiGatewayInferenceResult(decision, outputText, estimatedTokens, confidence);
+    }
+
+    /**
+     * Ensemble serving: runs inference on multiple candidate models and selects the
+     * best result based on confidence, or combines them for improved accuracy.
+     */
+    public AiEnsembleResult inferEnsemble(AiGatewayRequest request) {
+        ServerConfiguration.AiPlatform ai = configuration.getServer().getAiPlatform();
+        if (!ai.getServing().isEnsembleServingEnabled()) {
+            AiGatewayInferenceResult single = infer(request);
+            return new AiEnsembleResult(List.of(single), single, "single", single.confidence(), single.estimatedTokens());
+        }
+
+        String prompt = normalizePrompt(request.prompt());
+        String requestedType = normalizeRequestType(request.requestType());
+        RequestResolution resolution = resolveRequestType(requestedType, prompt, ai.getAdvanced());
+        List<ServerConfiguration.ModelProfile> enabledModels = registryService.routingModels();
+        List<ServerConfiguration.ModelProfile> candidates = candidatesForRequest(enabledModels, resolution.resolvedType(), null);
+
+        int maxCandidates = Math.min(3, candidates.size());
+        List<AiGatewayInferenceResult> results = new ArrayList<>(maxCandidates);
+        for (int i = 0; i < maxCandidates; i++) {
+            ServerConfiguration.ModelProfile model = candidates.get(i);
+            AiGatewayRequest modelRequest = new AiGatewayRequest(
+                    request.requestType(), request.prompt(),
+                    request.sessionId() + "-ensemble-" + i, request.streamingRequested());
+            AiGatewayInferenceResult result = infer(modelRequest);
+            results.add(result);
+        }
+
+        AiGatewayInferenceResult bestResult = results.stream()
+                .max(java.util.Comparator.comparingDouble(AiGatewayInferenceResult::confidence))
+                .orElse(results.get(0));
+
+        double ensembleConfidence = Math.min(0.99d, bestResult.confidence() + (results.size() > 1 ? 0.05d : 0.0d));
+        int totalTokens = results.stream().mapToInt(AiGatewayInferenceResult::estimatedTokens).sum();
+        String strategy = results.size() > 1 ? "best-of-" + results.size() : "single";
+        ensembleCount.incrementAndGet();
+
+        return new AiEnsembleResult(results, bestResult, strategy, ensembleConfidence, totalTokens);
     }
 
     public long getTotalRequests() {
@@ -140,9 +229,54 @@ public class AiGatewayService {
         return contextCache.size();
     }
 
+    public long getFailoverCount() {
+        return failoverCount.get();
+    }
+
+    public void recordFailover() {
+        failoverCount.incrementAndGet();
+    }
+
+    public long getEnsembleCount() {
+        return ensembleCount.get();
+    }
+
+    public Map<String, Long> getAbTestGroupACounts() {
+        return snapshotCounters(abTestGroupA);
+    }
+
+    public Map<String, Long> getAbTestGroupBCounts() {
+        return snapshotCounters(abTestGroupB);
+    }
+
     public Map<String, Long> getModelRequestCounts() {
         Map<String, Long> snapshot = new LinkedHashMap<>();
         modelRequestCounts.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> snapshot.put(entry.getKey(), entry.getValue().get()));
+        return snapshot;
+    }
+
+    private ServerConfiguration.ModelProfile abTestSelect(List<ServerConfiguration.ModelProfile> candidates,
+                                                             List<ServerConfiguration.ModelProfile> enabledModels,
+                                                             ServerConfiguration.ModelProfile preferredModel,
+                                                             String strategy,
+                                                             boolean autoSelectionEnabled) {
+        ServerConfiguration.ModelProfile modelA = selectModel(candidates, enabledModels, preferredModel, strategy, autoSelectionEnabled);
+        ServerConfiguration.ModelProfile modelB = candidates.stream()
+                .filter(c -> !c.getName().equalsIgnoreCase(modelA.getName()))
+                .findFirst()
+                .orElse(modelA);
+        boolean useGroupA = ThreadLocalRandom.current().nextDouble() < 0.5d;
+        ServerConfiguration.ModelProfile selected = useGroupA ? modelA : modelB;
+        ConcurrentMap<String, AtomicLong> targetGroup = useGroupA ? abTestGroupA : abTestGroupB;
+        targetGroup.computeIfAbsent(selected.getName(), ignored -> new AtomicLong()).incrementAndGet();
+        return selected;
+    }
+
+    private static Map<String, Long> snapshotCounters(ConcurrentMap<String, AtomicLong> counters) {
+        Map<String, Long> snapshot = new LinkedHashMap<>();
+        counters.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .forEach(entry -> snapshot.put(entry.getKey(), entry.getValue().get()));
         return snapshot;

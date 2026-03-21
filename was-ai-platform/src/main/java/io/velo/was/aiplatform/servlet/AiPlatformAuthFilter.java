@@ -49,7 +49,8 @@ public class AiPlatformAuthFilter implements Filter {
                 || "/api/status".equals(path)
                 || path.startsWith("/gateway")
                 || path.startsWith("/api-docs")
-                || path.startsWith("/invoke");
+                || path.startsWith("/invoke")
+                || path.startsWith("/v1/");
     }
 
     private static void applyHeaders(HttpServletResponse resp) {

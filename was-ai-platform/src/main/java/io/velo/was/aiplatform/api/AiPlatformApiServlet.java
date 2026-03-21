@@ -1,5 +1,8 @@
 package io.velo.was.aiplatform.api;
 
+import io.velo.was.aiplatform.edge.AiEdgeService;
+import io.velo.was.aiplatform.plugin.AiPluginRegistry;
+import io.velo.was.aiplatform.provider.AiProviderRegistry;
 import io.velo.was.aiplatform.billing.AiBillingService;
 import io.velo.was.aiplatform.billing.AiBillingSnapshot;
 import io.velo.was.aiplatform.finetuning.AiFineTuningJobRequest;
@@ -42,6 +45,9 @@ public class AiPlatformApiServlet extends HttpServlet {
     private final AiBillingService billingService;
     private final AiFineTuningService fineTuningService;
     private final AiTenantService tenantService;
+    private final AiPluginRegistry pluginRegistry;
+    private final AiProviderRegistry providerRegistry;
+    private final AiEdgeService edgeService;
 
     public AiPlatformApiServlet(ServerConfiguration configuration,
                                 AiModelRegistryService registryService,
@@ -51,6 +57,35 @@ public class AiPlatformApiServlet extends HttpServlet {
                                 AiBillingService billingService,
                                 AiFineTuningService fineTuningService,
                                 AiTenantService tenantService) {
+        this(configuration, registryService, gatewayService, usageService, publishedApiService, billingService,
+                fineTuningService, tenantService, new AiPluginRegistry(), new AiProviderRegistry(), new AiEdgeService());
+    }
+
+    public AiPlatformApiServlet(ServerConfiguration configuration,
+                                AiModelRegistryService registryService,
+                                AiGatewayService gatewayService,
+                                AiPlatformUsageService usageService,
+                                AiPublishedApiService publishedApiService,
+                                AiBillingService billingService,
+                                AiFineTuningService fineTuningService,
+                                AiTenantService tenantService,
+                                AiPluginRegistry pluginRegistry,
+                                AiProviderRegistry providerRegistry) {
+        this(configuration, registryService, gatewayService, usageService, publishedApiService, billingService,
+                fineTuningService, tenantService, pluginRegistry, providerRegistry, new AiEdgeService());
+    }
+
+    public AiPlatformApiServlet(ServerConfiguration configuration,
+                                AiModelRegistryService registryService,
+                                AiGatewayService gatewayService,
+                                AiPlatformUsageService usageService,
+                                AiPublishedApiService publishedApiService,
+                                AiBillingService billingService,
+                                AiFineTuningService fineTuningService,
+                                AiTenantService tenantService,
+                                AiPluginRegistry pluginRegistry,
+                                AiProviderRegistry providerRegistry,
+                                AiEdgeService edgeService) {
         this.configuration = configuration;
         this.registryService = registryService;
         this.gatewayService = gatewayService;
@@ -59,6 +94,9 @@ public class AiPlatformApiServlet extends HttpServlet {
         this.billingService = billingService;
         this.fineTuningService = fineTuningService;
         this.tenantService = tenantService;
+        this.pluginRegistry = pluginRegistry;
+        this.providerRegistry = providerRegistry;
+        this.edgeService = edgeService;
     }
 
     @Override
@@ -122,6 +160,25 @@ public class AiPlatformApiServlet extends HttpServlet {
             handleTenantGet(resp, path);
             return;
         }
+        if ("/plugins".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/plugins");
+            resp.getWriter().write(AiPlatformExtendedJson.plugins(pluginRegistry.listPlugins()));
+            return;
+        }
+        if ("/providers".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/providers");
+            resp.getWriter().write(AiPlatformExtendedJson.providers(providerRegistry.listProviders()));
+            return;
+        }
+        if ("/edge/devices".equals(path)) {
+            if (!configuration.getServer().getAiPlatform().getServing().isEdgeAiEnabled()) {
+                unavailable(resp, "Edge AI is disabled in configuration");
+                return;
+            }
+            usageService.recordControlPlaneAccess("/api/edge/devices");
+            resp.getWriter().write(AiPlatformExtendedJson.edgeDevices(edgeService.listDevices()));
+            return;
+        }
         if ("/fine-tuning/jobs".equals(path)) {
             if (!configuration.getServer().getAiPlatform().getAdvanced().isFineTuningApiEnabled()) {
                 unavailable(resp, "Fine-tuning API is disabled in configuration");
@@ -175,6 +232,33 @@ public class AiPlatformApiServlet extends HttpServlet {
                 handleTenantPost(req, resp, path, body);
                 return;
             }
+            if ("/edge/devices".equals(path)) {
+                if (!configuration.getServer().getAiPlatform().getServing().isEdgeAiEnabled()) {
+                    unavailable(resp, "Edge AI is disabled in configuration");
+                    return;
+                }
+                usageService.recordControlPlaneAccess("/api/edge/devices");
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+                resp.getWriter().write(AiPlatformExtendedJson.edgeDevice(edgeService.register(
+                        firstNonBlank(req.getParameter("deviceId"), extractJsonString(body, "deviceId")),
+                        firstNonBlank(req.getParameter("displayName"), extractJsonString(body, "displayName")),
+                        firstNonBlank(req.getParameter("deviceType"), extractJsonString(body, "deviceType")),
+                        parseInteger(firstNonBlank(req.getParameter("maxMemoryMb"), extractJsonNumber(body, "maxMemoryMb")), 512)
+                )));
+                return;
+            }
+            if (path.startsWith("/edge/devices/") && path.endsWith("/deploy")) {
+                if (!configuration.getServer().getAiPlatform().getServing().isEdgeAiEnabled()) {
+                    unavailable(resp, "Edge AI is disabled in configuration");
+                    return;
+                }
+                String deviceId = path.substring("/edge/devices/".length(), path.length() - "/deploy".length());
+                resp.getWriter().write(AiPlatformExtendedJson.edgeDevice(edgeService.deploy(deviceId,
+                        firstNonBlank(req.getParameter("model"), extractJsonString(body, "model")),
+                        firstNonBlank(req.getParameter("version"), extractJsonString(body, "version"))
+                )));
+                return;
+            }
             if ("/fine-tuning/jobs".equals(path)) {
                 if (!configuration.getServer().getAiPlatform().getAdvanced().isFineTuningApiEnabled()) {
                     unavailable(resp, "Fine-tuning API is disabled in configuration");
@@ -199,7 +283,13 @@ public class AiPlatformApiServlet extends HttpServlet {
         } catch (IllegalArgumentException e) {
             badRequest(resp, e.getMessage());
         } catch (NoSuchElementException e) {
-            notFound(resp, e.getMessage());
+            String hint = e.getMessage();
+            if (hint != null && hint.contains("Model")) {
+                hint += " — 먼저 [버전 등록]으로 모델을 등록하세요.";
+            } else if (hint != null && hint.contains("Tenant")) {
+                hint += " — 먼저 [테넌트 등록]으로 테넌트를 생성하세요.";
+            }
+            notFound(resp, hint != null ? hint : "Not Found");
         }
     }
 

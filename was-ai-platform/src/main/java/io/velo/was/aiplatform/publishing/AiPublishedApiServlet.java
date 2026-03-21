@@ -49,6 +49,7 @@ public class AiPublishedApiServlet extends HttpServlet {
         if (pathInfo == null || "/".equals(pathInfo)) {
             applyTenantHeaders(resp, tenantAccess, 0);
             resp.getWriter().write(AiPlatformExtendedJson.publishedEndpoints(publishedApiService.listEndpoints(req.getContextPath())));
+            resp.getWriter().flush();
             tenantService.recordUsage(tenantAccess, 0);
             return;
         }
@@ -70,6 +71,7 @@ public class AiPublishedApiServlet extends HttpServlet {
             resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
             resp.getWriter().write("{\"error\":\"" + AiGatewayServlet.escapeJson(e.getMessage()) + "\"}");
         }
+        resp.getWriter().flush();
     }
 
     private AiTenantAccessGrant authorize(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -78,6 +80,7 @@ public class AiPublishedApiServlet extends HttpServlet {
         } catch (SecurityException e) {
             resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             resp.getWriter().write("{\"error\":\"" + AiGatewayServlet.escapeJson(e.getMessage()) + "\"}");
+            resp.getWriter().flush();
             return null;
         } catch (IllegalStateException e) {
             int status = e.getMessage() != null && e.getMessage().contains("Rate limit")
@@ -85,6 +88,7 @@ public class AiPublishedApiServlet extends HttpServlet {
                     : HttpServletResponse.SC_FORBIDDEN;
             resp.setStatus(status);
             resp.getWriter().write("{\"error\":\"" + AiGatewayServlet.escapeJson(e.getMessage()) + "\"}");
+            resp.getWriter().flush();
             return null;
         }
     }

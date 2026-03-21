@@ -78,12 +78,20 @@ public class AiGatewayServlet extends HttpServlet {
                 resp.getWriter().write(inferenceResultToJson(result));
             }
             case "/stream" -> streamInference(resp, gatewayRequest, tenantAccess);
+            case "/ensemble" -> {
+                AiEnsembleResult ensembleResult = gatewayService.inferEnsemble(gatewayRequest);
+                usageService.recordInference(ensembleResult.selected(), false);
+                tenantService.recordUsage(tenantAccess, ensembleResult.totalEstimatedTokens());
+                applyTenantHeaders(resp, tenantAccess, ensembleResult.totalEstimatedTokens());
+                resp.getWriter().write(ensembleResultToJson(ensembleResult));
+            }
             default -> {
                 resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 applyTenantHeaders(resp, tenantAccess, 0);
                 resp.getWriter().write("{\"error\":\"Unknown gateway path\"}");
             }
         }
+        resp.getWriter().flush();
     }
 
     private AiTenantAccessGrant authorize(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -103,6 +111,7 @@ public class AiGatewayServlet extends HttpServlet {
         returnJson(resp);
         resp.setStatus(status);
         resp.getWriter().write("{\"error\":\"" + escapeJson(message) + "\"}");
+        resp.getWriter().flush();
         return null;
     }
 
@@ -129,6 +138,7 @@ public class AiGatewayServlet extends HttpServlet {
                 contextPath,
                 contextPath
         ).trim());
+        resp.getWriter().flush();
     }
 
     private void streamInference(HttpServletResponse resp, AiGatewayRequest gatewayRequest, AiTenantAccessGrant tenantAccess) throws IOException {
@@ -278,6 +288,21 @@ public class AiGatewayServlet extends HttpServlet {
                 "\"estimatedTokens\":" + result.estimatedTokens() + "," +
                 "\"confidence\":" + formatDouble(result.confidence()) +
                 "}}";
+    }
+
+    public static String ensembleResultToJson(AiEnsembleResult result) {
+        StringBuilder json = new StringBuilder(2048);
+        json.append("{\"combinationStrategy\":\"").append(escapeJson(result.combinationStrategy())).append("\",");
+        json.append("\"ensembleConfidence\":").append(formatDouble(result.ensembleConfidence())).append(',');
+        json.append("\"totalEstimatedTokens\":").append(result.totalEstimatedTokens()).append(',');
+        json.append("\"selected\":").append(inferenceResultToJson(result.selected())).append(',');
+        json.append("\"candidates\":[");
+        for (int i = 0; i < result.candidates().size(); i++) {
+            if (i > 0) json.append(',');
+            json.append(inferenceResultToJson(result.candidates().get(i)));
+        }
+        json.append("]}");
+        return json.toString();
     }
 
     private static String formatDouble(double value) {

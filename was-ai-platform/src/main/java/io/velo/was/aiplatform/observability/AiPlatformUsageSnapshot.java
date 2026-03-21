@@ -18,9 +18,13 @@ public record AiPlatformUsageSnapshot(
         int routableModels,
         long gatewayRouteDecisions,
         int cachedContexts,
+        long failoverCount,
+        long ensembleCount,
         Map<String, Long> endpointCounts,
         Map<String, Long> resolvedTypeCounts,
         Map<String, Long> registryActionCounts,
-        Map<String, Long> modelRequestCounts
+        Map<String, Long> modelRequestCounts,
+        Map<String, Long> abTestGroupACounts,
+        Map<String, Long> abTestGroupBCounts
 ) {
 }

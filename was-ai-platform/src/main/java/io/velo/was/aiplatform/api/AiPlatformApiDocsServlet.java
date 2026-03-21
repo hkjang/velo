@@ -48,7 +48,7 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
                   "info": {
                     "title": "Velo AI Platform Gateway API",
                     "description": "Configuration-driven gateway and control plane API for the standalone Velo AI Platform module.",
-                    "version": "0.3.0"
+                    "version": "0.5.0"
                   },
                   "servers": [
                     {
@@ -319,14 +319,83 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
                         }
                       }
                     },
-                    "/api/metrics": {
+                    "/api/tenants": {
                       "get": {
                         "tags": ["Control Plane"],
-                        "summary": "Alias for usage counters",
-                        "description": "Requires an authenticated console session.",
+                        "summary": "List tenants",
+                        "description": "Requires an authenticated console session with multi-tenant enabled.",
                         "responses": {
                           "200": {
-                            "description": "Usage snapshot"
+                            "description": "Tenant snapshot",
+                            "content": {
+                              "application/json": {
+                                "schema": {"$ref": "#/components/schemas/TenantSnapshot"}
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "post": {
+                        "tags": ["Control Plane"],
+                        "summary": "Register or update a tenant",
+                        "requestBody": {
+                          "required": true,
+                          "content": {
+                            "application/json": {
+                              "schema": {"$ref": "#/components/schemas/TenantRegistration"}
+                            }
+                          }
+                        },
+                        "responses": {
+                          "201": {
+                            "description": "Registered tenant"
+                          }
+                        }
+                      }
+                    },
+                    "/api/tenants/{id}/keys": {
+                      "post": {
+                        "tags": ["Control Plane"],
+                        "summary": "Issue an API key for a tenant",
+                        "responses": {
+                          "201": {
+                            "description": "Issued API key with secret"
+                          }
+                        }
+                      }
+                    },
+                    "/api/tenants/{id}/usage": {
+                      "get": {
+                        "tags": ["Control Plane"],
+                        "summary": "Get tenant usage metrics",
+                        "responses": {
+                          "200": {
+                            "description": "Tenant usage info"
+                          }
+                        }
+                      }
+                    },
+                    "/v1/chat/completions": {
+                      "post": {
+                        "tags": ["Gateway"],
+                        "summary": "OpenAI-compatible chat completions proxy",
+                        "description": "Accepts OpenAI-format requests and routes them through the AI gateway with failover support.",
+                        "requestBody": {
+                          "required": true,
+                          "content": {
+                            "application/json": {
+                              "schema": {"$ref": "#/components/schemas/ChatCompletionRequest"}
+                            }
+                          }
+                        },
+                        "responses": {
+                          "200": {
+                            "description": "OpenAI-compatible chat completion response",
+                            "content": {
+                              "application/json": {
+                                "schema": {"$ref": "#/components/schemas/ChatCompletionResponse"}
+                              }
+                            }
                           }
                         }
                       }
@@ -399,6 +468,82 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
                             }
                           }
                         }
+                      },
+                      "TenantRegistration": {
+                        "type": "object",
+                        "properties": {
+                          "tenantId": {"type": "string", "example": "tenant-a"},
+                          "displayName": {"type": "string", "example": "Tenant A"},
+                          "plan": {"type": "string", "example": "starter"},
+                          "rateLimitPerMinute": {"type": "integer", "example": 120},
+                          "tokenQuota": {"type": "integer", "example": 250000},
+                          "active": {"type": "boolean", "example": true}
+                        },
+                        "required": ["tenantId"]
+                      },
+                      "TenantSnapshot": {
+                        "type": "object",
+                        "properties": {
+                          "multiTenantEnabled": {"type": "boolean"},
+                          "apiKeyHeader": {"type": "string"},
+                          "totalTenants": {"type": "integer"},
+                          "activeTenants": {"type": "integer"},
+                          "tenants": {"type": "array", "items": {"type": "object"}}
+                        }
+                      },
+                      "ChatCompletionRequest": {
+                        "type": "object",
+                        "properties": {
+                          "model": {"type": "string", "example": "llm-general"},
+                          "messages": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "role": {"type": "string", "enum": ["system","user","assistant"]},
+                                "content": {"type": "string"}
+                              }
+                            }
+                          },
+                          "temperature": {"type": "number", "example": 0.7},
+                          "max_tokens": {"type": "integer", "example": 1024},
+                          "stream": {"type": "boolean", "example": false}
+                        },
+                        "required": ["messages"]
+                      },
+                      "ChatCompletionResponse": {
+                        "type": "object",
+                        "properties": {
+                          "id": {"type": "string"},
+                          "object": {"type": "string", "example": "chat.completion"},
+                          "created": {"type": "integer"},
+                          "model": {"type": "string"},
+                          "choices": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "index": {"type": "integer"},
+                                "message": {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {"type": "string"},
+                                    "content": {"type": "string"}
+                                  }
+                                },
+                                "finish_reason": {"type": "string"}
+                              }
+                            }
+                          },
+                          "usage": {
+                            "type": "object",
+                            "properties": {
+                              "prompt_tokens": {"type": "integer"},
+                              "completion_tokens": {"type": "integer"},
+                              "total_tokens": {"type": "integer"}
+                            }
+                          }
+                        }
                       }
                     }
                   }
@@ -424,7 +569,7 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
                 <style>
                   :root { --bg:#f5ede0; --card:rgba(255,255,255,0.84); --ink:#192923; --soft:#5d6d67; --teal:#0f766e; --deep:#12342f; --line:rgba(25,41,35,0.10); }
                   * { box-sizing:border-box; }
-                  body { margin:0; font-family:"IBM Plex Sans","Segoe UI",sans-serif; background:radial-gradient(circle at top left, rgba(15,118,110,0.16), transparent 26%), linear-gradient(180deg,#faf5eb,#efe4d4); color:var(--ink); }
+                  body { margin:0; font-family:"IBM Plex Sans","Segoe UI",sans-serif; background:radial-gradient(circle at top left, rgba(15,118,110,0.16), transparent 26%%), linear-gradient(180deg,#faf5eb,#efe4d4); color:var(--ink); }
                   .shell { width:min(1180px, calc(100vw - 32px)); margin:24px auto 48px; display:grid; gap:18px; }
                   .hero, .panel { border-radius:28px; border:1px solid rgba(255,255,255,0.50); background:var(--card); box-shadow:0 24px 64px rgba(18,52,47,0.12); backdrop-filter:blur(18px); }
                   .hero { padding:34px; background:linear-gradient(135deg, rgba(15,118,110,0.98), rgba(18,52,47,0.94)); color:#f8f3e8; }
@@ -503,6 +648,26 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
                             <strong>Billing</strong>
                             GET <code>%s/api/billing</code>
                           </div>
+                          <div>
+                            <strong>Chat (OpenAI)</strong>
+                            POST <code>%s/v1/chat/completions</code>
+                          </div>
+                          <div>
+                            <strong>Completions</strong>
+                            POST <code>%s/v1/completions</code>
+                          </div>
+                          <div>
+                            <strong>Ensemble</strong>
+                            POST <code>%s/gateway/ensemble</code>
+                          </div>
+                          <div>
+                            <strong>Tenants</strong>
+                            GET <code>%s/api/tenants</code>
+                          </div>
+                          <div>
+                            <strong>Plugins</strong>
+                            GET <code>%s/api/plugins</code>
+                          </div>
                         </div>
                         <pre class="code">curl -X POST %s/gateway/infer \
   -H "Content-Type: application/json" \
@@ -520,6 +685,10 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
                         <li>Model selection driven by route policies, category matching, and the default strategy.</li>
                         <li>Context cache keys derived from session and prompt fingerprints.</li>
                         <li>Streaming output when <code>server.aiPlatform.differentiation.streamingResponseEnabled</code> is true.</li><li>Model registry, version promotion, and usage APIs for the authenticated control plane.</li><li>Auto-generated published endpoints, billing preview, and fine-tuning job APIs.</li>
+                        <li>OpenAI-compatible proxy at <code>/v1/chat/completions</code> and <code>/v1/completions</code> with automatic failover.</li>
+                        <li>Ensemble serving at <code>/gateway/ensemble</code> for multi-model accuracy improvement.</li>
+                        <li>Multi-tenant management with rate limits, token quotas, and API key issuance.</li>
+                        <li>Plugin framework for custom pre/post processing of inference requests.</li>
                       </ul>
                     </section>
                   </div>
@@ -531,7 +700,7 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
                   </script>
                 </body>
                 </html>
-                """.formatted(contextPath, streamUrl, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath);
+                """.formatted(contextPath, streamUrl, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath, contextPath);
         resp.getWriter().write(page);
     }
 }

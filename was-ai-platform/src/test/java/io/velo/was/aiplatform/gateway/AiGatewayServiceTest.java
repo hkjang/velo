@@ -29,6 +29,7 @@ class AiGatewayServiceTest {
                 new ServerConfiguration.ModelProfile("llm-fast", "LLM", "builtin", "v2", "ultra-low", 120, 74, false, true)
         );
         configuration.getServer().getAiPlatform().getServing().setDefaultStrategy("LATENCY_FIRST");
+        configuration.getServer().getAiPlatform().getServing().setAbTestingEnabled(false);
         configuration.validate();
 
         AiGatewayService service = new AiGatewayService(configuration);

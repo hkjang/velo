@@ -6,8 +6,13 @@ import io.velo.was.aiplatform.api.AiPlatformApiDocsServlet;
 import io.velo.was.aiplatform.api.AiPlatformApiServlet;
 import io.velo.was.aiplatform.billing.AiBillingService;
 import io.velo.was.aiplatform.finetuning.AiFineTuningService;
+import io.velo.was.aiplatform.plugin.AiContentFilterPlugin;
+import io.velo.was.aiplatform.plugin.AiPluginRegistry;
+import io.velo.was.aiplatform.provider.AiProviderRegistry;
+import io.velo.was.aiplatform.gateway.AiChatCompletionServlet;
 import io.velo.was.aiplatform.gateway.AiGatewayService;
 import io.velo.was.aiplatform.gateway.AiGatewayServlet;
+import io.velo.was.aiplatform.gateway.AiTextCompletionServlet;
 import io.velo.was.aiplatform.observability.AiPlatformUsageService;
 import io.velo.was.aiplatform.publishing.AiPublishedApiService;
 import io.velo.was.aiplatform.publishing.AiPublishedApiServlet;
@@ -36,7 +41,12 @@ public final class AiPlatformApplication {
         AiPublishedApiService publishedApiService = new AiPublishedApiService(configuration, registryService);
         AiBillingService billingService = new AiBillingService(publishedApiService, registryService);
         AiFineTuningService fineTuningService = new AiFineTuningService(registryService);
-        AiGatewayService gatewayService = new AiGatewayService(configuration, registryService);
+        AiPluginRegistry pluginRegistry = new AiPluginRegistry();
+        if (configuration.getServer().getAiPlatform().getDifferentiation().isPluginFrameworkEnabled()) {
+            pluginRegistry.register(new AiContentFilterPlugin());
+        }
+        AiProviderRegistry providerRegistry = new AiProviderRegistry();
+        AiGatewayService gatewayService = new AiGatewayService(configuration, registryService, providerRegistry);
 
         var builder = SimpleServletApplication.builder(APP_NAME, contextPath)
                 .filter(new AiPlatformAuthFilter())
@@ -44,9 +54,12 @@ public final class AiPlatformApplication {
                 .servlet("/login", new AiPlatformLoginServlet(configuration, adminClient))
                 .servlet("/logout", new AiPlatformLogoutServlet())
                 .servlet("/api/*", new AiPlatformApiServlet(configuration, registryService, gatewayService, usageService,
-                        publishedApiService, billingService, fineTuningService, tenantService))
+                        publishedApiService, billingService, fineTuningService, tenantService, pluginRegistry, providerRegistry))
                 .servlet("/gateway/*", new AiGatewayServlet(configuration, gatewayService, usageService, tenantService))
-                .servlet("/invoke/*", new AiPublishedApiServlet(publishedApiService, usageService, tenantService));
+                .servlet("/invoke/*", new AiPublishedApiServlet(publishedApiService, usageService, tenantService))
+                .servlet("/v1/chat/completions", new AiChatCompletionServlet(configuration, gatewayService, usageService, tenantService))
+                .servlet("/v1/completions", new AiTextCompletionServlet(configuration, gatewayService, usageService, tenantService))
+                .servlet("/v1/models", new AiChatCompletionServlet(configuration, gatewayService, usageService, tenantService));
 
         if (configuration.getServer().getAiPlatform().getPlatform().isDeveloperPortalEnabled()) {
             builder.servlet("/api-docs/*", new AiPlatformApiDocsServlet(configuration));

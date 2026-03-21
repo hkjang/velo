@@ -91,10 +91,14 @@ public class AiPlatformUsageService {
                 registrySummary.routableModels(),
                 gatewayService.getTotalRequests(),
                 gatewayService.getContextCacheSize(),
+                gatewayService.getFailoverCount(),
+                gatewayService.getEnsembleCount(),
                 snapshot(endpointCounts),
                 snapshot(resolvedTypeCounts),
                 snapshot(registryActionCounts),
-                mergeModelCounts(gatewayService.getModelRequestCounts(), snapshot(publishedModelCounts))
+                mergeModelCounts(gatewayService.getModelRequestCounts(), snapshot(publishedModelCounts)),
+                gatewayService.getAbTestGroupACounts(),
+                gatewayService.getAbTestGroupBCounts()
         );
     }
 

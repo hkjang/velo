@@ -12,108 +12,160 @@ public final class AiPlatformLayout {
         ServerConfiguration.AiPlatform ai = server.getAiPlatform();
         String contextPath = ai.getConsole().getContextPath();
 
-        StringBuilder html = new StringBuilder(12_288);
-        html.append("""
-                <!DOCTYPE html>
-                <html lang="ko">
-                <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>""");
-        html.append(escapeHtml(title));
-        html.append("""
-                </title>
-                <style>
-                  :root { --bg:#f6efe3; --surface:rgba(255,255,255,0.82); --text:#1a2a25; --soft:#51645d; --line:rgba(17,24,39,0.08); --teal:#0f766e; --teal-soft:rgba(15,118,110,0.12); --shadow:0 22px 50px rgba(18,37,33,0.12); --radius:28px; }
-                  * { box-sizing:border-box; }
-                  html { scroll-behavior:smooth; }
-                  body { margin:0; font-family:"IBM Plex Sans","Noto Sans KR","Segoe UI",sans-serif; color:var(--text); background:radial-gradient(circle at top left, rgba(15,118,110,0.18), transparent 30%), radial-gradient(circle at top right, rgba(194,65,12,0.12), transparent 24%), linear-gradient(180deg,#f9f3e8 0%,#f1e7d8 100%); }
-                  a { color:inherit; text-decoration:none; }
-                  .shell { width:min(1280px, calc(100vw - 32px)); margin:20px auto 48px; }
-                  .topbar { position:sticky; top:12px; z-index:40; display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; padding:18px 22px; border:1px solid rgba(255,255,255,0.45); border-radius:24px; background:rgba(255,250,242,0.76); backdrop-filter:blur(18px); box-shadow:var(--shadow); }
-                  .brand { display:flex; align-items:center; gap:14px; }
-                  .brand-mark { width:48px; height:48px; display:grid; place-items:center; border-radius:16px; background:linear-gradient(135deg,#0f766e 0%,#164e63 100%); color:#fff7ed; font-size:18px; font-weight:800; letter-spacing:0.08em; }
-                  .brand-title { font-size:17px; font-weight:700; letter-spacing:-0.03em; }
-                  .brand-subtitle, .meta, .section-title p, .metric-note, .soft-item span, th { color:var(--soft); }
-                  .brand-subtitle { font-size:12px; margin-top:2px; }
-                  .nav, .meta, .pill-row, .hero-chips, .timeline-caps, .toolbar { display:flex; flex-wrap:wrap; gap:10px; }
-                  .nav a, .meta .logout, .pill, .hero-chip, .timeline-caps span, .toolbar button { border-radius:999px; }
-                  .nav a { padding:10px 14px; font-size:13px; background:rgba(255,255,255,0.48); border:1px solid rgba(17,24,39,0.05); }
-                  .meta { justify-content:flex-end; align-items:center; font-size:12px; gap:12px; }
-                  .meta .logout, .toolbar button { padding:10px 14px; background:#16302b; color:#fef6e4; border:0; cursor:pointer; font-weight:600; }
-                  .hero { margin-top:18px; padding:36px; border-radius:var(--radius); background:linear-gradient(135deg, rgba(15,118,110,0.98), rgba(22,78,99,0.94)); color:#f5f3ec; box-shadow:var(--shadow); }
-                  .eyebrow, .metric-kicker { font-size:11px; letter-spacing:0.18em; text-transform:uppercase; opacity:0.82; }
-                  .hero h1 { margin:12px 0; font-size:clamp(34px, 5vw, 54px); line-height:1.02; letter-spacing:-0.06em; }
-                  .hero p { margin:0; max-width:760px; font-size:15px; line-height:1.8; color:rgba(255,247,237,0.86); }
-                  .hero-chip, .pill, .timeline-caps span { padding:10px 14px; font-size:12px; }
-                  .hero-chip { background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.18); }
-                  .stack { display:grid; gap:18px; margin-top:18px; }
-                  .grid { display:grid; gap:18px; grid-template-columns:repeat(12, minmax(0, 1fr)); }
-                  .panel { background:var(--surface); border:1px solid rgba(255,255,255,0.5); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px; backdrop-filter:blur(18px); }
-                  .span-3 { grid-column:span 3; } .span-5 { grid-column:span 5; } .span-6 { grid-column:span 6; } .span-7 { grid-column:span 7; } .span-12 { grid-column:span 12; }
-                  .section-title { display:flex; justify-content:space-between; align-items:end; gap:12px; margin-bottom:14px; }
-                  .section-title h2 { margin:0; font-size:24px; letter-spacing:-0.04em; }
-                  .section-title p, .metric-note, .soft-item span { font-size:13px; line-height:1.7; }
-                  .metric-value { margin-top:8px; font-size:34px; letter-spacing:-0.06em; font-weight:700; }
-                  .pill.ok { background:var(--teal-soft); color:var(--teal); } .pill.off { background:rgba(100,116,139,0.12); color:#475569; }
-                  .soft-list, .timeline { display:grid; gap:10px; margin-top:14px; }
-                  .soft-item, .timeline-item { border:1px solid var(--line); background:rgba(255,255,255,0.5); }
-                  .soft-item { padding:14px 16px; border-radius:14px; }
-                  .soft-item strong { display:block; font-size:13px; margin-bottom:4px; }
-                  .table-wrap { overflow:auto; border-radius:16px; border:1px solid var(--line); background:rgba(255,255,255,0.46); }
-                  table { width:100%; border-collapse:collapse; min-width:720px; }
-                  th, td { padding:14px 16px; text-align:left; border-bottom:1px solid var(--line); font-size:13px; }
-                  th { font-weight:600; text-transform:uppercase; letter-spacing:0.08em; font-size:11px; }
-                  tr:last-child td { border-bottom:0; }
-                  code, pre { font-family:"JetBrains Mono","Cascadia Code",Consolas,monospace; }
-                  .yaml, .json-box { margin:0; padding:18px; border-radius:18px; overflow:auto; font-size:12px; line-height:1.8; }
-                  .yaml { white-space:pre-wrap; background:#14231f; color:#e7e0d2; }
-                  .json-box { margin-top:14px; background:rgba(255,255,255,0.55); border:1px solid var(--line); color:var(--text); max-height:360px; }
-                  .timeline-item { position:relative; padding:18px 18px 18px 62px; border-radius:20px; }
-                  .timeline-index { position:absolute; left:18px; top:18px; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:700; color:#fffdf8; background:#94a3b8; }
-                  .timeline-item.active { border-color:rgba(15,118,110,0.28); background:linear-gradient(135deg, rgba(15,118,110,0.12), rgba(255,255,255,0.62)); }
-                  .timeline-item.active .timeline-index { background:var(--teal); }
-                  .timeline-goal { font-size:18px; font-weight:700; letter-spacing:-0.04em; }
-                  @media (max-width:1080px) { .span-3, .span-5, .span-6, .span-7 { grid-column:span 12; } .shell { width:min(100vw - 18px, 1280px); } .hero { padding:26px; } .topbar { padding:16px; } }
-                </style>
-                </head>
-                <body>
-                  <div class="shell">
-                    <header class="topbar">
-                      <div class="brand">
-                        <div class="brand-mark">AI</div>
-                        <div>
-                          <div class="brand-title">Velo AI Platform</div>
-                          <div class="brand-subtitle">Built-in control plane for model serving, routing, and platform roadmap</div>
-                        </div>
-                      </div>
-                      <nav class="nav">
-                        <a href="#overview">Overview</a>
-                        <a href="#serving">Serving</a>
-                        <a href="#platform">Platform</a>
-                        <a href="#advanced">Advanced</a>
-                        <a href="#developer">Developer</a>
-                        <a href="#sandbox">Sandbox</a>
-                        <a href="#registry">Registry</a>
-                        <a href="#usage">Usage</a>
-                        <a href="#published">Published</a>
-                        <a href="#tuning">Tuning</a>
-                        <a href="#roadmap">Roadmap</a>
-                        <a href="#configuration">Configuration</a>
-                      </nav>
-                      <div class="meta">
-                        <span>""");
-        html.append(escapeHtml(server.getName()));
-        html.append("</span><span>");
-        html.append(escapeHtml(server.getNodeId()));
-        html.append("</span><span>");
-        html.append(escapeHtml(ai.getMode()));
-        html.append("</span><a class=\"logout\" href=\"");
-        html.append(escapeHtml(contextPath));
-        html.append("/logout\">Logout</a></div></header>");
+        StringBuilder html = new StringBuilder(16_384);
+        html.append("<!DOCTYPE html>\n<html lang=\"ko\">\n<head>\n<meta charset=\"UTF-8\">\n");
+        html.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
+        html.append("<title>").append(escapeHtml(title)).append("</title>\n");
+        html.append("<style>\n");
+        html.append(css());
+        html.append("</style>\n</head>\n<body>\n");
+        // sidebar
+        html.append("<aside class=\"sidebar\" id=\"sidebar\">\n");
+        html.append("  <div class=\"sidebar-brand\">\n");
+        html.append("    <div class=\"brand-icon\">AI</div>\n");
+        html.append("    <div><div class=\"brand-name\">Velo AI Platform</div>");
+        html.append("<div class=\"brand-sub\">").append(escapeHtml(server.getName())).append(" / ").append(escapeHtml(ai.getMode())).append("</div></div>\n");
+        html.append("  </div>\n");
+        html.append("  <nav class=\"sidebar-nav\">\n");
+        html.append("    <div class=\"nav-label\">\ub300\uc2dc\ubcf4\ub4dc</div>\n");
+        html.append("    <a href=\"#overview\" class=\"nav-item active\" onclick=\"showTab(event,'overview')\">&#x1f4ca; \uac1c\uc694</a>\n");
+        html.append("    <a href=\"#usage\" class=\"nav-item\" onclick=\"showTab(event,'usage')\">\ud83d\udcc8 \uc0ac\uc6a9\ub7c9</a>\n");
+        html.append("    <div class=\"nav-label\">\ubaa8\ub378 \uad00\ub9ac</div>\n");
+        html.append("    <a href=\"#serving\" class=\"nav-item\" onclick=\"showTab(event,'serving')\">\u2699\ufe0f \uc11c\ube59 \uc124\uc815</a>\n");
+        html.append("    <a href=\"#registry\" class=\"nav-item\" onclick=\"showTab(event,'registry')\">\ud83d\uddc2\ufe0f \ubaa8\ub378 \ub808\uc9c0\uc2a4\ud2b8\ub9ac</a>\n");
+        html.append("    <a href=\"#providers\" class=\"nav-item\" onclick=\"showTab(event,'providers')\">\ud83d\udd17 \ud504\ub85c\ubc14\uc774\ub354</a>\n");
+        html.append("    <div class=\"nav-label\">\uc6b4\uc601</div>\n");
+        html.append("    <a href=\"#sandbox\" class=\"nav-item\" onclick=\"showTab(event,'sandbox')\">\ud83e\uddea \uac8c\uc774\ud2b8\uc6e8\uc774 \ud14c\uc2a4\ud2b8</a>\n");
+        html.append("    <a href=\"#tenants\" class=\"nav-item\" onclick=\"showTab(event,'tenants')\">\ud83c\udfe2 \ud14c\ub10c\ud2b8</a>\n");
+        html.append("    <a href=\"#published\" class=\"nav-item\" onclick=\"showTab(event,'published')\">\ud83d\ude80 API \ubc1c\ud589</a>\n");
+        html.append("    <a href=\"#developer\" class=\"nav-item\" onclick=\"showTab(event,'developer')\">\ud83d\udcd6 \uac1c\ubc1c\uc790 \ud3ec\ud138</a>\n");
+        html.append("    <div class=\"nav-label\">\uc124\uc815</div>\n");
+        html.append("    <a href=\"#platform\" class=\"nav-item\" onclick=\"showTab(event,'platform')\">\ud83c\udfdb\ufe0f \ud50c\ub7ab\ud3fc</a>\n");
+        html.append("    <a href=\"#config\" class=\"nav-item\" onclick=\"showTab(event,'config')\">\ud83d\udcdd YAML \uc124\uc815</a>\n");
+        html.append("    <a href=\"#roadmap\" class=\"nav-item\" onclick=\"showTab(event,'roadmap')\">\ud83d\uddfa\ufe0f \ub85c\ub4dc\ub9f5</a>\n");
+        html.append("  </nav>\n");
+        html.append("  <div class=\"sidebar-footer\">\n");
+        html.append("    <a href=\"").append(escapeHtml(contextPath)).append("/logout\" class=\"nav-item logout\">\ub85c\uadf8\uc544\uc6c3</a>\n");
+        html.append("  </div>\n");
+        html.append("</aside>\n");
+        // main
+        html.append("<main class=\"main\">\n");
+        html.append("  <button class=\"mobile-menu\" onclick=\"document.getElementById('sidebar').classList.toggle('open')\">\u2630 \uba54\ub274</button>\n");
         html.append(body);
-        html.append("</div></body></html>");
+        html.append("</main>\n");
+        // tab script
+        html.append("<script>\n");
+        html.append("function showTab(e,id){e&&e.preventDefault();document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.nav-item').forEach(a=>a.classList.remove('active'));const el=document.getElementById('tab-'+id);if(el)el.style.display='block';if(e&&e.currentTarget)e.currentTarget.classList.add('active');document.getElementById('sidebar').classList.remove('open');}\n");
+        html.append("document.addEventListener('DOMContentLoaded',()=>{const h=location.hash.replace('#','');if(h){const a=document.querySelector('.nav-item[onclick*=\"'+h+'\"]');if(a){showTab(null,h);document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}}});\n");
+        html.append("</script>\n");
+        html.append("</body>\n</html>");
         return html.toString();
+    }
+
+    private static String css() {
+        return """
+            :root{--bg:#f4efe6;--surface:#fff;--text:#1a1a1a;--soft:#6b7280;--border:#e5e7eb;--primary:#0f766e;--primary-light:#ccfbf1;--primary-dark:#134e4a;--danger:#dc2626;--radius:12px;--shadow:0 1px 3px rgba(0,0,0,0.08);}
+            *{box-sizing:border-box;margin:0;padding:0;}
+            html{scroll-behavior:smooth;}
+            body{font-family:'Pretendard','Noto Sans KR','IBM Plex Sans',system-ui,sans-serif;color:var(--text);background:var(--bg);display:flex;min-height:100vh;}
+            /* sidebar */
+            .sidebar{width:240px;min-height:100vh;background:var(--primary-dark);color:#e2e8f0;display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100;overflow-y:auto;}
+            .sidebar-brand{padding:20px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.1);}
+            .brand-icon{width:40px;height:40px;background:var(--primary);border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff;flex-shrink:0;}
+            .brand-name{font-size:14px;font-weight:700;color:#fff;}
+            .brand-sub{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;}
+            .sidebar-nav{flex:1;padding:12px 8px;}
+            .nav-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.35);padding:16px 12px 6px;white-space:nowrap;}
+            .nav-item{display:block;padding:9px 12px;border-radius:8px;font-size:13px;color:rgba(255,255,255,0.7);text-decoration:none;transition:all 0.15s;cursor:pointer;white-space:nowrap;}
+            .nav-item:hover{background:rgba(255,255,255,0.08);color:#fff;}
+            .nav-item.active{background:var(--primary);color:#fff;font-weight:600;}
+            .sidebar-footer{padding:12px 8px;border-top:1px solid rgba(255,255,255,0.1);}
+            .nav-item.logout{color:rgba(255,255,255,0.5);}
+            .nav-item.logout:hover{color:#fca5a5;background:rgba(220,38,38,0.15);}
+            /* main */
+            .main{flex:1;margin-left:240px;padding:24px 32px 48px;max-width:1100px;}
+            .mobile-menu{display:none;padding:10px 16px;background:var(--primary-dark);color:#fff;border:0;border-radius:8px;cursor:pointer;font-size:14px;margin-bottom:16px;}
+            /* tab panels */
+            .tab-panel{display:none;}
+            .tab-panel:first-of-type{display:block;}
+            /* cards */
+            .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px;}
+            .card-header{font-size:18px;font-weight:700;margin-bottom:4px;word-break:keep-all;}
+            .card-desc{font-size:13px;color:var(--soft);margin-bottom:16px;line-height:1.6;word-break:keep-all;}
+            /* metric row */
+            .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;}
+            .metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
+            .metric-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--soft);margin-bottom:6px;}
+            .metric-val{font-size:24px;font-weight:700;color:var(--text);word-break:break-all;}
+            .metric-note{font-size:12px;color:var(--soft);margin-top:4px;word-break:keep-all;}
+            /* pills */
+            .pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+            .pill{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap;}
+            .pill.ok{background:var(--primary-light);color:var(--primary);}
+            .pill.off{background:#f1f5f9;color:#64748b;}
+            /* chips (hero) */
+            .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+            .chip{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.9);}
+            .chip.green{background:rgba(34,197,94,0.2);border-color:rgba(34,197,94,0.3);}
+            /* table */
+            .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;}
+            table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px;}
+            th{background:#f8fafc;padding:10px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--soft);border-bottom:1px solid var(--border);white-space:nowrap;}
+            td{padding:10px 14px;border-bottom:1px solid var(--border);}
+            tr:last-child td{border-bottom:0;}
+            td strong{font-weight:600;}
+            /* forms */
+            .form-grid{display:grid;gap:10px;margin-bottom:12px;}
+            .form-grid.cols-2{grid-template-columns:repeat(2,1fr);}
+            .form-grid.cols-3{grid-template-columns:repeat(3,1fr);}
+            .form-input,.form-select,.form-textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;background:var(--surface);}
+            .form-textarea{min-height:120px;resize:vertical;}
+            .form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(15,118,110,0.1);}
+            /* buttons */
+            .btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+            .btn{padding:9px 16px;border:0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.15s;}
+            .btn-primary{background:var(--primary);color:#fff;}
+            .btn-primary:hover{background:var(--primary-dark);}
+            .btn-secondary{background:#f1f5f9;color:var(--text);border:1px solid var(--border);}
+            .btn-secondary:hover{background:#e2e8f0;}
+            /* code/json */
+            .code-box{background:#1e293b;color:#e2e8f0;border-radius:var(--radius);padding:16px;font-family:'JetBrains Mono','Cascadia Code',Consolas,monospace;font-size:12px;line-height:1.7;overflow:auto;max-height:360px;white-space:pre-wrap;margin-bottom:12px;}
+            .json-box{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-family:'JetBrains Mono',Consolas,monospace;font-size:12px;line-height:1.6;overflow:auto;max-height:340px;white-space:pre-wrap;margin-bottom:12px;}
+            /* hero */
+            .hero{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;border-radius:var(--radius);padding:28px;margin-bottom:20px;}
+            .hero-eyebrow{font-size:11px;letter-spacing:0.15em;text-transform:uppercase;opacity:0.7;}
+            .hero h1{font-size:clamp(22px,3vw,32px);font-weight:700;line-height:1.3;margin:8px 0;word-break:keep-all;}
+            .hero p{font-size:14px;line-height:1.7;color:rgba(255,255,255,0.8);word-break:keep-all;}
+            /* info-list */
+            .info-list{display:grid;gap:8px;}
+            .info-item{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:12px 14px;}
+            .info-item strong{font-size:13px;display:block;margin-bottom:2px;}
+            .info-item span{font-size:12px;color:var(--soft);line-height:1.5;word-break:keep-all;}
+            /* two-col */
+            .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+            /* timeline */
+            .timeline{display:grid;gap:10px;}
+            .tl-item{position:relative;padding:14px 14px 14px 52px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;}
+            .tl-num{position:absolute;left:12px;top:14px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;background:#94a3b8;}
+            .tl-item.active{border-color:var(--primary);background:var(--primary-light);}
+            .tl-item.active .tl-num{background:var(--primary);}
+            .tl-title{font-size:15px;font-weight:700;}
+            .tl-note{font-size:12px;color:var(--soft);}
+            .tl-caps{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+            .tl-caps span{font-size:11px;padding:3px 8px;background:rgba(0,0,0,0.05);border-radius:4px;}
+            /* status */
+            .status-on{color:var(--primary);font-weight:600;}
+            .status-off{color:#94a3b8;}
+            /* responsive */
+            @media(max-width:768px){
+                .sidebar{transform:translateX(-100%);transition:transform 0.25s;}
+                .sidebar.open{transform:translateX(0);}
+                .main{margin-left:0;padding:16px;}
+                .mobile-menu{display:block;}
+                .two-col,.form-grid.cols-2,.form-grid.cols-3{grid-template-columns:1fr;}
+                .metrics{grid-template-columns:1fr 1fr;}
+            }
+            """;
     }
 
     public static String escapeHtml(String value) {
@@ -128,7 +180,7 @@ public final class AiPlatformLayout {
 
     public static String featurePill(String label, boolean enabled) {
         String css = enabled ? "ok" : "off";
-        String state = enabled ? "Enabled" : "Disabled";
-        return "<span class=\"pill " + css + "\">" + escapeHtml(label) + " - " + state + "</span>";
+        String state = enabled ? "\ud65c\uc131" : "\ube44\ud65c\uc131";
+        return "<span class=\"pill " + css + "\">" + escapeHtml(label) + " \u2014 " + state + "</span>";
     }
 }

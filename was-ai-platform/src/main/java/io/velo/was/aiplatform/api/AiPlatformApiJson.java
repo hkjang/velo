@@ -152,7 +152,12 @@ public final class AiPlatformApiJson {
                 q("routableModels") + ":" + usage.routableModels() + "}," +
                 q("gateway") + ":{" +
                 q("routeDecisions") + ":" + usage.gatewayRouteDecisions() + "," +
+                q("failoverCount") + ":" + usage.failoverCount() + "," +
+                q("ensembleCount") + ":" + usage.ensembleCount() + "," +
                 q("modelRequestCounts") + ":" + longMap(usage.modelRequestCounts()) + "}," +
+                q("abTest") + ":{" +
+                q("groupA") + ":" + longMap(usage.abTestGroupACounts()) + "," +
+                q("groupB") + ":" + longMap(usage.abTestGroupBCounts()) + "}," +
                 q("endpointCounts") + ":" + longMap(usage.endpointCounts()) + "," +
                 q("resolvedTypeCounts") + ":" + longMap(usage.resolvedTypeCounts()) + "," +
                 q("registryActionCounts") + ":" + longMap(usage.registryActionCounts()) +

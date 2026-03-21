@@ -1,5 +1,8 @@
 package io.velo.was.aiplatform.api;
 
+import io.velo.was.aiplatform.edge.AiEdgeDevice;
+import io.velo.was.aiplatform.plugin.AiPluginRegistry;
+import io.velo.was.aiplatform.provider.AiProviderRegistry;
 import io.velo.was.aiplatform.billing.AiBillingLineItem;
 import io.velo.was.aiplatform.billing.AiBillingSnapshot;
 import io.velo.was.aiplatform.finetuning.AiFineTuningJob;
@@ -166,6 +169,76 @@ public final class AiPlatformExtendedJson {
                 q("createdAt") + ":" + q(Instant.ofEpochMilli(job.createdAtEpochMillis()).toString()) + "," +
                 q("updatedAt") + ":" + q(Instant.ofEpochMilli(job.updatedAtEpochMillis()).toString()) +
                 "}";
+    }
+
+    public static String edgeDevices(List<AiEdgeDevice> devices) {
+        StringBuilder json = new StringBuilder(1024).append('{')
+                .append(q("count")).append(':').append(devices.size()).append(',')
+                .append(q("devices")).append(':').append('[');
+        boolean first = true;
+        for (AiEdgeDevice device : devices) {
+            if (!first) json.append(',');
+            first = false;
+            json.append('{')
+                    .append(q("deviceId")).append(':').append(q(device.deviceId())).append(',')
+                    .append(q("displayName")).append(':').append(q(device.displayName())).append(',')
+                    .append(q("deviceType")).append(':').append(q(device.deviceType())).append(',')
+                    .append(q("status")).append(':').append(q(device.status())).append(',')
+                    .append(q("deployedModel")).append(':').append(q(device.deployedModel())).append(',')
+                    .append(q("deployedVersion")).append(':').append(q(device.deployedVersion())).append(',')
+                    .append(q("maxMemoryMb")).append(':').append(device.maxMemoryMb())
+                    .append('}');
+        }
+        return json.append("]}").toString();
+    }
+
+    public static String edgeDevice(AiEdgeDevice device) {
+        return "{" +
+                q("deviceId") + ":" + q(device.deviceId()) + "," +
+                q("displayName") + ":" + q(device.displayName()) + "," +
+                q("deviceType") + ":" + q(device.deviceType()) + "," +
+                q("status") + ":" + q(device.status()) + "," +
+                q("deployedModel") + ":" + q(device.deployedModel()) + "," +
+                q("deployedVersion") + ":" + q(device.deployedVersion()) + "," +
+                q("maxMemoryMb") + ":" + device.maxMemoryMb() +
+                "}";
+    }
+
+    public static String providers(List<AiProviderRegistry.AiProviderInfo> providers) {
+        StringBuilder json = new StringBuilder(512).append('{')
+                .append(q("count")).append(':').append(providers.size()).append(',')
+                .append(q("providers")).append(':').append('[');
+        boolean first = true;
+        for (AiProviderRegistry.AiProviderInfo provider : providers) {
+            if (!first) json.append(',');
+            first = false;
+            json.append('{')
+                    .append(q("providerId")).append(':').append(q(provider.providerId())).append(',')
+                    .append(q("displayName")).append(':').append(q(provider.displayName())).append(',')
+                    .append(q("protocol")).append(':').append(q(provider.protocol())).append(',')
+                    .append(q("supportsStreaming")).append(':').append(provider.supportsStreaming()).append(',')
+                    .append(q("healthy")).append(':').append(provider.healthy())
+                    .append('}');
+        }
+        return json.append("]}").toString();
+    }
+
+    public static String plugins(List<AiPluginRegistry.AiPluginInfo> plugins) {
+        StringBuilder json = new StringBuilder(512).append('{')
+                .append(q("count")).append(':').append(plugins.size()).append(',')
+                .append(q("plugins")).append(':').append('[');
+        boolean first = true;
+        for (AiPluginRegistry.AiPluginInfo plugin : plugins) {
+            if (!first) json.append(',');
+            first = false;
+            json.append('{')
+                    .append(q("id")).append(':').append(q(plugin.id())).append(',')
+                    .append(q("name")).append(':').append(q(plugin.name())).append(',')
+                    .append(q("type")).append(':').append(q(plugin.type())).append(',')
+                    .append(q("enabled")).append(':').append(plugin.enabled())
+                    .append('}');
+        }
+        return json.append("]}").toString();
     }
 
     private static String tenantUsagePayload(AiTenantUsageInfo usage) {

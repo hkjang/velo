@@ -86,7 +86,7 @@ public final class AiPlatformApiJson {
                 .append(q("totalVersions")).append(':').append(summary.totalVersions()).append(',')
                 .append(q("routableModels")).append(':').append(summary.routableModels()).append(',')
                 .append(q("activeVersions")).append(':').append(summary.activeVersions())
-                .append("},").append(q("models")).append(\":\[");
+                .append("},").append(q("models")).append(":[");
         boolean first = true;
         for (AiRegisteredModel model : models) {
             if (!first) {

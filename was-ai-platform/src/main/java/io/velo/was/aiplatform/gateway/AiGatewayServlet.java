@@ -93,7 +93,7 @@ public class AiGatewayServlet extends HttpServlet {
             return tenantError(resp, HttpServletResponse.SC_UNAUTHORIZED, e.getMessage());
         } catch (IllegalStateException e) {
             int status = e.getMessage() != null && e.getMessage().contains("Rate limit")
-                    ? HttpServletResponse.SC_TOO_MANY_REQUESTS
+                    ? 429 /* Too Many Requests */
                     : HttpServletResponse.SC_FORBIDDEN;
             return tenantError(resp, status, e.getMessage());
         }

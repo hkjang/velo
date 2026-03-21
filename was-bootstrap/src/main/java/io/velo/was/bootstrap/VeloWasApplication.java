@@ -9,6 +9,7 @@ import io.velo.was.deploy.HotDeployWatcher;
 import io.velo.was.deploy.WarDeployer;
 import io.velo.was.http.HttpHandlerRegistry;
 import io.velo.was.http.HttpResponses;
+import io.velo.was.http.SseHandlerRegistry;
 import io.velo.was.observability.MetricsCollector;
 import io.velo.was.jsp.JspServlet;
 import io.velo.was.servlet.SessionCookieSettings;
@@ -177,10 +178,26 @@ public final class VeloWasApplication {
                 })
                 .fallback(servletContainer::handle);
 
+        // ── MCP server ──────────────────────────────────────────────────────
+        SseHandlerRegistry sseRegistry = new SseHandlerRegistry();
+        if (aiPlatformConfig.isEnabled()) {
+            io.velo.was.aiplatform.registry.AiModelRegistryService mcpRegistryService =
+                    new io.velo.was.aiplatform.registry.AiModelRegistryService(configuration);
+            io.velo.was.aiplatform.gateway.AiGatewayService mcpGatewayService =
+                    new io.velo.was.aiplatform.gateway.AiGatewayService(configuration, mcpRegistryService);
+            AdminClient mcpAdminClient = new LocalAdminClient(configuration);
+            io.velo.was.mcp.McpApplication.install(registry, sseRegistry, mcpRegistryService, mcpGatewayService,
+                    mcpAdminClient, "velo-mcp",
+                    configuration.getServer().getName() + "-" + configuration.getServer().getNodeId());
+            log.info("MCP server installed at /mcp (admin at /mcp/admin/*) with {} admin CLI tools",
+                    "full");
+        }
+
         NettyServer server = new NettyServer(
                 configuration.getServer(),
                 registry,
-                null,
+                null, // WebSocketHandlerRegistry
+                sseRegistry,
                 () -> new AdminWarUploadChannelHandler(warUploadService, deployDir.resolve(".upload-staging")));
 
         // Start TCP listeners from configuration

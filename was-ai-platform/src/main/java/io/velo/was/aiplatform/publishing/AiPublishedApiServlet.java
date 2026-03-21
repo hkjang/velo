@@ -81,7 +81,7 @@ public class AiPublishedApiServlet extends HttpServlet {
             return null;
         } catch (IllegalStateException e) {
             int status = e.getMessage() != null && e.getMessage().contains("Rate limit")
-                    ? HttpServletResponse.SC_TOO_MANY_REQUESTS
+                    ? 429 /* Too Many Requests */
                     : HttpServletResponse.SC_FORBIDDEN;
             resp.setStatus(status);
             resp.getWriter().write("{\"error\":\"" + AiGatewayServlet.escapeJson(e.getMessage()) + "\"}");

@@ -103,7 +103,8 @@ server:
       modelRegistrationEnabled: true
       autoApiGenerationEnabled: true
       versionManagementEnabled: true
-      billingEnabled: false      defaultTenantRateLimitPerMinute: 120
+      billingEnabled: false
+      defaultTenantRateLimitPerMinute: 120
       defaultTenantTokenQuota: 250000
       apiKeyHeader: X-AI-API-Key
       versioningStrategy: CANARY

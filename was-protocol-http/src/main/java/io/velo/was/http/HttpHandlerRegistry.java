@@ -5,11 +5,24 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class HttpHandlerRegistry {
 
-    private final Map<String, HttpHandler> getHandlers = new ConcurrentHashMap<>();
+    private final Map<String, HttpHandler> handlers = new ConcurrentHashMap<>();
     private volatile HttpHandler fallbackHandler = exchange -> HttpResponses.notFound("No route for " + exchange.uri());
 
+    /**
+     * Register a handler for a path, served on any HTTP method.
+     * The handler itself is responsible for method validation where needed.
+     */
     public HttpHandlerRegistry registerGet(String path, HttpHandler handler) {
-        getHandlers.put(path, handler);
+        handlers.put(path, handler);
+        return this;
+    }
+
+    /**
+     * Alias for {@link #registerGet} — registers a handler for any method at the given path.
+     * The handler is expected to check the HTTP method internally.
+     */
+    public HttpHandlerRegistry register(String path, HttpHandler handler) {
+        handlers.put(path, handler);
         return this;
     }
 
@@ -19,6 +32,6 @@ public class HttpHandlerRegistry {
     }
 
     public HttpHandler resolve(HttpExchange exchange) {
-        return getHandlers.getOrDefault(exchange.path(), fallbackHandler);
+        return handlers.getOrDefault(exchange.path(), fallbackHandler);
     }
 }

@@ -27,14 +27,21 @@ public class NettyHttpChannelHandler extends SimpleChannelInboundHandler<FullHtt
 
     private final HttpHandlerRegistry registry;
     private final WebSocketHandlerRegistry wsRegistry;
+    private final SseHandlerRegistry sseRegistry;
 
     public NettyHttpChannelHandler(HttpHandlerRegistry registry) {
-        this(registry, null);
+        this(registry, null, null);
     }
 
     public NettyHttpChannelHandler(HttpHandlerRegistry registry, WebSocketHandlerRegistry wsRegistry) {
+        this(registry, wsRegistry, null);
+    }
+
+    public NettyHttpChannelHandler(HttpHandlerRegistry registry, WebSocketHandlerRegistry wsRegistry,
+                                   SseHandlerRegistry sseRegistry) {
         this.registry = registry;
         this.wsRegistry = wsRegistry;
+        this.sseRegistry = sseRegistry;
     }
 
     @Override
@@ -58,6 +65,26 @@ public class NettyHttpChannelHandler extends SimpleChannelInboundHandler<FullHtt
             if (wsHandler != null) {
                 installWebSocketPipeline(ctx, request, wsHandler, path);
                 return;
+            }
+        }
+
+        // ── SSE detection: GET + Accept: text/event-stream ──
+        if (sseRegistry != null && isSseRequest(request)) {
+            String path = new QueryStringDecoder(request.uri()).path();
+            SseHandler sseHandler = sseRegistry.resolve(path);
+            if (sseHandler != null) {
+                boolean secure = ctx.pipeline().get(io.netty.handler.ssl.SslHandler.class) != null;
+                HttpExchange exchange = new HttpExchange(request, ctx.channel().remoteAddress(),
+                        ctx.channel().localAddress(), null, secure);
+                NettySseSink sink = new NettySseSink(ctx);
+                try {
+                    sseHandler.onConnect(exchange, sink);
+                } catch (Exception e) {
+                    ErrorLog.log(NettyHttpChannelHandler.class.getName(),
+                            "SSE handler error", e, null, request.uri());
+                    sink.close();
+                }
+                return; // channel stays open; sink manages its lifecycle
             }
         }
 
@@ -140,6 +167,11 @@ public class NettyHttpChannelHandler extends SimpleChannelInboundHandler<FullHtt
     private static boolean isWebSocketUpgrade(FullHttpRequest request) {
         return request.headers().containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE, true)
                 && request.headers().containsValue(HttpHeaderNames.UPGRADE, HttpHeaderValues.WEBSOCKET, true);
+    }
+
+    private static boolean isSseRequest(FullHttpRequest request) {
+        return request.method() == io.netty.handler.codec.http.HttpMethod.GET
+                && request.headers().containsValue(HttpHeaderNames.ACCEPT, "text/event-stream", true);
     }
 
     /**

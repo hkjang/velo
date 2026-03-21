@@ -26,6 +26,7 @@
         <module>was-tcp-listener</module>
         <module>was-webadmin</module>
         <module>was-ai-platform</module>
+        <module>was-mcp</module>
         <module>was-bootstrap</module>
     </modules>
 

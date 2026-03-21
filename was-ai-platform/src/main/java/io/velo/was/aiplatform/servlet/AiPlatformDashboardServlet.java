@@ -24,6 +24,10 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         this(configuration);
     }
 
+    public AiPlatformDashboardServlet(ServerConfiguration configuration, AiModelRegistryService registryService, AiGatewayService gatewayService, AiPlatformUsageService usageService, io.velo.was.aiplatform.tenant.AiTenantService tenantService) {
+        this(configuration);
+    }
+
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("text/html; charset=UTF-8");

@@ -23,6 +23,7 @@ import io.netty.util.AsciiString;
 import io.velo.was.config.ServerConfiguration;
 import io.velo.was.http.HttpHandlerRegistry;
 import io.velo.was.http.NettyHttpChannelHandler;
+import io.velo.was.http.SseHandlerRegistry;
 import io.velo.was.http.WebSocketHandlerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +38,7 @@ public class NettyServer implements AutoCloseable {
     private final ServerConfiguration.Server server;
     private final HttpHandlerRegistry registry;
     private final WebSocketHandlerRegistry wsRegistry;
+    private final SseHandlerRegistry sseRegistry;
     private final Supplier<ChannelHandler> httpPipelineHandlerFactory;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
@@ -44,20 +46,34 @@ public class NettyServer implements AutoCloseable {
     private ReloadingSslContextProvider sslContextProvider;
 
     public NettyServer(ServerConfiguration.Server server, HttpHandlerRegistry registry) {
-        this(server, registry, null, null);
+        this(server, registry, null, null, null);
     }
 
     public NettyServer(ServerConfiguration.Server server, HttpHandlerRegistry registry,
                        WebSocketHandlerRegistry wsRegistry) {
-        this(server, registry, wsRegistry, null);
+        this(server, registry, wsRegistry, null, null);
     }
 
     public NettyServer(ServerConfiguration.Server server, HttpHandlerRegistry registry,
                        WebSocketHandlerRegistry wsRegistry,
                        Supplier<ChannelHandler> httpPipelineHandlerFactory) {
+        this(server, registry, wsRegistry, null, httpPipelineHandlerFactory);
+    }
+
+    public NettyServer(ServerConfiguration.Server server, HttpHandlerRegistry registry,
+                       WebSocketHandlerRegistry wsRegistry,
+                       SseHandlerRegistry sseRegistry) {
+        this(server, registry, wsRegistry, sseRegistry, null);
+    }
+
+    public NettyServer(ServerConfiguration.Server server, HttpHandlerRegistry registry,
+                       WebSocketHandlerRegistry wsRegistry,
+                       SseHandlerRegistry sseRegistry,
+                       Supplier<ChannelHandler> httpPipelineHandlerFactory) {
         this.server = server;
         this.registry = registry;
         this.wsRegistry = wsRegistry;
+        this.sseRegistry = sseRegistry;
         this.httpPipelineHandlerFactory = httpPipelineHandlerFactory;
     }
 
@@ -87,7 +103,7 @@ public class NettyServer implements AutoCloseable {
                             SslContext sslContext = sslContextProvider.current();
                             channel.pipeline().addLast("ssl", sslContext.newHandler(channel.alloc()));
                             channel.pipeline().addLast("alpn",
-                                    new AlpnNegotiationHandler(server, registry, wsRegistry, httpPipelineHandlerFactory));
+                                    new AlpnNegotiationHandler(server, registry, wsRegistry, sseRegistry, httpPipelineHandlerFactory));
                         } else {
                             // ── Cleartext: h2c upgrade + HTTP/1.1 ──
                             configureCleartextPipeline(channel);
@@ -131,7 +147,7 @@ public class NettyServer implements AutoCloseable {
                                         Http2FrameCodecBuilder.forServer().build(),
                                         new Http2MultiplexHandler(
                                                 new AlpnNegotiationHandler.Http2StreamChannelInitializer(
-                                                        server, registry, wsRegistry, httpPipelineHandlerFactory)));
+                                                        server, registry, wsRegistry, sseRegistry, httpPipelineHandlerFactory)));
                             }
                             return null;
                         };
@@ -149,7 +165,7 @@ public class NettyServer implements AutoCloseable {
                         ch.pipeline().addLast("h2Codec", Http2FrameCodecBuilder.forServer().build());
                         ch.pipeline().addLast("h2Multiplexer", new Http2MultiplexHandler(
                                 new AlpnNegotiationHandler.Http2StreamChannelInitializer(
-                                        server, registry, wsRegistry, httpPipelineHandlerFactory)));
+                                        server, registry, wsRegistry, sseRegistry, httpPipelineHandlerFactory)));
                     }
                 });
 
@@ -176,7 +192,7 @@ public class NettyServer implements AutoCloseable {
                     new HttpContentCompressor(compression.getCompressionLevel()));
         }
 
-        channel.pipeline().addLast("httpHandler", new NettyHttpChannelHandler(registry, wsRegistry));
+        channel.pipeline().addLast("httpHandler", new NettyHttpChannelHandler(registry, wsRegistry, sseRegistry));
     }
 
     public void blockUntilShutdown() throws InterruptedException {

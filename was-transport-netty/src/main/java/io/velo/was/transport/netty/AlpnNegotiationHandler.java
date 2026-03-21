@@ -18,6 +18,7 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.velo.was.config.ServerConfiguration;
 import io.velo.was.http.HttpHandlerRegistry;
 import io.velo.was.http.NettyHttpChannelHandler;
+import io.velo.was.http.SseHandlerRegistry;
 import io.velo.was.http.WebSocketHandlerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,16 +38,19 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
     private final ServerConfiguration.Server serverConfig;
     private final HttpHandlerRegistry registry;
     private final WebSocketHandlerRegistry wsRegistry;
+    private final SseHandlerRegistry sseRegistry;
     private final Supplier<ChannelHandler> httpPipelineHandlerFactory;
 
     AlpnNegotiationHandler(ServerConfiguration.Server serverConfig,
                            HttpHandlerRegistry registry,
                            WebSocketHandlerRegistry wsRegistry,
+                           SseHandlerRegistry sseRegistry,
                            Supplier<ChannelHandler> httpPipelineHandlerFactory) {
         super(ApplicationProtocolNames.HTTP_1_1);
         this.serverConfig = serverConfig;
         this.registry = registry;
         this.wsRegistry = wsRegistry;
+        this.sseRegistry = sseRegistry;
         this.httpPipelineHandlerFactory = httpPipelineHandlerFactory;
     }
 
@@ -66,7 +70,7 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
     private void configureHttp2(ChannelPipeline pipeline) {
         pipeline.addLast("h2Codec", Http2FrameCodecBuilder.forServer().build());
         pipeline.addLast("h2Multiplexer", new Http2MultiplexHandler(
-                new Http2StreamChannelInitializer(serverConfig, registry, wsRegistry, httpPipelineHandlerFactory)));
+                new Http2StreamChannelInitializer(serverConfig, registry, wsRegistry, sseRegistry, httpPipelineHandlerFactory)));
     }
 
     private void configureHttp1(ChannelPipeline pipeline) {
@@ -95,7 +99,7 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
                     new HttpContentCompressor(compression.getCompressionLevel()));
         }
 
-        pipeline.addLast("httpHandler", new NettyHttpChannelHandler(registry, wsRegistry));
+        pipeline.addLast("httpHandler", new NettyHttpChannelHandler(registry, wsRegistry, sseRegistry));
     }
 
     /**
@@ -108,15 +112,18 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
         private final ServerConfiguration.Server serverConfig;
         private final HttpHandlerRegistry registry;
         private final WebSocketHandlerRegistry wsRegistry;
+        private final SseHandlerRegistry sseRegistry;
         private final Supplier<ChannelHandler> httpPipelineHandlerFactory;
 
         Http2StreamChannelInitializer(ServerConfiguration.Server serverConfig,
                                       HttpHandlerRegistry registry,
                                       WebSocketHandlerRegistry wsRegistry,
+                                      SseHandlerRegistry sseRegistry,
                                       Supplier<ChannelHandler> httpPipelineHandlerFactory) {
             this.serverConfig = serverConfig;
             this.registry = registry;
             this.wsRegistry = wsRegistry;
+            this.sseRegistry = sseRegistry;
             this.httpPipelineHandlerFactory = httpPipelineHandlerFactory;
         }
 
@@ -134,7 +141,7 @@ class AlpnNegotiationHandler extends ApplicationProtocolNegotiationHandler {
                         new HttpContentCompressor(serverConfig.getCompression().getCompressionLevel()));
             }
 
-            ch.pipeline().addLast("httpHandler", new NettyHttpChannelHandler(registry, wsRegistry));
+            ch.pipeline().addLast("httpHandler", new NettyHttpChannelHandler(registry, wsRegistry, sseRegistry));
         }
     }
 }

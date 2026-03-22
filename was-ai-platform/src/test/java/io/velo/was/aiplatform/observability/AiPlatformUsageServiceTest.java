@@ -38,5 +38,14 @@ class AiPlatformUsageServiceTest {
         assertTrue(snapshot.totalEstimatedTokens() > 0);
         assertTrue(snapshot.modelRequestCounts().containsKey(route.modelName()));
         assertEquals(1L, snapshot.registryActionCounts().get("register"));
+        assertEquals(0, snapshot.intentRouteCalls());
+
+        // Intent routing counter
+        usageService.recordIntentRoute();
+        usageService.recordIntentRoute();
+        usageService.recordIntentRoute();
+        AiPlatformUsageSnapshot snapshot2 = usageService.snapshot(true, gatewayService, registryService);
+        assertEquals(3, snapshot2.intentRouteCalls());
+        assertTrue(snapshot2.meteredRequests() > snapshot.meteredRequests(), "intentRouteCalls should contribute to meteredRequests");
     }
 }

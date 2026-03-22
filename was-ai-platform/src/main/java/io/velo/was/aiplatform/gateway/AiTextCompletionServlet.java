@@ -57,6 +57,16 @@ public class AiTextCompletionServlet extends HttpServlet {
             return;
         }
 
+        // 의도 기반 라우팅 헤더 추가
+        try {
+            io.velo.was.aiplatform.intent.IntentRouteDecision intentDecision =
+                    gatewayService.intentRoute(prompt, tenantAccess.tenantId());
+            resp.setHeader("X-Intent", intentDecision.resolvedIntent().name());
+            resp.setHeader("X-Intent-Model", intentDecision.modelName());
+            resp.setHeader("X-Intent-Policy", intentDecision.policyId());
+        } catch (Exception ignored) {
+        }
+
         AiGatewayRequest gatewayRequest = new AiGatewayRequest(
                 "CHAT", prompt,
                 "completions-" + UUID.randomUUID().toString().substring(0, 8), false);

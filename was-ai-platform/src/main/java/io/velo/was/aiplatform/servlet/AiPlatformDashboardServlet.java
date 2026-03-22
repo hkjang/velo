@@ -419,12 +419,12 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("  try{\n");
         b.append("    const u=JSON.parse(await api('/api/usage'));\n");
         b.append("    const o=JSON.parse(await api('/api/overview'));\n");
-        b.append("    if(u.requests){document.getElementById('mv-totalRequests').textContent=(u.requests.routeCalls||0)+(u.requests.inferCalls||0)+(u.requests.streamCalls||0);}\n");
+        b.append("    if(u.requests){document.getElementById('mv-totalRequests').textContent=(u.requests.routeCalls||0)+(u.requests.inferCalls||0)+(u.requests.streamCalls||0)+(u.requests.intentRouteCalls||0);}\n");
         b.append("    if(u.cache){document.getElementById('mv-cacheHits').textContent=u.cache.hits||0;}\n");
         b.append("    if(o.registry){document.getElementById('mv-registeredModels').textContent=o.registry.registeredModels||o.registry.totalModels||0;}\n");
         b.append("    if(o.tenancy){document.getElementById('mv-activeTenants').textContent=o.tenancy.activeTenants||0;}\n");
         b.append("    if(u.requests){\n");
-        b.append("      usageHistory.push({route:u.requests.routeCalls||0,infer:u.requests.inferCalls||0,stream:u.requests.streamCalls||0});\n");
+        b.append("      usageHistory.push({route:(u.requests.routeCalls||0)+(u.requests.intentRouteCalls||0),infer:u.requests.inferCalls||0,stream:u.requests.streamCalls||0});\n");
         b.append("      if(usageHistory.length>12)usageHistory.shift();\n");
         b.append("      renderTrafficChart();\n");
         b.append("    }\n");

@@ -45,8 +45,11 @@ public class AiPlatformDataStore {
     public <T> void save(String fileName, T data) {
         try {
             Path file = dataDir.resolve(fileName);
-            mapper.writeValue(file.toFile(), data);
-            LOG.fine(() -> "Saved " + fileName);
+            // UTF-8 인코딩을 명시적으로 지정 (Windows CP949 방지)
+            byte[] jsonBytes = mapper.writeValueAsBytes(data);
+            java.nio.file.Files.write(file, jsonBytes,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+            LOG.fine(() -> "Saved " + fileName + " (" + jsonBytes.length + " bytes, UTF-8)");
         } catch (IOException e) {
             LOG.log(Level.WARNING, "Failed to save " + fileName, e);
         }
@@ -61,7 +64,8 @@ public class AiPlatformDataStore {
             if (!Files.exists(file)) {
                 return null;
             }
-            T result = mapper.readValue(file.toFile(), type);
+            byte[] bytes = Files.readAllBytes(file);
+            T result = mapper.readValue(bytes, type);
             LOG.fine(() -> "Loaded " + fileName);
             return result;
         } catch (IOException e) {
@@ -79,7 +83,8 @@ public class AiPlatformDataStore {
             if (!Files.exists(file)) {
                 return null;
             }
-            List<T> result = mapper.readValue(file.toFile(), typeRef);
+            byte[] bytes = Files.readAllBytes(file);
+            List<T> result = mapper.readValue(bytes, typeRef);
             LOG.fine(() -> "Loaded " + fileName + " (" + result.size() + " items)");
             return result;
         } catch (IOException e) {

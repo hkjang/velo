@@ -114,6 +114,21 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         apiPath(s, "/api/published-apis", "get", "Control Plane", "List published generated APIs", null, false);
         s.append(",\n");
         apiPath(s, "/api/config", "get", "Control Plane", "Get current AI platform configuration", null, false);
+        s.append(",\n");
+        // Intent routing
+        apiPath(s, "/gateway/intent-route", "post", "Gateway", "Intent-based routing decision", "Analyze prompt keywords to determine optimal model routing.", true);
+        s.append(",\n");
+        apiPath(s, "/api/intent/test", "post", "Control Plane", "Test intent routing for a prompt", "Returns routing decision with matched keywords and policy.", true);
+        s.append(",\n");
+        apiPath(s, "/api/intent/preview", "post", "Control Plane", "Preview keyword analysis", "Returns normalized text and matched keywords without routing.", true);
+        s.append(",\n");
+        apiPath(s, "/api/intent/keywords", "get", "Control Plane", "List intent keywords", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/intent/policies", "get", "Control Plane", "List intent routing policies", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/intent/stats", "get", "Control Plane", "Get intent routing statistics", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/intent/audit", "get", "Control Plane", "Get intent routing audit log", null, false);
         s.append("\n");
         s.append("  },\n");
         // Components

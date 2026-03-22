@@ -38,7 +38,7 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         StringBuilder b = new StringBuilder(48_000);
 
         // ===== TAB: overview — 대시보드 (트래킹 차트 포함) =====
-        b.append("<div class=\"tab-panel\" id=\"tab-overview\">\n");
+        b.append("<div class=\"tab-panel active\" id=\"tab-overview\">\n");
         b.append("<div class=\"hero\"><div class=\"hero-eyebrow\">Velo AI Platform</div>");
         b.append("<h1>\ud1b5\ud569 AI \ud50c\ub7ab\ud3fc \ub300\uc2dc\ubcf4\ub4dc</h1>");
         b.append("<p>\uba40\ud2f0 LLM \ub77c\uc6b0\ud305, OpenAI \ud638\ud658 \ud504\ub85d\uc2dc, \uc7a5\uc560 \uc870\uce58, A/B \ud14c\uc2a4\ud2b8, \ube44\uc6a9 \ucd94\uc801, \ud14c\ub10c\ud2b8 \uad00\ub9ac\ub97c \uc124\uc815 \ud558\ub098\ub85c \uc81c\uc5b4\ud569\ub2c8\ub2e4.</p>");

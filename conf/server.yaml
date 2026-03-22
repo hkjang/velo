@@ -120,7 +120,7 @@ server:
       contextCacheEnabled: true
       contextCacheTtlSeconds: 300
       aiGatewayEnabled: true
-      fineTuningApiEnabled: false
+      # fineTuningApiEnabled: removed (v0.5.16)
       observabilityEnabled: true
       gpuSchedulingEnabled: false
     commercialization:

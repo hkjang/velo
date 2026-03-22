@@ -88,6 +88,7 @@ public class AiGatewayServlet extends HttpServlet {
             case "/intent-route" -> {
                 io.velo.was.aiplatform.intent.IntentRouteDecision intentDecision =
                         gatewayService.intentRoute(gatewayRequest.prompt(), tenantAccess.tenantId());
+                usageService.recordIntentRoute();
                 tenantService.recordUsage(tenantAccess, 0);
                 applyTenantHeaders(resp, tenantAccess, 0);
                 resp.getWriter().write(intentDecisionToJson(intentDecision));
@@ -125,26 +126,19 @@ public class AiGatewayServlet extends HttpServlet {
     private void writeDiscovery(HttpServletResponse resp, String contextPath, AiTenantAccessGrant tenantAccess) throws IOException {
         returnJson(resp);
         applyTenantHeaders(resp, tenantAccess, 0);
-        resp.getWriter().write("""
-                {
-                  "service": "velo-ai-gateway",
-                  "contextPath": "%s",
-                  "tenantEnforced": %s,
-                  "apiKeyHeader": "%s",
-                  "endpoints": [
-                    "%s/gateway/route",
-                    "%s/gateway/infer",
-                    "%s/gateway/stream"
-                  ]
-                }
-                """.formatted(
-                contextPath,
-                tenantAccess.tracked(),
-                tenantService.apiKeyHeader(),
-                contextPath,
-                contextPath,
-                contextPath
-        ).trim());
+        StringBuilder d = new StringBuilder(512);
+        d.append("{\"service\":\"velo-ai-gateway\"");
+        d.append(",\"contextPath\":\"").append(escapeJson(contextPath)).append("\"");
+        d.append(",\"tenantEnforced\":").append(tenantAccess.tracked());
+        d.append(",\"apiKeyHeader\":\"").append(escapeJson(tenantService.apiKeyHeader())).append("\"");
+        d.append(",\"endpoints\":[");
+        d.append("\"").append(contextPath).append("/gateway/route\",");
+        d.append("\"").append(contextPath).append("/gateway/infer\",");
+        d.append("\"").append(contextPath).append("/gateway/stream\",");
+        d.append("\"").append(contextPath).append("/gateway/ensemble\",");
+        d.append("\"").append(contextPath).append("/gateway/intent-route\"");
+        d.append("]}");
+        resp.getWriter().write(d.toString());
         resp.getWriter().flush();
     }
 

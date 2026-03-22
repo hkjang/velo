@@ -57,7 +57,7 @@ public final class AiPlatformLayout {
         html.append("</main>\n");
         // tab script
         html.append("<script>\n");
-        html.append("function showTab(e,id){e&&e.preventDefault();document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.nav-item').forEach(a=>a.classList.remove('active'));const el=document.getElementById('tab-'+id);if(el)el.style.display='block';if(e&&e.currentTarget)e.currentTarget.classList.add('active');document.getElementById('sidebar').classList.remove('open');}\n");
+        html.append("function showTab(e,id){e&&e.preventDefault();document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(a=>a.classList.remove('active'));const el=document.getElementById('tab-'+id);if(el)el.classList.add('active');if(e&&e.currentTarget)e.currentTarget.classList.add('active');document.getElementById('sidebar').classList.remove('open');}\n");
         html.append("document.addEventListener('DOMContentLoaded',()=>{const h=location.hash.replace('#','');if(h){const a=document.querySelector('.nav-item[onclick*=\"'+h+'\"]');if(a){showTab(null,h);document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}}});\n");
         html.append("</script>\n");
         html.append("</body>\n</html>");
@@ -89,7 +89,7 @@ public final class AiPlatformLayout {
             .mobile-menu{display:none;padding:10px 16px;background:var(--primary-dark);color:#fff;border:0;border-radius:8px;cursor:pointer;font-size:14px;margin-bottom:16px;}
             /* tab panels */
             .tab-panel{display:none;}
-            .tab-panel:first-of-type{display:block;}
+            .tab-panel.active{display:block;}
             /* cards */
             .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px;}
             .card-header{font-size:18px;font-weight:700;margin-bottom:4px;word-break:keep-all;}

@@ -57,6 +57,7 @@ public final class AiPlatformApiJson {
                 q("inferCalls") + ":" + usage.inferCalls() + "," +
                 q("streamCalls") + ":" + usage.streamCalls() + "," +
                 q("publishedInvokeCalls") + ":" + usage.publishedInvokeCalls() + "," +
+                q("intentRouteCalls") + ":" + usage.intentRouteCalls() + "," +
                 q("cacheHits") + ":" + usage.cacheHits() + "," +
                 q("totalEstimatedTokens") + ":" + usage.totalEstimatedTokens() + "}," +
                 q("tenancy") + ":{" +
@@ -138,6 +139,7 @@ public final class AiPlatformApiJson {
                 q("inferCalls") + ":" + usage.inferCalls() + "," +
                 q("streamCalls") + ":" + usage.streamCalls() + "," +
                 q("publishedInvokeCalls") + ":" + usage.publishedInvokeCalls() + "," +
+                q("intentRouteCalls") + ":" + usage.intentRouteCalls() + "," +
                 q("meteredRequests") + ":" + usage.meteredRequests() + "}," +
                 q("billing") + ":{" +
                 q("enabled") + ":" + usage.billingEnabled() + "," +

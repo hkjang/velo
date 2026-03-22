@@ -8,6 +8,7 @@ public record AiPlatformUsageSnapshot(
         long inferCalls,
         long streamCalls,
         long publishedInvokeCalls,
+        long intentRouteCalls,
         long registryMutations,
         long cacheHits,
         long totalEstimatedTokens,

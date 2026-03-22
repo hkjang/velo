@@ -20,6 +20,7 @@ public class AiPlatformUsageService {
     private final AtomicLong inferCalls = new AtomicLong();
     private final AtomicLong streamCalls = new AtomicLong();
     private final AtomicLong publishedInvokeCalls = new AtomicLong();
+    private final AtomicLong intentRouteCalls = new AtomicLong();
     private final AtomicLong registryMutations = new AtomicLong();
     private final AtomicLong cacheHits = new AtomicLong();
     private final AtomicLong totalEstimatedTokens = new AtomicLong();
@@ -57,6 +58,11 @@ public class AiPlatformUsageService {
         }
     }
 
+    public void recordIntentRoute() {
+        intentRouteCalls.incrementAndGet();
+        increment(endpointCounts, "/gateway/intent-route");
+    }
+
     public void recordPublishedInvocation(String modelName, int estimatedTokens) {
         publishedInvokeCalls.incrementAndGet();
         increment(endpointCounts, "/invoke/{model}");
@@ -74,13 +80,14 @@ public class AiPlatformUsageService {
                                             AiGatewayService gatewayService,
                                             AiModelRegistryService registryService) {
         AiModelRegistrySummary registrySummary = registryService.summary();
-        long meteredRequests = routeCalls.get() + inferCalls.get() + streamCalls.get() + publishedInvokeCalls.get();
+        long meteredRequests = routeCalls.get() + inferCalls.get() + streamCalls.get() + publishedInvokeCalls.get() + intentRouteCalls.get();
         return new AiPlatformUsageSnapshot(
                 controlPlaneCalls.get(),
                 routeCalls.get(),
                 inferCalls.get(),
                 streamCalls.get(),
                 publishedInvokeCalls.get(),
+                intentRouteCalls.get(),
                 registryMutations.get(),
                 cacheHits.get(),
                 totalEstimatedTokens.get(),

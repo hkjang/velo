@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: velo-was
+  namespace: velo
+  labels:
+    app.kubernetes.io/name: velo-was
+    app.kubernetes.io/version: "0.5.19"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: velo-was
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: velo-was
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/ai-platform/api/metrics"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: velo-was
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: velo-was
+          image: velo-was:0.5.19
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms512m -Xmx1g -XX:+UseZGC -XX:+ZGenerational -XX:+ExitOnOutOfMemoryError"
+            - name: VELO_CONFIG
+              value: "/opt/velo/conf/server.yaml"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: velo-secrets
+                  key: OPENAI_API_KEY
+                  optional: true
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: velo-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+          volumeMounts:
+            - name: config
+              mountPath: /opt/velo/conf
+              readOnly: true
+            - name: data
+              mountPath: /opt/velo/data
+          livenessProbe:
+            httpGet:
+              path: /ai-platform/api/status
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ai-platform/api/status
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+          startupProbe:
+            httpGet:
+              path: /ai-platform/api/status
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1536Mi
+      volumes:
+        - name: config
+          configMap:
+            name: velo-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: velo-data
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: velo-was
+  namespace: velo
+  labels:
+    app.kubernetes.io/name: velo-was

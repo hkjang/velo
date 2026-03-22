@@ -1,0 +1,17 @@
+apiVersion: v2
+name: velo-was
+description: Velo WAS — Lightweight Java WAS with AI Platform, MCP Server, and Intent Routing
+type: application
+version: 0.5.19
+appVersion: "0.5.19"
+keywords:
+  - was
+  - ai-platform
+  - llm-gateway
+  - intent-routing
+  - mcp
+home: https://github.com/hkjang/velo
+sources:
+  - https://github.com/hkjang/velo
+maintainers:
+  - name: hkjang

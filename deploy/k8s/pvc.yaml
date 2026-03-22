@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: velo-data
+  namespace: velo
+  labels:
+    app.kubernetes.io/name: velo-was
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # storageClassName: standard  # Uncomment and set for your cluster

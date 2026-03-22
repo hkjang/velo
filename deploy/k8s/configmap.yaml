@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: velo-config
+  namespace: velo
+  labels:
+    app.kubernetes.io/name: velo-was
+data:
+  server.yaml: |
+    server:
+      name: velo-was
+      nodeId: ${HOSTNAME}
+      gracefulShutdownMillis: 30000
+
+      listener:
+        host: 0.0.0.0
+        port: 8080
+        soBacklog: 2048
+        reuseAddress: true
+        tcpNoDelay: true
+        keepAlive: true
+        maxContentLength: 10485760
+        idleTimeoutSeconds: 60
+
+      threading:
+        bossThreads: 1
+        businessThreads: 32
+
+      webadmin:
+        enabled: true
+        contextPath: /webadmin
+        username: admin
+        password: admin
+
+      aiPlatform:
+        enabled: true
+        mode: PLATFORM
+        console:
+          enabled: true
+          contextPath: /ai-platform
+        serving:
+          modelRouterEnabled: true
+          abTestingEnabled: true
+          autoModelSelectionEnabled: true
+          defaultStrategy: BALANCED
+          models:
+            - name: llm-general
+              category: LLM
+              provider: builtin
+              version: v1
+              latencyTier: balanced
+              latencyMs: 250
+              accuracyScore: 85
+              defaultSelected: true
+              enabled: true
+        advanced:
+          intentRoutingEnabled: true
+          intentAnalysisWindow: 8000
+          contextCacheEnabled: true
+          contextCacheTtlSeconds: 300
+          aiGatewayEnabled: true
+          observabilityEnabled: true
+        platform:
+          modelRegistrationEnabled: true
+          versionManagementEnabled: true
+          billingEnabled: true
+          multiTenantEnabled: true
+          developerPortalEnabled: true

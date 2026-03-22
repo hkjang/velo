@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: velo
+  labels:
+    app.kubernetes.io/name: velo-was
+    app.kubernetes.io/part-of: velo

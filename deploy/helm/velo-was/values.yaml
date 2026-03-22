@@ -1,0 +1,82 @@
+# Default values for velo-was
+replicaCount: 2
+
+image:
+  repository: velo-was
+  tag: "0.5.19"
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: velo.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 1536Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# JVM configuration
+jvm:
+  opts: "-Xms512m -Xmx1g -XX:+UseZGC -XX:+ZGenerational -XX:+ExitOnOutOfMemoryError"
+
+# AI Platform settings
+aiPlatform:
+  enabled: true
+  mode: PLATFORM
+  contextPath: /ai-platform
+  intentRouting:
+    enabled: true
+    analysisWindow: 8000
+
+# API Keys (set via --set or secret)
+secrets:
+  openaiApiKey: ""
+  anthropicApiKey: ""
+
+# Data persistence
+persistence:
+  enabled: true
+  size: 1Gi
+  # storageClass: ""
+
+# Probes
+probes:
+  liveness:
+    initialDelaySeconds: 30
+    periodSeconds: 15
+  readiness:
+    initialDelaySeconds: 15
+    periodSeconds: 10
+  startup:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    failureThreshold: 12
+
+# Redis (optional, for cluster cache)
+redis:
+  enabled: false
+  url: "redis://redis:6379"

@@ -1,0 +1,29 @@
+# Build artifacts
+*/target/
+!was-bootstrap/target/*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.claude/
+
+# Tools (use container's JDK/Maven)
+.tools/
+
+# Git
+.git/
+.gitignore
+
+# OS
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Data (mount as volume)
+data/

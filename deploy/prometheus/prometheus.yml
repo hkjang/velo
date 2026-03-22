@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'velo-was'
+    metrics_path: '/ai-platform/api/metrics'
+    static_configs:
+      - targets: ['velo-was:8080']
+        labels:
+          instance: 'node-1'
+      - targets: ['velo-was-2:8080']
+        labels:
+          instance: 'node-2'

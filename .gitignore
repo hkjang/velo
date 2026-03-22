@@ -6,7 +6,8 @@
 logs/
 
 .tools
-deploy
+# deploy work directory (WAR runtime artifacts)
+deploy/.work/
 .claude/settings.local.json
 .claude/settings.json
 .claude/skills.json

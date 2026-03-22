@@ -120,6 +120,8 @@ public final class AiPlatformLayout {
             .form-grid{display:grid;gap:10px;margin-bottom:12px;}
             .form-grid.cols-2{grid-template-columns:repeat(2,1fr);}
             .form-grid.cols-3{grid-template-columns:repeat(3,1fr);}
+            .form-field{display:flex;flex-direction:column;gap:4px;}
+            .form-label{font-size:11px;font-weight:600;color:var(--soft);letter-spacing:0.03em;}
             .form-input,.form-select,.form-textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;background:var(--surface);}
             .form-textarea{min-height:120px;resize:vertical;}
             .form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(15,118,110,0.1);}

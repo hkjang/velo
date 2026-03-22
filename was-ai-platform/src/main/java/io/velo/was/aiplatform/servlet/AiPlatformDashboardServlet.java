@@ -149,7 +149,7 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         input(b, "registryLatency", "210", "\uc9c0\uc5f0(ms)");
         input(b, "registryAccuracy", "89", "\uc815\ud655\ub3c4 (0-100)");
         b.append("</div>");
-        b.append("<div class=\"form-grid\"><select id=\"registryStatus\" class=\"form-select\"><option value=\"ACTIVE\">ACTIVE (\ud65c\uc131)</option><option value=\"CANARY\">CANARY (\uce74\ub098\ub9ac)</option><option value=\"INACTIVE\">INACTIVE (\ube44\ud65c\uc131)</option></select></div>");
+        b.append("<div class=\"form-grid\"><div class=\"form-field\"><label class=\"form-label\" for=\"registryStatus\">\ubc84\uc804 \uc0c1\ud0dc</label><select id=\"registryStatus\" class=\"form-select\"><option value=\"ACTIVE\">ACTIVE (\ud65c\uc131)</option><option value=\"CANARY\">CANARY (\uce74\ub098\ub9ac)</option><option value=\"INACTIVE\">INACTIVE (\ube44\ud65c\uc131)</option></select></div></div>");
         b.append("<div class=\"btns\">");
         b.append("<button class=\"btn btn-primary\" onclick=\"registerRegistryModel()\">\ubc84\uc804 \ub4f1\ub85d</button>");
         b.append("<button class=\"btn btn-secondary\" onclick=\"updateRegistryStatus('ACTIVE')\">ACTIVE \uc2b9\uaca9</button>");
@@ -202,7 +202,8 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("<div class=\"card\"><div class=\"card-header\">\uc758\ub3c4 \ub77c\uc6b0\ud305 \ud14c\uc2a4\ud2b8</div>");
         b.append("<div class=\"card-desc\">\ud504\ub86c\ud504\ud2b8\ub97c \uc785\ub825\ud558\uba74 \ud0a4\uc6cc\ub4dc \ubd84\uc11d \u2192 \uc758\ub3c4 \ud30c\uc545 \u2192 \ub77c\uc6b0\ud305 \uacb0\uc815 \uacfc\uc815\uc744 \ud655\uc778</div>");
         b.append("<div class=\"form-grid cols-2\">");
-        b.append("<textarea id=\"intentPrompt\" class=\"form-textarea\" style=\"min-height:60px;\">\uc774\ubc88 \ub2ec \ub9e4\ucd9c \ubcf4\uace0\uc11c\ub97c \uc694\uc57d\ud574 \uc8fc\uc138\uc694</textarea>");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"intentPrompt\">\ud14c\uc2a4\ud2b8 \ud504\ub86c\ud504\ud2b8</label>");
+        b.append("<textarea id=\"intentPrompt\" class=\"form-textarea\" style=\"min-height:60px;\">\uc774\ubc88 \ub2ec \ub9e4\ucd9c \ubcf4\uace0\uc11c\ub97c \uc694\uc57d\ud574 \uc8fc\uc138\uc694</textarea></div>");
         input(b, "intentTenantId", "", "\ud14c\ub10c\ud2b8 ID (\uc120\ud0dd)");
         b.append("</div>");
         b.append("<div class=\"btns\">");
@@ -216,12 +217,13 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("<div class=\"form-grid cols-3\">");
         input(b, "kwPrimary", "", "\uc8fc \ud0a4\uc6cc\ub4dc *");
         input(b, "kwSynonyms", "", "\ub3d9\uc758\uc5b4 (\uc27c\ud45c \uad6c\ubd84)");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"kwIntent\">\uc758\ub3c4 \uc720\ud615</label>");
         b.append("<select id=\"kwIntent\" class=\"form-select\">");
         b.append("<option value=\"SUMMARIZATION\">\uc694\uc57d</option><option value=\"GENERATION\">\uc0dd\uc131</option>");
         b.append("<option value=\"CODE\">\ucf54\ub4dc</option><option value=\"CLASSIFICATION\">\ubd84\ub958</option>");
         b.append("<option value=\"EXTRACTION\">\ucd94\ucd9c</option><option value=\"SEARCH\">\uac80\uc0c9</option>");
         b.append("<option value=\"VALIDATION\">\uac80\uc99d</option><option value=\"TRANSLATION\">\ubc88\uc5ed</option>");
-        b.append("<option value=\"CONVERSATION\">\ub300\ud654</option><option value=\"GENERAL\">\uc77c\ubc18</option></select>");
+        b.append("<option value=\"CONVERSATION\">\ub300\ud654</option><option value=\"GENERAL\">\uc77c\ubc18</option></select></div>");
         input(b, "kwPriority", "50", "\uc6b0\uc120\uc21c\uc704 (0-100)");
         b.append("</div>");
         b.append("<div class=\"btns\">");
@@ -247,10 +249,11 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("<div class=\"tab-panel\" id=\"tab-sandbox\">\n");
         b.append("<div class=\"card\"><div class=\"card-header\">\uac8c\uc774\ud2b8\uc6e8\uc774 \ud14c\uc2a4\ud2b8</div><div class=\"card-desc\">\ub77c\uc6b0\ud305/\ucd94\ub860/\uc559\uc0c1\ube14/\uc2a4\ud2b8\ub9ac\ubc0d \ub3d9\uc791\uc744 \uc9c1\uc811 \ud655\uc778\ud569\ub2c8\ub2e4.</div>");
         b.append("<div class=\"form-grid cols-2\">");
-        b.append("<select id=\"gatewayType\" class=\"form-select\"><option value=\"AUTO\">\uc790\ub3d9 (AUTO)</option><option value=\"CHAT\">\ucc44\ud305 (CHAT)</option><option value=\"VISION\">\ube44\uc804 (VISION)</option><option value=\"RECOMMENDATION\">\ucd94\ucc9c (RECOMMENDATION)</option></select>");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"gatewayType\">\uc694\uccad \uc720\ud615</label><select id=\"gatewayType\" class=\"form-select\"><option value=\"AUTO\">\uc790\ub3d9 (AUTO)</option><option value=\"CHAT\">\ucc44\ud305 (CHAT)</option><option value=\"VISION\">\ube44\uc804 (VISION)</option><option value=\"RECOMMENDATION\">\ucd94\ucc9c (RECOMMENDATION)</option></select></div>");
         input(b, "gatewaySession", "console-demo", "\uc138\uc158 ID");
         b.append("</div>");
-        b.append("<textarea id=\"gatewayPrompt\" class=\"form-textarea\">\uc2e0\uaddc \ubaa8\ubc14\uc77c \uace0\uac1d\uc5d0\uac8c \ucd94\ucc9c\ud560 \uc2a4\ud0c0\ud130 \uc0c1\ud488 3\uac1c\ub97c \uc81c\uc548\ud574 \uc8fc\uc138\uc694.</textarea>");
+        b.append("<div class=\"form-field\" style=\"grid-column:1/-1;\"><label class=\"form-label\" for=\"gatewayPrompt\">\ud504\ub86c\ud504\ud2b8 \uc785\ub825</label>");
+        b.append("<textarea id=\"gatewayPrompt\" class=\"form-textarea\">\uc2e0\uaddc \ubaa8\ubc14\uc77c \uace0\uac1d\uc5d0\uac8c \ucd94\ucc9c\ud560 \uc2a4\ud0c0\ud130 \uc0c1\ud488 3\uac1c\ub97c \uc81c\uc548\ud574 \uc8fc\uc138\uc694.</textarea></div>");
         b.append("<div class=\"btns\">");
         b.append("<button class=\"btn btn-primary\" onclick=\"callGateway('route')\">\ub77c\uc6b0\ud305</button>");
         b.append("<button class=\"btn btn-primary\" onclick=\"callGateway('infer')\">\ucd94\ub860</button>");
@@ -275,7 +278,7 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("<div class=\"form-grid cols-3\">");
         input(b, "tenantId", "tenant-demo", "\ud14c\ub10c\ud2b8 ID *");
         input(b, "tenantDisplayName", "\ub370\ubaa8 \ud14c\ub10c\ud2b8", "\ud45c\uc2dc \uc774\ub984");
-        b.append("<select id=\"tenantPlan\" class=\"form-select\"><option value=\"starter\">Starter</option><option value=\"pro\">Pro</option><option value=\"enterprise\">Enterprise</option></select>");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"tenantPlan\">\uc694\uae08\uc81c</label><select id=\"tenantPlan\" class=\"form-select\"><option value=\"starter\">Starter</option><option value=\"pro\">Pro</option><option value=\"enterprise\">Enterprise</option></select></div>");
         input(b, "tenantRateLimit", "120", "\uc694\uccad \uc81c\ud55c(\ubd84\ub2f9)");
         input(b, "tenantTokenQuota", "250000", "\ud1a0\ud070 \ucffc\ud130");
         input(b, "tenantKeyLabel", "default", "API \ud0a4 \ub77c\ubca8");
@@ -300,7 +303,8 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("</div>");
         b.append("<div class=\"form-grid cols-2\">");
         input(b, "publishedModelName", "llm-general", "\ubaa8\ub378\uba85");
-        b.append("<textarea id=\"publishedPrompt\" class=\"form-textarea\" style=\"min-height:60px;\">\uc2e0\uaddc \uae30\uc5c5 \uace0\uac1d\uc744 \uc704\ud55c \uc628\ubcf4\ub529 \uac00\uc774\ub4dc\ub97c \uc694\uc57d\ud574 \uc8fc\uc138\uc694.</textarea>");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"publishedPrompt\">\ud504\ub86c\ud504\ud2b8</label>");
+        b.append("<textarea id=\"publishedPrompt\" class=\"form-textarea\" style=\"min-height:60px;\">\uc2e0\uaddc \uae30\uc5c5 \uace0\uac1d\uc744 \uc704\ud55c \uc628\ubcf4\ub529 \uac00\uc774\ub4dc\ub97c \uc694\uc57d\ud574 \uc8fc\uc138\uc694.</textarea></div>");
         b.append("</div>");
         b.append("<div class=\"btns\"><button class=\"btn btn-primary\" onclick=\"invokePublishedModel()\">API \ud638\ucd9c</button>");
         b.append("<button class=\"btn btn-secondary\" onclick=\"refreshPublishedApis()\">\ubc1c\ud589 API \uc0c8\ub85c\uace0\uce68</button></div>");
@@ -485,7 +489,10 @@ public class AiPlatformDashboardServlet extends HttpServlet {
     }
 
     private static void input(StringBuilder b, String id, String val, String ph) {
+        b.append("<div class=\"form-field\">");
+        b.append("<label class=\"form-label\" for=\"").append(id).append("\">").append(h(ph)).append("</label>");
         b.append("<input id=\"").append(id).append("\" type=\"text\" value=\"").append(h(val)).append("\" class=\"form-input\" placeholder=\"").append(h(ph)).append("\">");
+        b.append("</div>");
     }
 
     private static void provRow(StringBuilder b, String prov, String proto, String models, boolean fo, boolean lb, boolean on) {

@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "velo-was",
+      "runtimeExecutable": "D:/project/velo/.tools/jdk/jdk-21.0.10+7/bin/java.exe",
+      "runtimeArgs": [
+        "-Xms256m", "-Xmx1g", "-XX:+UseZGC",
+        "-Dvelo.config=D:/project/velo/conf/server.yaml",
+        "-Dvelo.home=D:/project/velo",
+        "-jar", "D:/project/velo/was-bootstrap/target/was-bootstrap-0.5.19-jar-with-dependencies.jar"
+      ],
+      "port": 8080
+    }
+  ]
+}

@@ -14,14 +14,29 @@ import java.util.List;
  */
 public class RouteDecisionEngine {
 
-    private static final int MAX_PROMPT_LENGTH = 32_000;
+    /**
+     * 키워드 분석 윈도우 크기 (기본 8,000자).
+     * 의도 판별을 위한 키워드는 프롬프트 앞부분에 집중되므로,
+     * 전체 프롬프트를 정규화할 필요 없이 앞부분만 분석합니다.
+     * 실제 프롬프트는 truncate하지 않고 그대로 모델에 전달됩니다.
+     *
+     * 현대 AI 모델(128K~1M 컨텍스트)의 긴 입력을 고려하여
+     * 분석 윈도우만 제한하고 원본은 보존합니다.
+     */
+    private static final int DEFAULT_ANALYSIS_WINDOW = 8_000;
 
     private final IntentRoutingPolicyService policyService;
     private final String defaultModel;
+    private final int analysisWindow;
 
     public RouteDecisionEngine(IntentRoutingPolicyService policyService, String defaultModel) {
+        this(policyService, defaultModel, DEFAULT_ANALYSIS_WINDOW);
+    }
+
+    public RouteDecisionEngine(IntentRoutingPolicyService policyService, String defaultModel, int analysisWindow) {
         this.policyService = policyService;
         this.defaultModel = defaultModel != null ? defaultModel : "llm-general";
+        this.analysisWindow = analysisWindow > 0 ? analysisWindow : DEFAULT_ANALYSIS_WINDOW;
     }
 
     /**
@@ -34,12 +49,12 @@ public class RouteDecisionEngine {
     public IntentRouteDecision decide(String prompt, String tenantId) {
         long startNanos = System.nanoTime();
 
-        // 0. 길이 제한
-        String safePrompt = (prompt != null && prompt.length() > MAX_PROMPT_LENGTH)
-                ? prompt.substring(0, MAX_PROMPT_LENGTH) : prompt;
+        // 0. 키워드 분석 윈도우 — 프롬프트 앞부분만 분석 (원본은 보존)
+        String analysisText = (prompt != null && prompt.length() > analysisWindow)
+                ? prompt.substring(0, analysisWindow) : prompt;
 
-        // 1. 정규화
-        String normalized = RequestNormalizer.normalize(safePrompt);
+        // 1. 정규화 (분석 윈도우만)
+        String normalized = RequestNormalizer.normalize(analysisText);
         if (normalized.isBlank()) {
             return IntentRouteDecision.defaultRoute(defaultModel, System.nanoTime() - startNanos);
         }

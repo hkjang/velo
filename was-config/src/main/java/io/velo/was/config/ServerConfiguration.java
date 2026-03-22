@@ -923,6 +923,8 @@ public class ServerConfiguration {
         private int contextCacheTtlSeconds = 300;
         private boolean aiGatewayEnabled = true;
         // fineTuningApiEnabled removed (feature removed in v0.5.16)
+        private boolean intentRoutingEnabled = true;
+        private int intentAnalysisWindow = 8000;
         private boolean observabilityEnabled = true;
         private boolean gpuSchedulingEnabled = false;
 
@@ -940,6 +942,10 @@ public class ServerConfiguration {
         @Deprecated public boolean isFineTuningApiEnabled() { return false; }
         /** @deprecated Fine-tuning removed in v0.5.16 */
         @Deprecated public void setFineTuningApiEnabled(boolean ignored) { }
+        public boolean isIntentRoutingEnabled() { return intentRoutingEnabled; }
+        public void setIntentRoutingEnabled(boolean intentRoutingEnabled) { this.intentRoutingEnabled = intentRoutingEnabled; }
+        public int getIntentAnalysisWindow() { return intentAnalysisWindow; }
+        public void setIntentAnalysisWindow(int intentAnalysisWindow) { this.intentAnalysisWindow = intentAnalysisWindow; }
         public boolean isObservabilityEnabled() { return observabilityEnabled; }
         public void setObservabilityEnabled(boolean observabilityEnabled) { this.observabilityEnabled = observabilityEnabled; }
         public boolean isGpuSchedulingEnabled() { return gpuSchedulingEnabled; }

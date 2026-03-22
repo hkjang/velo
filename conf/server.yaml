@@ -120,7 +120,8 @@ server:
       contextCacheEnabled: true
       contextCacheTtlSeconds: 300
       aiGatewayEnabled: true
-      # fineTuningApiEnabled: removed (v0.5.16)
+      intentRoutingEnabled: true
+      intentAnalysisWindow: 8000  # 키워드 분석 윈도우 (문자 수). 프롬프트 앞부분만 분석하여 의도 판별
       observabilityEnabled: true
       gpuSchedulingEnabled: false
     commercialization:

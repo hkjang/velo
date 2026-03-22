@@ -229,6 +229,11 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(buildIntentStatsJson());
             return;
         }
+        if ("/intent/export".equals(path) && intentPolicyService != null) {
+            usageService.recordControlPlaneAccess("/api/intent/export");
+            resp.getWriter().write(buildExportJson());
+            return;
+        }
         notFound(resp, "Not Found");
     }
 
@@ -453,6 +458,13 @@ public class AiPlatformApiServlet extends HttpServlet {
                 resp.getWriter().write(buildPolicyJson(pol));
                 return;
             }
+            // 벌크 임포트
+            if ("/intent/import".equals(path) && intentPolicyService != null) {
+                usageService.recordControlPlaneAccess("/api/intent/import");
+                int imported = handleBulkImport(body);
+                resp.getWriter().write("{\"imported\":" + imported + "}");
+                return;
+            }
             notFound(resp, "Not Found");
         } catch (IllegalArgumentException e) {
             badRequest(resp, e.getMessage());
@@ -655,6 +667,8 @@ public class AiPlatformApiServlet extends HttpServlet {
         sb.append("\"contextCacheEnabled\":").append(ai.getAdvanced().isContextCacheEnabled()).append(",");
         sb.append("\"contextCacheTtlSeconds\":").append(ai.getAdvanced().getContextCacheTtlSeconds()).append(",");
         sb.append("\"aiGatewayEnabled\":").append(ai.getAdvanced().isAiGatewayEnabled()).append(",");
+        sb.append("\"intentRoutingEnabled\":").append(ai.getAdvanced().isIntentRoutingEnabled()).append(",");
+        sb.append("\"intentAnalysisWindow\":").append(ai.getAdvanced().getIntentAnalysisWindow()).append(",");
         sb.append("\"observabilityEnabled\":").append(ai.getAdvanced().isObservabilityEnabled());
         sb.append("},");
         // differentiation
@@ -823,6 +837,82 @@ public class AiPlatformApiServlet extends HttpServlet {
         }
         sb.append("}}");
         return sb.toString();
+    }
+
+    private String buildExportJson() {
+        var keywords = intentPolicyService.listKeywords();
+        var policies = intentPolicyService.listPolicies();
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("{\"keywords\":[");
+        boolean first = true;
+        for (IntentKeyword kw : keywords) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append(buildKeywordJson(kw));
+        }
+        sb.append("],\"policies\":[");
+        first = true;
+        for (RoutingPolicy pol : policies) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append(buildPolicyJson(pol));
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    private int handleBulkImport(String body) {
+        int imported = 0;
+        // 키워드 배열 파싱 (간이 JSON 파싱)
+        java.util.regex.Pattern kwPattern = java.util.regex.Pattern.compile(
+                "\"primaryKeyword\"\\s*:\\s*\"([^\"]+)\"");
+        java.util.regex.Pattern synPattern = java.util.regex.Pattern.compile(
+                "\"synonyms\"\\s*:\\s*\"([^\"]*)\"");
+        java.util.regex.Pattern intentPattern = java.util.regex.Pattern.compile(
+                "\"intent\"\\s*:\\s*\"([^\"]+)\"");
+        java.util.regex.Pattern prioPattern = java.util.regex.Pattern.compile(
+                "\"priority\"\\s*:\\s*(\\d+)");
+
+        // Jackson으로 파싱 시도
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+            if (root.has("keywords") && root.get("keywords").isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode kw : root.get("keywords")) {
+                    String pk = kw.has("primaryKeyword") ? kw.get("primaryKeyword").asText() : "";
+                    if (pk.isBlank()) continue;
+                    String syn = kw.has("synonyms") ? kw.get("synonyms").asText("") : "";
+                    String intent = kw.has("intent") ? kw.get("intent").asText("GENERAL") : "GENERAL";
+                    int priority = kw.has("priority") ? kw.get("priority").asInt(50) : 50;
+                    java.util.List<String> synonyms = syn.isBlank() ? java.util.List.of()
+                            : java.util.Arrays.stream(syn.split("[,;|]")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+                    // synonyms가 배열인 경우
+                    if (kw.has("synonyms") && kw.get("synonyms").isArray()) {
+                        java.util.List<String> arr = new java.util.ArrayList<>();
+                        for (com.fasterxml.jackson.databind.JsonNode s : kw.get("synonyms")) arr.add(s.asText());
+                        synonyms = arr;
+                    }
+                    intentPolicyService.addKeyword(pk, synonyms, IntentType.fromString(intent), priority);
+                    imported++;
+                }
+            }
+            if (root.has("policies") && root.get("policies").isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode pol : root.get("policies")) {
+                    String intent = pol.has("intent") ? pol.get("intent").asText("GENERAL") : "GENERAL";
+                    int priority = pol.has("priority") ? pol.get("priority").asInt(50) : 50;
+                    String routeTarget = pol.has("routeTarget") ? pol.get("routeTarget").asText("default") : "default";
+                    String modelName = pol.has("modelName") ? pol.get("modelName").asText("llm-general") : "llm-general";
+                    String fallback = pol.has("fallbackModel") ? pol.get("fallbackModel").asText(modelName) : modelName;
+                    boolean streaming = pol.has("streamingPreferred") && pol.get("streamingPreferred").asBoolean();
+                    String tenant = pol.has("tenantOverride") ? pol.get("tenantOverride").asText("") : "";
+                    int maxTokens = pol.has("maxInputTokens") ? pol.get("maxInputTokens").asInt(0) : 0;
+                    intentPolicyService.addPolicy(IntentType.fromString(intent), priority, routeTarget, modelName, fallback, streaming, tenant, maxTokens);
+                    imported++;
+                }
+            }
+        } catch (Exception e) {
+            throw new IllegalArgumentException("JSON 파싱 오류: " + e.getMessage());
+        }
+        return imported;
     }
 
     private static String esc(String s) {

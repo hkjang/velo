@@ -62,7 +62,8 @@ public final class AiPlatformApplication {
                 .findFirst()
                 .map(ServerConfiguration.ModelProfile::getName)
                 .orElse("llm-general");
-        RouteDecisionEngine intentEngine = new RouteDecisionEngine(intentPolicyService, defaultModel);
+        int analysisWindow = configuration.getServer().getAiPlatform().getAdvanced().getIntentAnalysisWindow();
+        RouteDecisionEngine intentEngine = new RouteDecisionEngine(intentPolicyService, defaultModel, analysisWindow);
         gatewayService.setIntentEngine(intentEngine);
 
         var builder = SimpleServletApplication.builder(APP_NAME, contextPath)

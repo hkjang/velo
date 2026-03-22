@@ -67,6 +67,17 @@ public class AiChatCompletionServlet extends HttpServlet {
             return;
         }
 
+        // 의도 기반 라우팅 헤더 추가 (비동기 분석)
+        try {
+            io.velo.was.aiplatform.intent.IntentRouteDecision intentDecision =
+                    gatewayService.intentRoute(prompt, tenantAccess.tenantId());
+            resp.setHeader("X-Intent", intentDecision.resolvedIntent().name());
+            resp.setHeader("X-Intent-Model", intentDecision.modelName());
+            resp.setHeader("X-Intent-Policy", intentDecision.policyId());
+        } catch (Exception ignored) {
+            // 의도 라우팅 실패 시 기본 라우팅으로 진행
+        }
+
         String requestType = model.isBlank() ? "AUTO" : "CHAT";
         AiGatewayRequest gatewayRequest = new AiGatewayRequest(requestType, prompt, "openai-compat-" + UUID.randomUUID().toString().substring(0, 8), stream);
 

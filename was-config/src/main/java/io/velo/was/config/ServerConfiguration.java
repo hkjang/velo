@@ -922,7 +922,7 @@ public class ServerConfiguration {
         private boolean contextCacheEnabled = true;
         private int contextCacheTtlSeconds = 300;
         private boolean aiGatewayEnabled = true;
-        private boolean fineTuningApiEnabled = false;
+        // fineTuningApiEnabled removed (feature removed in v0.5.16)
         private boolean observabilityEnabled = true;
         private boolean gpuSchedulingEnabled = false;
 
@@ -936,8 +936,10 @@ public class ServerConfiguration {
         public void setContextCacheTtlSeconds(int contextCacheTtlSeconds) { this.contextCacheTtlSeconds = contextCacheTtlSeconds; }
         public boolean isAiGatewayEnabled() { return aiGatewayEnabled; }
         public void setAiGatewayEnabled(boolean aiGatewayEnabled) { this.aiGatewayEnabled = aiGatewayEnabled; }
-        public boolean isFineTuningApiEnabled() { return fineTuningApiEnabled; }
-        public void setFineTuningApiEnabled(boolean fineTuningApiEnabled) { this.fineTuningApiEnabled = fineTuningApiEnabled; }
+        /** @deprecated Fine-tuning removed in v0.5.16 */
+        @Deprecated public boolean isFineTuningApiEnabled() { return false; }
+        /** @deprecated Fine-tuning removed in v0.5.16 */
+        @Deprecated public void setFineTuningApiEnabled(boolean ignored) { }
         public boolean isObservabilityEnabled() { return observabilityEnabled; }
         public void setObservabilityEnabled(boolean observabilityEnabled) { this.observabilityEnabled = observabilityEnabled; }
         public boolean isGpuSchedulingEnabled() { return gpuSchedulingEnabled; }

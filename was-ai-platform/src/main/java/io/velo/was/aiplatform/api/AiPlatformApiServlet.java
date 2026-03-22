@@ -425,6 +425,10 @@ public class AiPlatformApiServlet extends HttpServlet {
                 int priority = parseInteger(firstNonBlank(req.getParameter("priority"), extractJsonNumber(body, "priority")), 50);
                 java.util.List<String> synonyms = synonymsStr.isBlank() ? java.util.List.of()
                         : java.util.Arrays.stream(synonymsStr.split("[,;|]")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+                if (primaryKeyword.isBlank()) {
+                    badRequest(resp, "primaryKeyword는 필수입니다.");
+                    return;
+                }
                 IntentKeyword kw = intentPolicyService.addKeyword(primaryKeyword, synonyms, IntentType.fromString(intentStr), priority);
                 resp.setStatus(HttpServletResponse.SC_CREATED);
                 resp.getWriter().write(buildKeywordJson(kw));
@@ -440,6 +444,10 @@ public class AiPlatformApiServlet extends HttpServlet {
                 boolean streaming = parseBoolean(firstNonBlank(req.getParameter("streamingPreferred"), extractJsonBoolean(body, "streamingPreferred")), false);
                 String tenantOverride = firstNonBlank(req.getParameter("tenantOverride"), extractJsonString(body, "tenantOverride"));
                 int maxTokens = parseInteger(firstNonBlank(req.getParameter("maxInputTokens"), extractJsonNumber(body, "maxInputTokens")), 0);
+                if (modelName.isBlank()) {
+                    badRequest(resp, "modelName은 필수입니다.");
+                    return;
+                }
                 RoutingPolicy pol = intentPolicyService.addPolicy(IntentType.fromString(intentStr), priority, routeTarget, modelName, fallback, streaming, tenantOverride, maxTokens);
                 resp.setStatus(HttpServletResponse.SC_CREATED);
                 resp.getWriter().write(buildPolicyJson(pol));

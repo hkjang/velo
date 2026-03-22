@@ -14,6 +14,8 @@ import java.util.List;
  */
 public class RouteDecisionEngine {
 
+    private static final int MAX_PROMPT_LENGTH = 32_000;
+
     private final IntentRoutingPolicyService policyService;
     private final String defaultModel;
 
@@ -32,8 +34,12 @@ public class RouteDecisionEngine {
     public IntentRouteDecision decide(String prompt, String tenantId) {
         long startNanos = System.nanoTime();
 
+        // 0. 길이 제한
+        String safePrompt = (prompt != null && prompt.length() > MAX_PROMPT_LENGTH)
+                ? prompt.substring(0, MAX_PROMPT_LENGTH) : prompt;
+
         // 1. 정규화
-        String normalized = RequestNormalizer.normalize(prompt);
+        String normalized = RequestNormalizer.normalize(safePrompt);
         if (normalized.isBlank()) {
             return IntentRouteDecision.defaultRoute(defaultModel, System.nanoTime() - startNanos);
         }

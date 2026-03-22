@@ -85,6 +85,13 @@ public class AiGatewayServlet extends HttpServlet {
                 applyTenantHeaders(resp, tenantAccess, ensembleResult.totalEstimatedTokens());
                 resp.getWriter().write(ensembleResultToJson(ensembleResult));
             }
+            case "/intent-route" -> {
+                io.velo.was.aiplatform.intent.IntentRouteDecision intentDecision =
+                        gatewayService.intentRoute(gatewayRequest.prompt(), tenantAccess.tenantId());
+                tenantService.recordUsage(tenantAccess, 0);
+                applyTenantHeaders(resp, tenantAccess, 0);
+                resp.getWriter().write(intentDecisionToJson(intentDecision));
+            }
             default -> {
                 resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 applyTenantHeaders(resp, tenantAccess, 0);
@@ -302,6 +309,27 @@ public class AiGatewayServlet extends HttpServlet {
             json.append(inferenceResultToJson(result.candidates().get(i)));
         }
         json.append("]}");
+        return json.toString();
+    }
+
+    public static String intentDecisionToJson(io.velo.was.aiplatform.intent.IntentRouteDecision d) {
+        StringBuilder json = new StringBuilder(512);
+        json.append("{\"resolvedIntent\":\"").append(escapeJson(d.resolvedIntent().name())).append("\",");
+        json.append("\"intentLabel\":\"").append(escapeJson(d.resolvedIntent().label())).append("\",");
+        json.append("\"matchedKeyword\":").append(d.matchedKeyword() != null ? "\"" + escapeJson(d.matchedKeyword()) + "\"" : "null").append(',');
+        json.append("\"policyId\":\"").append(escapeJson(d.policyId())).append("\",");
+        json.append("\"routeTarget\":\"").append(escapeJson(d.routeTarget())).append("\",");
+        json.append("\"modelName\":\"").append(escapeJson(d.modelName())).append("\",");
+        json.append("\"fallbackModel\":\"").append(escapeJson(d.fallbackModel())).append("\",");
+        json.append("\"streamingPreferred\":").append(d.streamingPreferred()).append(',');
+        json.append("\"priority\":").append(d.priority()).append(',');
+        json.append("\"reasoning\":\"").append(escapeJson(d.reasoning())).append("\",");
+        json.append("\"candidateKeywords\":[");
+        for (int i = 0; i < d.candidateKeywords().size(); i++) {
+            if (i > 0) json.append(',');
+            json.append("\"").append(escapeJson(d.candidateKeywords().get(i))).append("\"");
+        }
+        json.append("],\"processingTimeMicros\":").append(d.processingTimeNanos() / 1000).append('}');
         return json.toString();
     }
 

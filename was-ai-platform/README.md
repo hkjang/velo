@@ -1,6 +1,6 @@
 # was-ai-platform
 
-Standalone AI platform module for Velo WAS. Transforms a lightweight WAS into a fully-featured AI serving platform with multi-LLM routing, OpenAI-compatible proxy, tenant management, billing, fine-tuning, and observability.
+Standalone AI platform module for Velo WAS. Transforms a lightweight WAS into a fully-featured AI serving platform with multi-LLM routing, intent-based routing, OpenAI-compatible proxy, tenant management, billing, and observability.
 
 ## Architecture
 
@@ -15,12 +15,12 @@ Standalone AI platform module for Velo WAS. Transforms a lightweight WAS into a 
 |                                                          |
 |  +----------------------------------------------------+  |
 |  |              Control Plane API (/api/*)             |  |
-|  |  models | tenants | billing | usage | fine-tuning   |  |
+|  |  models | tenants | billing | usage | intent-routing |  |
 |  +----------------------------------------------------+  |
 |                                                          |
 |  +----------------------------------------------------+  |
 |  |           AI Gateway (/gateway/*)                   |  |
-|  |  route | infer | stream                             |  |
+|  |  route | infer | stream | intent-route               |  |
 |  +----------------------------------------------------+  |
 |                                                          |
 |  +----------------------------------------------------+  |
@@ -34,8 +34,8 @@ Standalone AI platform module for Velo WAS. Transforms a lightweight WAS into a 
 |  +----------------------------------------------------+  |
 |                                                          |
 |  +-----------+ +-----------+ +-----------+ +-----------+ |
-|  |  Model    | |  Tenant   | | Billing   | |  Fine-    | |
-|  |  Registry | |  Service  | | Service   | |  Tuning   | |
+|  |  Model    | |  Tenant   | | Billing   | |  Intent   | |
+|  |  Registry | |  Service  | | Service   | |  Routing  | |
 |  +-----------+ +-----------+ +-----------+ +-----------+ |
 |                                                          |
 |  +----------------------------------------------------+  |
@@ -71,7 +71,7 @@ Standalone AI platform module for Velo WAS. Transforms a lightweight WAS into a 
 - **Model Registry**: Register, version, promote (ACTIVE/CANARY), and retire model profiles at runtime
 - **Tenant Management**: Multi-tenant isolation with API key auth, rate limits, token quotas, and usage tracking
 - **Billing**: Category-based pricing with per-model cost breakdown and metered request accounting
-- **Fine-Tuning API**: Job lifecycle management (QUEUED, RUNNING, SUCCEEDED, CANCELLED) with auto-materialization of tuned models
+- **Intent-Based Routing**: Keyword extraction → intent detection → policy-based model selection with audit logging
 - **Published APIs**: Auto-generated per-model `/invoke/{model}` REST endpoints from the active registry
 - **Developer Portal**: Generated OpenAPI 3.0.3 spec with interactive docs UI
 - **Plugin Framework**: Extensible pre/post processing pipeline with built-in content filter

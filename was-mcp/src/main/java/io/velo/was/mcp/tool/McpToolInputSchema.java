@@ -64,25 +64,32 @@ public record McpToolInputSchema(
                 if (!first) sb.append(',');
                 first = false;
                 sb.append('"').append(escape(e.getKey().toString())).append("\":");
-                Object v = e.getValue();
-                if (v instanceof String s) {
-                    sb.append('"').append(escape(s)).append('"');
-                } else if (v instanceof List<?> list) {
-                    sb.append('[');
-                    boolean fi = true;
-                    for (Object item : list) {
-                        if (!fi) sb.append(',');
-                        fi = false;
-                        sb.append('"').append(escape(item.toString())).append('"');
-                    }
-                    sb.append(']');
-                } else {
-                    sb.append(v);
-                }
+                sb.append(valueToJson(e.getValue()));
             }
             return sb.append('}').toString();
         }
         return "{}";
+    }
+
+    /** Recursively serialize any JSON-compatible value. */
+    @SuppressWarnings("unchecked")
+    private static String valueToJson(Object v) {
+        if (v == null) return "null";
+        if (v instanceof String s) return "\"" + escape(s) + "\"";
+        if (v instanceof Number || v instanceof Boolean) return v.toString();
+        if (v instanceof Map<?, ?>) return propertyJson(v);  // recursive for nested objects
+        if (v instanceof List<?> list) {
+            StringBuilder sb = new StringBuilder("[");
+            boolean first = true;
+            for (Object item : list) {
+                if (!first) sb.append(',');
+                first = false;
+                sb.append(valueToJson(item));
+            }
+            sb.append(']');
+            return sb.toString();
+        }
+        return "\"" + escape(v.toString()) + "\"";
     }
 
     private static String escape(String s) {

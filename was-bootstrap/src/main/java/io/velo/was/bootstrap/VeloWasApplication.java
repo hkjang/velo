@@ -192,7 +192,8 @@ public final class VeloWasApplication {
                     configuration.getServer().getName() + "-" + configuration.getServer().getNodeId());
 
             // ── MCP audit file logger (daily-rotating JSON lines) ──
-            Path auditLogDir = Path.of(deployConfig.getDirectory()).getParent().resolve("logs");
+            Path deployPath = Path.of(deployConfig.getDirectory()).toAbsolutePath();
+            Path auditLogDir = (deployPath.getParent() != null ? deployPath.getParent() : deployPath).resolve("logs");
             io.velo.was.mcp.audit.McpAuditFileLogger auditFileLogger =
                     new io.velo.was.mcp.audit.McpAuditFileLogger(auditLogDir);
             mcpResult.auditLog().setFileLogger(auditFileLogger);

@@ -26,6 +26,6 @@ public record McpPromptGetResult(String description, List<McpPromptMessage> mess
 
     private static String escape(String s) {
         return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("\n", "\\n").replace("\r", "\\r");
+                .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 }

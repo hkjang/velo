@@ -31,11 +31,11 @@ final class McpTransportResponses {
         return response;
     }
 
-    /** 204 No Content for notifications. */
+    /** 204 No Content for notifications (RFC 7231: MUST NOT contain a message body). */
     static FullHttpResponse noContent(String sessionId) {
         FullHttpResponse response = new DefaultFullHttpResponse(
                 HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT);
-        response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, 0);
+        // 204 responses MUST NOT include Content-Length per RFC 7231 §6.3.5
         if (sessionId != null) {
             response.headers().set(McpPostHandler.SESSION_HEADER, sessionId);
         }

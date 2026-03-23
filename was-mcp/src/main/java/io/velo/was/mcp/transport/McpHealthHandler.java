@@ -9,7 +9,7 @@ import io.velo.was.mcp.McpServer;
 /**
  * Simple liveness/readiness endpoint for the MCP server.
  *
- * <p>{@code GET /mcp/health} returns a JSON object indicating server status,
+ * <p>{@code GET /ai-platform/mcp/health} returns a JSON object indicating server status,
  * active session count, and registered capability counts.
  */
 public class McpHealthHandler implements HttpHandler {
@@ -45,6 +45,7 @@ public class McpHealthHandler implements HttpHandler {
     }
 
     private static String escape(String s) {
-        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
+        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 }

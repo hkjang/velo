@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 
 /**
- * HTTP POST handler for the MCP endpoint ({@code /mcp}).
+ * HTTP POST handler for the MCP endpoint ({@code /ai-platform/mcp}).
  *
  * <p>Accepts {@code application/json} bodies containing JSON-RPC 2.0 messages.
  * Returns the JSON-RPC response as {@code application/json}.
@@ -44,12 +44,13 @@ public class McpPostHandler implements HttpHandler {
     public FullHttpResponse handle(HttpExchange exchange) {
         FullHttpRequest request = exchange.request();
 
-        if (request.method() == HttpMethod.GET) {
-            // GET without Accept: text/event-stream → method not allowed for this handler
-            return HttpResponses.methodNotAllowed("Use GET with Accept: text/event-stream for SSE");
-        }
         if (request.method() != HttpMethod.POST) {
-            return HttpResponses.methodNotAllowed("Only POST and GET are supported on /mcp");
+            // GET with Accept: text/event-stream is handled by SseHandlerRegistry, not this handler.
+            // Any other method (GET without SSE, PUT, DELETE, etc.) is rejected here.
+            String hint = request.method() == HttpMethod.GET
+                    ? "Use POST for JSON-RPC, or GET with Accept: text/event-stream for SSE"
+                    : "Only POST is supported for JSON-RPC on this endpoint";
+            return HttpResponses.methodNotAllowed(hint);
         }
 
         String contentType = request.headers().get(HttpHeaderNames.CONTENT_TYPE);

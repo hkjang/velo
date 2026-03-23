@@ -129,6 +129,12 @@ public class McpTestConsoleServlet extends HttpServlet {
         out.println("    <button class=\"btn\" onclick=\"adminGet('audit?limit=10')\">Audit</button>");
         out.println("    <button class=\"btn\" onclick=\"adminGet('policies')\">Policies</button>");
         out.println("  </div>");
+        out.println("  <h3>App MCP Gateway</h3>");
+        out.println("  <div class=\"btn-group\">");
+        out.println("    <button class=\"btn\" onclick=\"adminGet('app-endpoints')\">App Endpoints</button>");
+        out.println("    <button class=\"btn\" onclick=\"adminGet('app-sessions')\">App Sessions</button>");
+        out.println("    <button class=\"btn\" onclick=\"adminGet('app-traffic?limit=20')\">App Traffic</button>");
+        out.println("  </div>");
         out.println("  <pre id=\"adminResult\" class=\"result\"></pre>");
         out.println("</div>");
 

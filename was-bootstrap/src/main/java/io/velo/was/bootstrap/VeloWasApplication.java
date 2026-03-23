@@ -186,11 +186,28 @@ public final class VeloWasApplication {
             io.velo.was.aiplatform.gateway.AiGatewayService mcpGatewayService =
                     new io.velo.was.aiplatform.gateway.AiGatewayService(configuration, mcpRegistryService);
             AdminClient mcpAdminClient = new LocalAdminClient(configuration);
-            io.velo.was.mcp.McpApplication.install(registry, sseRegistry, mcpRegistryService, mcpGatewayService,
+            io.velo.was.mcp.McpApplication.InstallResult mcpResult =
+                    io.velo.was.mcp.McpApplication.install(registry, sseRegistry, mcpRegistryService, mcpGatewayService,
                     mcpAdminClient, "velo-mcp",
                     configuration.getServer().getName() + "-" + configuration.getServer().getNodeId());
-            log.info("MCP server installed at /ai-platform/mcp (admin at /ai-platform/mcp/admin/*) with {} admin CLI tools",
-                    "full");
+
+            // ── Wire App MCP Gateway for monitoring deployed app MCP traffic ──
+            io.velo.was.mcp.gateway.McpAppGatewayService appMcpGateway =
+                    new io.velo.was.mcp.gateway.McpAppGatewayService(mcpResult.auditLog());
+            mcpResult.adminHandler().setAppGatewayService(appMcpGateway);
+
+            // Install global filter provider to intercept MCP traffic from apps
+            servletContainer.setGlobalFilterProvider((contextPath, appName) -> {
+                // Skip built-in WAS apps (web admin, ai-platform, sample-app)
+                if ("/admin".equals(contextPath) || "/ai-platform".equals(contextPath)
+                        || "/app".equals(contextPath)) {
+                    return java.util.List.of();
+                }
+                return java.util.List.of(
+                        new io.velo.was.mcp.gateway.McpAppTrafficInterceptor(appMcpGateway, contextPath, appName));
+            });
+
+            log.info("MCP server installed at /ai-platform/mcp (admin at /ai-platform/mcp/admin/*) with app MCP gateway");
         }
 
         NettyServer server = new NettyServer(

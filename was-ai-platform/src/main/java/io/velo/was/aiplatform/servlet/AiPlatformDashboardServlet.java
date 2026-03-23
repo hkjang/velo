@@ -471,6 +471,50 @@ public class AiPlatformDashboardServlet extends HttpServlet {
 
         b.append("</div>\n");
 
+        // ===== TAB: app-mcp — 앱 MCP 모니터링 =====
+        b.append("<div class=\"tab-panel\" id=\"tab-app-mcp\">\n");
+        b.append("<div class=\"hero\"><div class=\"hero-eyebrow\">Application MCP Gateway</div>");
+        b.append("<h1>\uc571 MCP \ubaa8\ub2c8\ud130\ub9c1</h1>");
+        b.append("<p>\ubc30\ud3ec\ub41c \uc560\ud50c\ub9ac\ucf00\uc774\uc158(WAR)\uc5d0\uc11c \ub178\ucd9c\ud558\ub294 MCP \uc5d4\ub4dc\ud3ec\uc778\ud2b8\ub97c \uc911\uc559\uc5d0\uc11c \uac10\uc2dc\ud558\uace0 \uac10\uc0ac\ud569\ub2c8\ub2e4.</p>");
+        b.append("<div class=\"chips\" id=\"appMcpChips\">");
+        chip(b, "\uac8c\uc774\ud2b8\uc6e8\uc774 \ud65c\uc131", true);
+        b.append("</div></div>\n");
+
+        // App MCP Metrics
+        b.append("<div class=\"metrics\" id=\"appMcpMetrics\">");
+        metric(b, "\ubc1c\uacac\ub41c \uc5d4\ub4dc\ud3ec\uc778\ud2b8", "0", "\uc571 MCP \uc5d4\ub4dc\ud3ec\uc778\ud2b8 \uc218", "appMcpEndpoints");
+        metric(b, "\ud65c\uc131 \uc138\uc158", "0", "\uc571 MCP \ud074\ub77c\uc774\uc5b8\ud2b8 \uc138\uc158", "appMcpSessions");
+        metric(b, "\ucd1d \uc694\uccad", "0", "\uc571 MCP \uc694\uccad \ud69f\uc218", "appMcpTotalReqs");
+        metric(b, "\uc624\ub958 \ud69f\uc218", "0", "\uc571 MCP \uc624\ub958", "appMcpTotalErrors");
+        b.append("</div>\n");
+
+        // App MCP Endpoints table
+        b.append("<div class=\"card\"><div class=\"card-header\">\uc571 MCP \uc5d4\ub4dc\ud3ec\uc778\ud2b8</div>");
+        b.append("<div class=\"card-desc\">\ubc30\ud3ec\ub41c \uc560\ud50c\ub9ac\ucf00\uc774\uc158\uc5d0\uc11c \ubc1c\uacac\ub41c MCP \uc5d4\ub4dc\ud3ec\uc778\ud2b8 \ubaa9\ub85d</div>");
+        b.append("<button onclick=\"refreshAppMcpEndpoints()\" class=\"btn\">\uc0c8\ub85c\uace0\uce68</button>");
+        b.append("<div id=\"appMcpEndpointsTable\"></div>");
+        b.append("</div>\n");
+
+        // App MCP Sessions table
+        b.append("<div class=\"card\"><div class=\"card-header\">\uc571 MCP \uc138\uc158</div>");
+        b.append("<div class=\"card-desc\">\uc571 MCP \uc5d4\ub4dc\ud3ec\uc778\ud2b8\uc5d0 \uc5f0\uacb0\ub41c \ud074\ub77c\uc774\uc5b8\ud2b8 \uc138\uc158</div>");
+        b.append("<button onclick=\"refreshAppMcpSessions()\" class=\"btn\">\uc0c8\ub85c\uace0\uce68</button>");
+        b.append("<div id=\"appMcpSessionsTable\"></div>");
+        b.append("</div>\n");
+
+        // App MCP Traffic (audit log for apps)
+        b.append("<div class=\"card\"><div class=\"card-header\">\uc571 MCP \ud2b8\ub798\ud53d \ub85c\uadf8</div>");
+        b.append("<div class=\"card-desc\">\uc571 MCP \uc694\uccad/\uc751\ub2f5 \uac10\uc0ac \uae30\ub85d</div>");
+        b.append("<div class=\"form-row\">");
+        input(b, "appMcpTrafficLimit", "20", "\uc870\ud68c \uac74\uc218");
+        input(b, "appMcpTrafficCtx", "", "Context Path \ud544\ud130");
+        b.append("</div>");
+        b.append("<button onclick=\"refreshAppMcpTraffic()\" class=\"btn\">\uc870\ud68c</button>");
+        b.append("<div id=\"appMcpTrafficTable\"></div>");
+        b.append("</div>\n");
+
+        b.append("</div>\n");
+
         // ===== TAB: roadmap =====
         b.append("<div class=\"tab-panel\" id=\"tab-roadmap\">\n");
         b.append("<div class=\"card\"><div class=\"card-header\">\uc9c4\ud654 \ub85c\ub4dc\ub9f5</div><div class=\"card-desc\">\uae30\ubcf8 \uc11c\ube59\uc5d0\uc11c \ud50c\ub7ab\ud3fc \uc0c1\uc6a9\ud654\uae4c\uc9c0</div>");
@@ -682,9 +726,61 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         // HTML escape helper
         b.append("function esc(s){if(!s)return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}\n");
 
+        // ── App MCP monitoring functions ─────────────────────────────────
+        b.append("async function refreshAppMcpEndpoints(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await mcpApi('/admin/app-endpoints'));\n");
+        b.append("    document.getElementById('mv-appMcpEndpoints').textContent=d.count||0;\n");
+        b.append("    const el=document.getElementById('appMcpEndpointsTable');\n");
+        b.append("    if(!d.endpoints||d.endpoints.length===0){el.innerHTML='<p>\\ubc1c\\uacac\\ub41c \\uc571 MCP \\uc5d4\\ub4dc\\ud3ec\\uc778\\ud2b8\\uac00 \\uc5c6\\uc2b5\\ub2c8\\ub2e4. MCP \\uc5d4\\ub4dc\\ud3ec\\uc778\\ud2b8\\ub97c \\ub178\\ucd9c\\ud558\\ub294 WAR\\ub97c \\ubc30\\ud3ec\\ud558\\uba74 \\uc790\\ub3d9 \\uac10\\uc9c0\\ub429\\ub2c8\\ub2e4.</p>';return;}\n");
+        b.append("    let totalReqs=0,totalErrs=0;\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>Context Path</th><th>\\uc571\\uba85</th><th>\\ucd1d \\uc694\\uccad</th><th>\\uc624\\ub958</th><th>\\ud3c9\\uade0(ms)</th><th>\\ubc1c\\uacac\\uc2dc\\uac04</th><th>\\ub9c8\\uc9c0\\ub9c9 \\uc694\\uccad</th></tr></thead><tbody>';\n");
+        b.append("    d.endpoints.forEach(e=>{\n");
+        b.append("      totalReqs+=e.totalRequests||0;totalErrs+=e.totalErrors||0;\n");
+        b.append("      h+='<tr><td><strong>'+esc(e.contextPath)+'</strong></td><td>'+esc(e.appName)+'</td><td>'+e.totalRequests+'</td><td>'+(e.totalErrors||0)+'</td><td>'+e.avgDurationMs+'</td><td>'+esc(e.discoveredAt)+'</td><td>'+esc(e.lastRequestAt)+'</td></tr>';\n");
+        b.append("    });\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("    document.getElementById('mv-appMcpTotalReqs').textContent=totalReqs;\n");
+        b.append("    document.getElementById('mv-appMcpTotalErrors').textContent=totalErrs;\n");
+        b.append("  }catch(e){document.getElementById('appMcpEndpointsTable').textContent=e.message;}\n");
+        b.append("}\n");
+
+        b.append("async function refreshAppMcpSessions(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await mcpApi('/admin/app-sessions'));\n");
+        b.append("    document.getElementById('mv-appMcpSessions').textContent=d.count||0;\n");
+        b.append("    const el=document.getElementById('appMcpSessionsTable');\n");
+        b.append("    if(!d.sessions||d.sessions.length===0){el.innerHTML='<p>\\ud65c\\uc131 \\uc571 MCP \\uc138\\uc158\\uc774 \\uc5c6\\uc2b5\\ub2c8\\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>Context Path</th><th>\\uc138\\uc158 ID</th><th>\\ud074\\ub77c\\uc774\\uc5b8\\ud2b8</th><th>\\ubc84\\uc804</th><th>\\uc0dd\\uc131</th><th>\\ub9c8\\uc9c0\\ub9c9 \\ud65c\\ub3d9</th></tr></thead><tbody>';\n");
+        b.append("    d.sessions.forEach(s=>{\n");
+        b.append("      h+='<tr><td>'+esc(s.contextPath)+'</td><td>'+esc(s.sessionId)+'</td><td>'+esc(s.clientName)+'</td><td>'+esc(s.clientVersion)+'</td><td>'+esc(s.createdAt)+'</td><td>'+esc(s.lastActivityAt)+'</td></tr>';\n");
+        b.append("    });\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('appMcpSessionsTable').textContent=e.message;}\n");
+        b.append("}\n");
+
+        b.append("async function refreshAppMcpTraffic(){\n");
+        b.append("  try{\n");
+        b.append("    const limit=document.getElementById('appMcpTrafficLimit').value||20;\n");
+        b.append("    const ctx=document.getElementById('appMcpTrafficCtx').value;\n");
+        b.append("    let url='/admin/app-traffic?limit='+limit;\n");
+        b.append("    if(ctx)url+='&contextPath='+encodeURIComponent(ctx);\n");
+        b.append("    const d=JSON.parse(await mcpApi(url));\n");
+        b.append("    const el=document.getElementById('appMcpTrafficTable');\n");
+        b.append("    if(!d.entries||d.entries.length===0){el.innerHTML='<p>\\uc571 MCP \\ud2b8\\ub798\\ud53d \\uae30\\ub85d\\uc774 \\uc5c6\\uc2b5\\ub2c8\\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>\\uc2dc\\uac04</th><th>\\uba54\\uc11c\\ub4dc</th><th>\\ub3c4\\uad6c</th><th>\\ud074\\ub77c\\uc774\\uc5b8\\ud2b8</th><th>\\uc18c\\uc694(ms)</th><th>\\uacb0\\uacfc</th></tr></thead><tbody>';\n");
+        b.append("    d.entries.forEach(e=>{\n");
+        b.append("      const ok=e.success?'<span class=\"status-on\">\\uc131\\uacf5</span>':'<span class=\"status-off\">\\uc2e4\\ud328 ('+e.errorCode+')</span>';\n");
+        b.append("      h+='<tr><td>'+esc(e.timestamp)+'</td><td>'+esc(e.method)+'</td><td>'+(esc(e.toolName)||'-')+'</td><td>'+(esc(e.clientName)||'-')+'</td><td>'+e.durationMs+'</td><td>'+ok+'</td></tr>';\n");
+        b.append("    });\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('appMcpTrafficTable').textContent=e.message;}\n");
+        b.append("}\n");
+
         // Init
         b.append("refreshOverview();refreshRegistry();refreshUsage();refreshPublishedApis();refreshBilling();refreshTenants();refreshConfig();refreshKeywords();refreshPolicies();refreshIntentStats();refreshPlugins();\n");
         b.append("refreshMcpHealth();refreshMcpServers();refreshMcpTools();refreshMcpResources();refreshMcpPrompts();refreshMcpSessions();refreshMcpAudit();refreshMcpPolicies();\n");
+        b.append("refreshAppMcpEndpoints();refreshAppMcpSessions();refreshAppMcpTraffic();\n");
         b.append("updateLiveDashboard();\n");
         b.append("setInterval(updateLiveDashboard,5000);\n");
         b.append("</script>\n");

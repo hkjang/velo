@@ -9,6 +9,7 @@ import io.velo.was.http.HttpResponses;
 import io.velo.was.mcp.McpServer;
 import io.velo.was.mcp.audit.McpAuditEntry;
 import io.velo.was.mcp.audit.McpAuditLog;
+import io.velo.was.mcp.gateway.McpAppGatewayService;
 import io.velo.was.mcp.policy.McpPolicy;
 import io.velo.was.mcp.policy.McpPolicyEnforcer;
 import io.velo.was.mcp.session.McpSession;
@@ -53,6 +54,7 @@ public class McpAdminHandler implements HttpHandler {
     private final McpServerRegistry serverRegistry;
     private final McpAuditLog auditLog;
     private final McpPolicyEnforcer policyEnforcer;
+    private volatile McpAppGatewayService appGatewayService;
 
     public McpAdminHandler(McpServer server,
                            McpServerRegistry serverRegistry,
@@ -62,6 +64,11 @@ public class McpAdminHandler implements HttpHandler {
         this.serverRegistry = serverRegistry;
         this.auditLog = auditLog;
         this.policyEnforcer = policyEnforcer;
+    }
+
+    /** Set the app MCP gateway service for application-level MCP monitoring. */
+    public void setAppGatewayService(McpAppGatewayService appGatewayService) {
+        this.appGatewayService = appGatewayService;
     }
 
     @Override
@@ -77,14 +84,17 @@ public class McpAdminHandler implements HttpHandler {
 
         try {
             return switch (sub) {
-                case "servers"   -> handleServers(method, request);
-                case "tools"     -> handleTools(method, request);
-                case "resources" -> handleResources(method, request);
-                case "prompts"   -> handlePrompts(method, request);
-                case "sessions"  -> handleSessions(method);
-                case "audit"     -> handleAudit(method, request);
-                case "policies"  -> handlePolicies(method, request);
-                default          -> HttpResponses.notFound("Unknown admin endpoint: " + sub);
+                case "servers"        -> handleServers(method, request);
+                case "tools"          -> handleTools(method, request);
+                case "resources"      -> handleResources(method, request);
+                case "prompts"        -> handlePrompts(method, request);
+                case "sessions"       -> handleSessions(method);
+                case "audit"          -> handleAudit(method, request);
+                case "policies"       -> handlePolicies(method, request);
+                case "app-endpoints"  -> handleAppEndpoints(method);
+                case "app-sessions"   -> handleAppSessions(method, request);
+                case "app-traffic"    -> handleAppTraffic(method, request);
+                default               -> HttpResponses.notFound("Unknown admin endpoint: " + sub);
             };
         } catch (Exception e) {
             log.error("Admin API error: {} {}", method, path, e);
@@ -292,6 +302,97 @@ public class McpAdminHandler implements HttpHandler {
             return HttpResponses.jsonOk(policy.toJson());
         }
         return HttpResponses.methodNotAllowed("GET or PUT only");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  /ai-platform/mcp/admin/app-endpoints — GET
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private FullHttpResponse handleAppEndpoints(HttpMethod method) {
+        if (method != HttpMethod.GET) {
+            return HttpResponses.methodNotAllowed("GET only");
+        }
+        McpAppGatewayService gw = appGatewayService;
+        if (gw == null) {
+            return HttpResponses.jsonOk("{\"endpoints\":[],\"count\":0,\"message\":\"App MCP gateway not initialized\"}");
+        }
+        var endpoints = gw.listEndpoints();
+        StringBuilder sb = new StringBuilder(2048).append("{\"endpoints\":[");
+        boolean first = true;
+        for (var ep : endpoints) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(ep.toJson());
+        }
+        sb.append("],\"count\":").append(endpoints.size()).append('}');
+        return HttpResponses.jsonOk(sb.toString());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  /ai-platform/mcp/admin/app-sessions — GET
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private FullHttpResponse handleAppSessions(HttpMethod method, FullHttpRequest request) {
+        if (method != HttpMethod.GET) {
+            return HttpResponses.methodNotAllowed("GET only");
+        }
+        McpAppGatewayService gw = appGatewayService;
+        if (gw == null) {
+            return HttpResponses.jsonOk("{\"sessions\":[],\"count\":0}");
+        }
+        Map<String, List<String>> params = new io.netty.handler.codec.http.QueryStringDecoder(
+                request.uri()).parameters();
+        String ctxFilter = firstParam(params, "contextPath");
+
+        var sessions = ctxFilter != null ? gw.listSessions(ctxFilter) : gw.listSessions();
+        StringBuilder sb = new StringBuilder(4096).append("{\"sessions\":[");
+        boolean first = true;
+        for (var s : sessions) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(s.toJson());
+        }
+        sb.append("],\"count\":").append(sessions.size()).append('}');
+        return HttpResponses.jsonOk(sb.toString());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  /ai-platform/mcp/admin/app-traffic — GET (audit filtered by app prefix)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private FullHttpResponse handleAppTraffic(HttpMethod method, FullHttpRequest request) {
+        if (method != HttpMethod.GET) {
+            return HttpResponses.methodNotAllowed("GET only");
+        }
+        Map<String, List<String>> params = new io.netty.handler.codec.http.QueryStringDecoder(
+                request.uri()).parameters();
+        int limit = intParam(params, "limit", 100);
+        String ctxFilter = firstParam(params, "contextPath");
+
+        // App traffic entries have method prefixed with "[/contextPath] "
+        String methodFilter = ctxFilter != null ? "[" + ctxFilter + "]" : "[/";
+
+        // Filter audit entries that start with app context prefix
+        List<McpAuditEntry> allEntries = auditLog.query(limit * 5, null); // oversample for filtering
+        List<McpAuditEntry> appEntries = new ArrayList<>();
+        for (McpAuditEntry entry : allEntries) {
+            if (entry.method() != null && entry.method().startsWith(methodFilter)) {
+                appEntries.add(entry);
+                if (appEntries.size() >= limit) break;
+            }
+        }
+
+        StringBuilder sb = new StringBuilder(8192);
+        sb.append("{\"total\":").append(appEntries.size());
+        sb.append(",\"entries\":[");
+        boolean first = true;
+        for (McpAuditEntry entry : appEntries) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(entry.toJson());
+        }
+        sb.append("]}");
+        return HttpResponses.jsonOk(sb.toString());
     }
 
     // ═══════════════════════════════════════════════════════════════════════

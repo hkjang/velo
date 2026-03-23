@@ -20,4 +20,9 @@ public final class McpEndpointPaths {
     public static final String ADMIN_SESSIONS  = "/ai-platform/mcp/admin/sessions";
     public static final String ADMIN_AUDIT     = "/ai-platform/mcp/admin/audit";
     public static final String ADMIN_POLICIES  = "/ai-platform/mcp/admin/policies";
+
+    // ── App MCP gateway monitoring paths ───────────────────────────────────
+    public static final String ADMIN_APP_ENDPOINTS = "/ai-platform/mcp/admin/app-endpoints";
+    public static final String ADMIN_APP_SESSIONS  = "/ai-platform/mcp/admin/app-sessions";
+    public static final String ADMIN_APP_TRAFFIC   = "/ai-platform/mcp/admin/app-traffic";
 }

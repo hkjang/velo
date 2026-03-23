@@ -41,12 +41,29 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public class SimpleServletContainer implements ServletContainer, AutoCloseable {
 
+    /**
+     * Functional interface for providing global filters that are injected into every
+     * deployed application. Used by the MCP gateway to intercept MCP traffic from apps.
+     */
+    @FunctionalInterface
+    public interface GlobalFilterProvider {
+        /**
+         * Create filters to prepend to the given application's filter chain.
+         *
+         * @param contextPath the application's context path
+         * @param appName     the application's name
+         * @return list of filters to prepend, or empty list for none
+         */
+        List<Filter> createFilters(String contextPath, String appName);
+    }
+
     private final HttpSessionStore sessionStore;
     private final SessionExpirationScheduler sessionScheduler;
     private final SessionCookieSettings sessionCookieSettings;
     private final ServletPathMapper servletPathMapper;
     private final Map<String, DeployedApplication> applications = new ConcurrentHashMap<>();
     private final Map<String, Object> serverAttributes = new ConcurrentHashMap<>();
+    private volatile GlobalFilterProvider globalFilterProvider;
     private final ScheduledExecutorService asyncExecutor =
             Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors(),
                     Thread.ofVirtual().name("velo-async-", 0).factory());
@@ -138,6 +155,14 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                 .map(app -> new DeployedAppInfo(app.name(), app.contextPath(),
                         app.servlets().size(), app.filters().size()))
                 .toList();
+    }
+
+    /**
+     * Set a global filter provider that injects filters into every deployed application.
+     * Used by MCP gateway to intercept MCP JSON-RPC traffic from applications.
+     */
+    public void setGlobalFilterProvider(GlobalFilterProvider provider) {
+        this.globalFilterProvider = provider;
     }
 
     /**
@@ -664,7 +689,19 @@ public class SimpleServletContainer implements ServletContainer, AutoCloseable {
                     listener.requestInitialized(requestEvent);
                 }
             }
-            new SimpleFilterChain(application.resolveFilters(requestContext, runtime), runtime.servlet)
+            List<Filter> resolvedFilters = application.resolveFilters(requestContext, runtime);
+            // Prepend global filters (e.g. MCP traffic interceptor)
+            GlobalFilterProvider gfp = globalFilterProvider;
+            if (gfp != null) {
+                List<Filter> globalFilters = gfp.createFilters(application.contextPath(), application.name());
+                if (globalFilters != null && !globalFilters.isEmpty()) {
+                    List<Filter> combined = new ArrayList<>(globalFilters.size() + resolvedFilters.size());
+                    combined.addAll(globalFilters);
+                    combined.addAll(resolvedFilters);
+                    resolvedFilters = combined;
+                }
+            }
+            new SimpleFilterChain(resolvedFilters, runtime.servlet)
                     .doFilter(dispatchRequest, dispatchResponse);
             return new DispatchResult(sessionHolder, asyncHolder.isStarted());
         } finally {

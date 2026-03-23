@@ -7,6 +7,7 @@ import io.velo.was.http.HttpHandlerRegistry;
 import io.velo.was.http.SseHandlerRegistry;
 import io.velo.was.mcp.admin.McpAdminHandler;
 import io.velo.was.mcp.admin.McpServerRegistry;
+import io.velo.was.mcp.gateway.McpAppGatewayService;
 import io.velo.was.mcp.audit.McpAuditLog;
 import io.velo.was.mcp.builtin.McpAdminCliTools;
 import io.velo.was.mcp.builtin.McpChatPrompt;
@@ -54,6 +55,12 @@ public final class McpApplication {
     private McpApplication() {}
 
     /**
+     * Result of {@link #install} — exposes key components for further wiring
+     * (e.g. connecting the app MCP gateway).
+     */
+    public record InstallResult(McpServer server, McpAdminHandler adminHandler, McpAuditLog auditLog) {}
+
+    /**
      * Construct the MCP server, admin control plane, and register all handlers.
      *
      * @param httpRegistry    HTTP handler registry for POST, health, and admin endpoints
@@ -67,12 +74,12 @@ public final class McpApplication {
     /**
      * Convenience overload without AdminClient (admin CLI tools not registered).
      */
-    public static McpServer install(HttpHandlerRegistry httpRegistry,
-                                    SseHandlerRegistry sseRegistry,
-                                    AiModelRegistryService registryService,
-                                    AiGatewayService gatewayService,
-                                    String serverName,
-                                    String serverVersion) {
+    public static InstallResult install(HttpHandlerRegistry httpRegistry,
+                                        SseHandlerRegistry sseRegistry,
+                                        AiModelRegistryService registryService,
+                                        AiGatewayService gatewayService,
+                                        String serverName,
+                                        String serverVersion) {
         return install(httpRegistry, sseRegistry, registryService, gatewayService, null, serverName, serverVersion);
     }
 
@@ -81,13 +88,13 @@ public final class McpApplication {
      *
      * @param adminClient     Admin CLI client (for server/app/monitoring tools); null to skip
      */
-    public static McpServer install(HttpHandlerRegistry httpRegistry,
-                                    SseHandlerRegistry sseRegistry,
-                                    AiModelRegistryService registryService,
-                                    AiGatewayService gatewayService,
-                                    AdminClient adminClient,
-                                    String serverName,
-                                    String serverVersion) {
+    public static InstallResult install(HttpHandlerRegistry httpRegistry,
+                                        SseHandlerRegistry sseRegistry,
+                                        AiModelRegistryService registryService,
+                                        AiGatewayService gatewayService,
+                                        AdminClient adminClient,
+                                        String serverName,
+                                        String serverVersion) {
         McpServerInfo serverInfo = new McpServerInfo(serverName, serverVersion);
 
         // ── Tool registry ────────────────────────────────────────────────────
@@ -149,6 +156,11 @@ public final class McpApplication {
         httpRegistry.register(McpEndpointPaths.ADMIN_AUDIT, adminHandler);
         httpRegistry.register(McpEndpointPaths.ADMIN_POLICIES, adminHandler);
 
-        return mcpServer;
+        // ── App MCP gateway admin endpoints ────────────────────────────────
+        httpRegistry.register(McpEndpointPaths.ADMIN_APP_ENDPOINTS, adminHandler);
+        httpRegistry.register(McpEndpointPaths.ADMIN_APP_SESSIONS, adminHandler);
+        httpRegistry.register(McpEndpointPaths.ADMIN_APP_TRAFFIC, adminHandler);
+
+        return new InstallResult(mcpServer, adminHandler, auditLog);
     }
 }

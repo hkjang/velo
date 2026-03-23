@@ -68,32 +68,36 @@ public class McpAppTrafficInterceptor implements Filter {
             return;
         }
 
-        // ── Detect MCP traffic ─────────────────────────────────────────────
+        // ── Quick pre-check: only inspect POST+JSON or GET+SSE ─────────────
         String method = httpReq.getMethod();
-        boolean isMcpPost = "POST".equalsIgnoreCase(method) && isMcpJsonRpc(httpReq);
+        boolean mayBeMcpPost = "POST".equalsIgnoreCase(method) && hasJsonContentType(httpReq);
         boolean isMcpSse = "GET".equalsIgnoreCase(method) && isSseRequest(httpReq);
 
-        if (!isMcpPost && !isMcpSse) {
+        if (!mayBeMcpPost && !isMcpSse) {
             chain.doFilter(request, response);
             return;
         }
 
-        // Register endpoint on first detection
-        gatewayService.registerEndpoint(contextPath, appName);
-
-        long startTime = System.currentTimeMillis();
-        String sessionId = extractSessionId(httpReq);
-        String jsonRpcMethod = null;
-        String toolName = null;
-        String clientName = null;
-
-        // For POST, try to extract JSON-RPC method from cached body
-        if (isMcpPost) {
+        // ── For POST: read body once and verify it is actually JSON-RPC ────
+        if (mayBeMcpPost) {
             CachedBodyServletRequest cachedReq = new CachedBodyServletRequest(httpReq);
             String body = cachedReq.getCachedBody();
-            jsonRpcMethod = extractJsonField(body, "method");
-            toolName = extractToolName(body, jsonRpcMethod);
-            clientName = extractClientName(body, jsonRpcMethod);
+
+            // Guard: only intercept real MCP JSON-RPC traffic (must contain "jsonrpc")
+            if (!isJsonRpcBody(body)) {
+                // Not MCP — pass through with cached body (stream already consumed)
+                chain.doFilter(cachedReq, response);
+                return;
+            }
+
+            // ── Confirmed MCP JSON-RPC — full interception ─────────────────
+            gatewayService.registerEndpoint(contextPath, appName);
+
+            long startTime = System.currentTimeMillis();
+            String sessionId = extractSessionId(httpReq);
+            String jsonRpcMethod = extractJsonField(body, "method");
+            String toolName = extractToolName(body, jsonRpcMethod);
+            String clientName = extractClientName(body, jsonRpcMethod);
 
             // Track session on initialize
             if ("initialize".equals(jsonRpcMethod) && clientName != null) {
@@ -120,7 +124,9 @@ public class McpAppTrafficInterceptor implements Filter {
                         httpReq.getRemoteAddr());
             }
         } else {
-            // SSE — just record the connection event, don't wrap
+            // ── SSE — register endpoint & record connection event ──────────
+            gatewayService.registerEndpoint(contextPath, appName);
+            String sessionId = extractSessionId(httpReq);
             gatewayService.recordTraffic(contextPath, appName, sessionId,
                     null, "sse/connect", null, 0, true, 0, null,
                     httpReq.getRemoteAddr());
@@ -137,9 +143,15 @@ public class McpAppTrafficInterceptor implements Filter {
     //  Detection helpers
     // ═══════════════════════════════════════════════════════════════════════
 
-    private static boolean isMcpJsonRpc(HttpServletRequest req) {
+    /** Check Content-Type header only (lightweight pre-filter). */
+    private static boolean hasJsonContentType(HttpServletRequest req) {
         String contentType = req.getContentType();
         return contentType != null && contentType.contains("application/json");
+    }
+
+    /** Verify the body actually contains JSON-RPC 2.0 envelope. */
+    private static boolean isJsonRpcBody(String body) {
+        return body != null && body.contains("\"jsonrpc\"");
     }
 
     private static boolean isSseRequest(HttpServletRequest req) {
@@ -223,6 +235,16 @@ public class McpAppTrafficInterceptor implements Filter {
 
         String getCachedBody() {
             return new String(cachedBody, StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public int getContentLength() {
+            return cachedBody.length;
+        }
+
+        @Override
+        public long getContentLengthLong() {
+            return cachedBody.length;
         }
 
         @Override

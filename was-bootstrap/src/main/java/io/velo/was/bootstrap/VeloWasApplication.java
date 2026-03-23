@@ -191,8 +191,12 @@ public final class VeloWasApplication {
                     mcpAdminClient, "velo-mcp",
                     configuration.getServer().getName() + "-" + configuration.getServer().getNodeId());
 
-            // ── MCP audit file logger (daily-rotating JSON lines) ──
+            // ── MCP server registry persistence (restore remote servers on restart) ──
             Path deployPath = Path.of(deployConfig.getDirectory()).toAbsolutePath();
+            Path confDir = (deployPath.getParent() != null ? deployPath.getParent() : deployPath).resolve("conf");
+            mcpResult.serverRegistry().setPersistFile(confDir.resolve("mcp-servers.json"));
+
+            // ── MCP audit file logger (daily-rotating JSON lines) ──
             Path auditLogDir = (deployPath.getParent() != null ? deployPath.getParent() : deployPath).resolve("logs");
             io.velo.was.mcp.audit.McpAuditFileLogger auditFileLogger =
                     new io.velo.was.mcp.audit.McpAuditFileLogger(auditLogDir);

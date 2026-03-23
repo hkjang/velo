@@ -368,8 +368,14 @@ public class McpAdminHandler implements HttpHandler {
         boolean ok = gw.connect(serverId);
         var conn = gw.getConnection(serverId);
         String state = conn != null ? conn.state().name() : "UNKNOWN";
-        return HttpResponses.jsonOk("{\"serverId\":\"" + escape(serverId)
-                + "\",\"connected\":" + ok + ",\"state\":\"" + state + "\"}");
+        String errMsg = conn != null ? conn.errorMessage() : null;
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"serverId\":\"").append(escape(serverId))
+          .append("\",\"connected\":").append(ok)
+          .append(",\"state\":\"").append(state).append('"');
+        if (errMsg != null) sb.append(",\"errorMessage\":\"").append(escape(errMsg)).append('"');
+        sb.append('}');
+        return HttpResponses.jsonOk(sb.toString());
     }
 
     private FullHttpResponse handleGatewayDisconnect(HttpMethod method, FullHttpRequest request) {
@@ -395,8 +401,16 @@ public class McpAdminHandler implements HttpHandler {
         int tools = conn != null ? conn.tools().size() : 0;
         int resources = conn != null ? conn.resources().size() : 0;
         int prompts = conn != null ? conn.prompts().size() : 0;
-        return HttpResponses.jsonOk("{\"serverId\":\"" + escape(serverId) + "\",\"refreshed\":" + ok
-                + ",\"tools\":" + tools + ",\"resources\":" + resources + ",\"prompts\":" + prompts + "}");
+        String errMsg = conn != null ? conn.errorMessage() : null;
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"serverId\":\"").append(escape(serverId))
+          .append("\",\"refreshed\":").append(ok)
+          .append(",\"tools\":").append(tools)
+          .append(",\"resources\":").append(resources)
+          .append(",\"prompts\":").append(prompts);
+        if (errMsg != null) sb.append(",\"errorMessage\":\"").append(escape(errMsg)).append('"');
+        sb.append('}');
+        return HttpResponses.jsonOk(sb.toString());
     }
 
     private FullHttpResponse handleGatewayRoutingTable(HttpMethod method) {

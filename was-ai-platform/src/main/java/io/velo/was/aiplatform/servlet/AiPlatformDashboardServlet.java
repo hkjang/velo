@@ -796,7 +796,7 @@ public class AiPlatformDashboardServlet extends HttpServlet {
 
         b.append("async function gatewayAction(action,serverId){\n");
         b.append("  const res=await mcpApi('/admin/gateway/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serverId:serverId})});\n");
-        b.append("  try{const j=JSON.parse(res);if(j.error){showToast('\\u274c '+action+' \\uc2e4\\ud328: '+JSON.stringify(j.error).substring(0,200),'error');}else{showToast('\\u2705 '+action+' \\uc131\\uacf5','success');}}catch(e){}\n");
+        b.append("  try{const j=JSON.parse(res);if(j.error){showToast('\\u274c '+action+' \\uc2e4\\ud328: '+JSON.stringify(j.error).substring(0,200),'error');}else if(j.connected===false||j.refreshed===false){showToast('\\u274c '+action+' \\uc2e4\\ud328: '+(j.errorMessage||j.state||'\\uc5f0\\uacb0 \\uc2e4\\ud328'),'error');}else{showToast('\\u2705 '+action+' \\uc131\\uacf5','success');}}catch(e){}\n");
         b.append("  refreshGatewayStatus();refreshMcpServers();refreshRoutingTable();\n");
         b.append("}\n");
 

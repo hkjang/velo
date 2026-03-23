@@ -189,6 +189,15 @@ public class McpRemoteClient implements AutoCloseable {
             return new RpcResult(Map.of(), "{}", null);
         }
 
+        // Check if response is SSE (text/event-stream) — extract JSON from data lines
+        String contentType = response.headers().firstValue("Content-Type").orElse("");
+        if (contentType.contains("text/event-stream")) {
+            responseBody = extractJsonFromSse(responseBody);
+            if (responseBody == null || responseBody.isBlank()) {
+                return new RpcResult(Map.of(), "{}", null);
+            }
+        }
+
         Object parsed = SimpleJsonParser.parse(responseBody);
         if (parsed instanceof Map<?, ?> rpcResponse) {
             Map<String, Object> rpcMap = (Map<String, Object>) rpcResponse;
@@ -220,6 +229,26 @@ public class McpRemoteClient implements AutoCloseable {
             builder.header("Mcp-Session-Id", remoteSessionId);
         }
         return builder.build();
+    }
+
+    // ── SSE helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Extract the last JSON-RPC response from an SSE stream body.
+     * SSE format: "event: message\ndata: {json}\n\n"
+     */
+    private static String extractJsonFromSse(String sseBody) {
+        String lastJson = null;
+        for (String line : sseBody.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("data:")) {
+                String data = trimmed.substring(5).trim();
+                if (data.startsWith("{")) {
+                    lastJson = data;
+                }
+            }
+        }
+        return lastJson;
     }
 
     // ── JSON helpers ─────────────────────────────────────────────────────

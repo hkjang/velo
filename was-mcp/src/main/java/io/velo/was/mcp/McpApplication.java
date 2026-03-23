@@ -60,7 +60,8 @@ public final class McpApplication {
      * (e.g. connecting the app MCP gateway).
      */
     public record InstallResult(McpServer server, McpAdminHandler adminHandler,
-                                McpAuditLog auditLog, McpGatewayRouter gatewayRouter) {}
+                                McpAuditLog auditLog, McpGatewayRouter gatewayRouter,
+                                McpServerRegistry serverRegistry) {}
 
     /**
      * Construct the MCP server, admin control plane, and register all handlers.
@@ -179,6 +180,6 @@ public final class McpApplication {
         httpRegistry.register(McpEndpointPaths.ADMIN_GATEWAY_REFRESH, adminHandler);
         httpRegistry.register(McpEndpointPaths.ADMIN_GATEWAY_ROUTING, adminHandler);
 
-        return new InstallResult(mcpServer, adminHandler, auditLog, gatewayRouter);
+        return new InstallResult(mcpServer, adminHandler, auditLog, gatewayRouter, serverRegistry);
     }
 }

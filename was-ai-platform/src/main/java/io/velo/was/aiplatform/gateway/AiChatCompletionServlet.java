@@ -1,5 +1,6 @@
 package io.velo.was.aiplatform.gateway;
 
+import io.velo.was.aiplatform.audit.AiGatewayAuditLog;
 import io.velo.was.aiplatform.observability.AiPlatformUsageService;
 import io.velo.was.aiplatform.tenant.AiTenantAccessGrant;
 import io.velo.was.aiplatform.tenant.AiTenantService;
@@ -35,15 +36,25 @@ public class AiChatCompletionServlet extends HttpServlet {
     private final AiGatewayService gatewayService;
     private final AiPlatformUsageService usageService;
     private final AiTenantService tenantService;
+    private final AiGatewayAuditLog auditLog;
 
     public AiChatCompletionServlet(ServerConfiguration configuration,
                                    AiGatewayService gatewayService,
                                    AiPlatformUsageService usageService,
                                    AiTenantService tenantService) {
+        this(configuration, gatewayService, usageService, tenantService, null);
+    }
+
+    public AiChatCompletionServlet(ServerConfiguration configuration,
+                                   AiGatewayService gatewayService,
+                                   AiPlatformUsageService usageService,
+                                   AiTenantService tenantService,
+                                   AiGatewayAuditLog auditLog) {
         this.configuration = configuration;
         this.gatewayService = gatewayService;
         this.usageService = usageService;
         this.tenantService = tenantService;
+        this.auditLog = auditLog;
     }
 
     @Override
@@ -53,6 +64,8 @@ public class AiChatCompletionServlet extends HttpServlet {
             return;
         }
 
+        long auditStart = System.nanoTime();
+        String remoteAddr = req.getRemoteAddr();
         String body = req.getReader().lines().collect(Collectors.joining("\n"));
         String model = extractJsonString(body, "model");
         boolean stream = "true".equalsIgnoreCase(extractJsonString(body, "stream"))
@@ -69,12 +82,14 @@ public class AiChatCompletionServlet extends HttpServlet {
 
         // 의도 기반 라우팅: 모델 미지정 시 의도 분석으로 최적 모델 결정
         String resolvedModel = model;
+        String intentName = null;
         try {
             io.velo.was.aiplatform.intent.IntentRouteDecision intentDecision =
                     gatewayService.intentRoute(prompt, tenantAccess.tenantId());
             resp.setHeader("X-Intent", intentDecision.resolvedIntent().name());
             resp.setHeader("X-Intent-Model", intentDecision.modelName());
             resp.setHeader("X-Intent-Policy", intentDecision.policyId());
+            intentName = intentDecision.resolvedIntent().name();
             if (model.isBlank()) {
                 resolvedModel = intentDecision.modelName();
             }
@@ -96,9 +111,12 @@ public class AiChatCompletionServlet extends HttpServlet {
                 applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
                 resp.getWriter().write(toOpenAiResponse(result));
             }
+            auditChatSuccess(tenantAccess, result, prompt, stream, auditStart, remoteAddr, intentName);
         } catch (IllegalStateException e) {
             // Failover: if first model fails, try with fallback
+            auditChatFailure(tenantAccess, prompt, stream, auditStart, e.getMessage(), remoteAddr, intentName);
             try {
+                long failoverStart = System.nanoTime();
                 AiGatewayRequest fallbackRequest = new AiGatewayRequest("CHAT", prompt,
                         "openai-compat-failover-" + UUID.randomUUID().toString().substring(0, 8), stream);
                 AiGatewayInferenceResult result = gatewayService.infer(fallbackRequest);
@@ -107,11 +125,13 @@ public class AiChatCompletionServlet extends HttpServlet {
                 returnJson(resp);
                 applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
                 resp.getWriter().write(toOpenAiResponse(result));
+                auditChatSuccess(tenantAccess, result, prompt, stream, failoverStart, remoteAddr, intentName);
             } catch (Exception fallbackError) {
                 returnJson(resp);
                 resp.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
                 resp.getWriter().write("{\"error\":{\"message\":\"" + AiGatewayServlet.escapeJson(e.getMessage())
                         + "\",\"type\":\"server_error\"}}");
+                auditChatFailure(tenantAccess, prompt, stream, auditStart, "failover: " + fallbackError.getMessage(), remoteAddr, intentName);
             }
         }
         resp.getWriter().flush();
@@ -266,5 +286,40 @@ public class AiChatCompletionServlet extends HttpServlet {
             combined.append(matcher.group(1).replace("\\n", "\n").replace("\\\"", "\"").replace("\\\\", "\\"));
         }
         return combined.toString().trim();
+    }
+
+    // ── 감사 기록 헬퍼 ──
+
+    private void auditChatSuccess(AiTenantAccessGrant tenant, AiGatewayInferenceResult result,
+                                   String prompt, boolean stream, long startNanos,
+                                   String remoteAddr, String intentType) {
+        if (auditLog == null) return;
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        // Determine modality from resolved type
+        String modality = AiGatewayService.modalityForResolvedType(result.decision().resolvedType());
+        auditLog.recordSuccess(
+                tenant != null ? tenant.tenantId() : null,
+                "v1/chat/completions",
+                result.decision().modelName(),
+                result.decision().provider(),
+                "CHAT", prompt,
+                durationMs, result.estimatedTokens(), stream,
+                remoteAddr, result.decision().routePolicy(), intentType,
+                modality);
+    }
+
+    private void auditChatFailure(AiTenantAccessGrant tenant, String prompt, boolean stream,
+                                   long startNanos, String errorMsg, String remoteAddr,
+                                   String intentType) {
+        if (auditLog == null) return;
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        auditLog.recordFailure(
+                tenant != null ? tenant.tenantId() : null,
+                "v1/chat/completions",
+                null, null,
+                "CHAT", prompt,
+                durationMs, 0, stream,
+                errorMsg, remoteAddr, null, intentType,
+                "text");
     }
 }

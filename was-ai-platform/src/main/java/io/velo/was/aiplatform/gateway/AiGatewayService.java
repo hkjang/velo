@@ -181,13 +181,21 @@ public class AiGatewayService {
     public AiGatewayInferenceResult infer(AiGatewayRequest request) {
         AiGatewayRouteDecision decision = route(request);
         String prompt = normalizePrompt(request.prompt());
+        String modality = request.effectiveModality();
+        String resolvedModality = modalityForResolvedType(decision.resolvedType());
+        // Use explicit modality from request, otherwise derive from routing
+        String effectiveModality = "text".equals(modality) ? resolvedModality : modality;
 
-        // Try real provider adapter first
+        // Build the appropriate provider request based on modality
+        AiProviderRequest providerRequest = buildProviderRequest(decision, request, prompt, effectiveModality);
+
+        // Try real provider adapter first with modality-aware dispatch
         AiProviderResponse providerResponse = null;
         try {
-            providerResponse = providerRegistry.tryInfer(
-                    decision.provider(),
-                    AiProviderRequest.chat(decision.modelName(), prompt));
+            providerResponse = providerRegistry.tryInferMultimodal(
+                    decision.provider(), providerRequest, effectiveModality);
+        } catch (UnsupportedOperationException ignored) {
+            // Modality not supported by provider — fall back to mock
         } catch (Exception ignored) {
             // Provider failed — fall back to mock
         }
@@ -195,8 +203,11 @@ public class AiGatewayService {
         String outputText;
         int estimatedTokens;
         double confidence;
-        if (providerResponse != null && providerResponse.content() != null && !providerResponse.content().isBlank()) {
-            outputText = providerResponse.content();
+        if (providerResponse != null && (
+                (providerResponse.content() != null && !providerResponse.content().isBlank())
+                || providerResponse.hasBinaryData())) {
+            outputText = providerResponse.content() != null ? providerResponse.content()
+                    : "[Binary " + providerResponse.contentType() + " data]";
             estimatedTokens = providerResponse.totalTokens();
             confidence = Math.min(0.99d, Math.max(0.55d, decision.accuracyScore() / 100.0d));
         } else {
@@ -205,6 +216,21 @@ public class AiGatewayService {
             confidence = Math.min(0.99d, Math.max(0.55d, decision.accuracyScore() / 100.0d));
         }
         return new AiGatewayInferenceResult(decision, outputText, estimatedTokens, confidence);
+    }
+
+    private AiProviderRequest buildProviderRequest(AiGatewayRouteDecision decision,
+                                                    AiGatewayRequest request,
+                                                    String prompt, String modality) {
+        return switch (modality) {
+            case "vision" -> AiProviderRequest.vision(decision.modelName(), prompt,
+                    request.imageUrl() != null ? request.imageUrl() : "");
+            case "image_gen" -> AiProviderRequest.chat(decision.modelName(), prompt);
+            case "stt" -> AiProviderRequest.audio(decision.modelName(),
+                    request.audioData() != null ? request.audioData() : "");
+            case "tts" -> AiProviderRequest.tts(decision.modelName(), prompt);
+            case "embedding" -> AiProviderRequest.embedding(decision.modelName(), prompt);
+            default -> AiProviderRequest.chat(decision.modelName(), prompt);
+        };
     }
 
     /**
@@ -320,16 +346,22 @@ public class AiGatewayService {
 
     private static String generateOutput(AiGatewayRouteDecision decision, String prompt) {
         String preview = prompt.isBlank() ? "No prompt provided." : preview(prompt, 120);
+        String mockSuffix = " This built-in gateway currently returns a mock response envelope until provider adapters are connected.";
         return switch (decision.resolvedType()) {
             case "VISION" -> "Vision route selected. Model " + decision.modelName()
-                    + " will handle image-aware reasoning. Prompt preview: " + preview
-                    + " This built-in gateway currently returns a mock response envelope until provider adapters are connected.";
+                    + " will handle image-aware reasoning. Prompt preview: " + preview + mockSuffix;
+            case "IMAGE_GENERATION" -> "Image generation route selected. Model " + decision.modelName()
+                    + " will generate an image from the prompt. Prompt preview: " + preview + mockSuffix;
+            case "STT" -> "Speech-to-text route selected. Model " + decision.modelName()
+                    + " will transcribe audio input to text." + mockSuffix;
+            case "TTS" -> "Text-to-speech route selected. Model " + decision.modelName()
+                    + " will synthesize speech from text. Prompt preview: " + preview + mockSuffix;
+            case "EMBEDDING" -> "Embedding route selected. Model " + decision.modelName()
+                    + " will generate vector embeddings. Input preview: " + preview + mockSuffix;
             case "RECOMMENDATION" -> "Recommendation route selected. Model " + decision.modelName()
-                    + " will prepare ranking or personalization output. Prompt preview: " + preview
-                    + " This built-in gateway currently returns a mock response envelope until provider adapters are connected.";
+                    + " will prepare ranking or personalization output. Prompt preview: " + preview + mockSuffix;
             default -> "Conversation route selected. Model " + decision.modelName()
-                    + " will handle general language generation. Prompt preview: " + preview
-                    + " This built-in gateway currently returns a mock response envelope until provider adapters are connected.";
+                    + " will handle general language generation. Prompt preview: " + preview + mockSuffix;
         };
     }
 
@@ -352,6 +384,18 @@ public class AiGatewayService {
         String lowered = prompt.toLowerCase(Locale.ROOT);
         if (containsAny(lowered, "image", "vision", "photo", "ocr", "screenshot", "diagram")) {
             return new RequestResolution(requestedType.isBlank() ? "AUTO" : requestedType, "VISION", true);
+        }
+        if (containsAny(lowered, "generate image", "create image", "draw", "dalle", "image generation")) {
+            return new RequestResolution(requestedType.isBlank() ? "AUTO" : requestedType, "IMAGE_GENERATION", true);
+        }
+        if (containsAny(lowered, "transcribe", "whisper", "speech to text", "stt", "음성 인식", "음성인식")) {
+            return new RequestResolution(requestedType.isBlank() ? "AUTO" : requestedType, "STT", true);
+        }
+        if (containsAny(lowered, "text to speech", "tts", "voice synthesis", "음성 합성", "음성합성", "speak")) {
+            return new RequestResolution(requestedType.isBlank() ? "AUTO" : requestedType, "TTS", true);
+        }
+        if (containsAny(lowered, "embedding", "embed", "vector", "임베딩")) {
+            return new RequestResolution(requestedType.isBlank() ? "AUTO" : requestedType, "EMBEDDING", true);
         }
         if (containsAny(lowered, "recommend", "ranking", "rank", "personalize", "suggest", "catalog")) {
             return new RequestResolution(requestedType.isBlank() ? "AUTO" : requestedType, "RECOMMENDATION", true);
@@ -402,8 +446,24 @@ public class AiGatewayService {
     private static String categoryForRequest(String resolvedType) {
         return switch (resolvedType) {
             case "VISION" -> "CV";
+            case "IMAGE_GENERATION" -> "IMAGE_GEN";
+            case "STT" -> "AUDIO";
+            case "TTS" -> "AUDIO";
+            case "EMBEDDING" -> "EMBEDDING";
             case "RECOMMENDATION" -> "RECOMMENDER";
             default -> "LLM";
+        };
+    }
+
+    /** Map resolved request type to modality for provider dispatch. */
+    static String modalityForResolvedType(String resolvedType) {
+        return switch (resolvedType) {
+            case "VISION" -> "vision";
+            case "IMAGE_GENERATION" -> "image_gen";
+            case "STT" -> "stt";
+            case "TTS" -> "tts";
+            case "EMBEDDING" -> "embedding";
+            default -> "text";
         };
     }
 

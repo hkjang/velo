@@ -1,5 +1,6 @@
 package io.velo.was.aiplatform.gateway;
 
+import io.velo.was.aiplatform.audit.AiGatewayAuditLog;
 import io.velo.was.aiplatform.observability.AiPlatformUsageService;
 import io.velo.was.aiplatform.tenant.AiTenantAccessGrant;
 import io.velo.was.aiplatform.tenant.AiTenantService;
@@ -28,14 +29,24 @@ public class AiTextCompletionServlet extends HttpServlet {
     private final AiGatewayService gatewayService;
     private final AiPlatformUsageService usageService;
     private final AiTenantService tenantService;
+    private final AiGatewayAuditLog auditLog;
 
     public AiTextCompletionServlet(ServerConfiguration configuration,
                                    AiGatewayService gatewayService,
                                    AiPlatformUsageService usageService,
                                    AiTenantService tenantService) {
+        this(configuration, gatewayService, usageService, tenantService, null);
+    }
+
+    public AiTextCompletionServlet(ServerConfiguration configuration,
+                                   AiGatewayService gatewayService,
+                                   AiPlatformUsageService usageService,
+                                   AiTenantService tenantService,
+                                   AiGatewayAuditLog auditLog) {
         this.gatewayService = gatewayService;
         this.usageService = usageService;
         this.tenantService = tenantService;
+        this.auditLog = auditLog;
     }
 
     @Override
@@ -45,6 +56,8 @@ public class AiTextCompletionServlet extends HttpServlet {
             return;
         }
 
+        long auditStart = System.nanoTime();
+        String remoteAddr = req.getRemoteAddr();
         String body = req.getReader().lines().collect(Collectors.joining("\n"));
         String model = extractJsonString(body, "model");
         String prompt = extractJsonString(body, "prompt");
@@ -58,12 +71,14 @@ public class AiTextCompletionServlet extends HttpServlet {
         }
 
         // 의도 기반 라우팅 헤더 추가
+        String intentName = null;
         try {
             io.velo.was.aiplatform.intent.IntentRouteDecision intentDecision =
                     gatewayService.intentRoute(prompt, tenantAccess.tenantId());
             resp.setHeader("X-Intent", intentDecision.resolvedIntent().name());
             resp.setHeader("X-Intent-Model", intentDecision.modelName());
             resp.setHeader("X-Intent-Policy", intentDecision.policyId());
+            intentName = intentDecision.resolvedIntent().name();
         } catch (Exception ignored) {
         }
 
@@ -78,9 +93,12 @@ public class AiTextCompletionServlet extends HttpServlet {
             returnJson(resp);
             applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
             resp.getWriter().write(toCompletionResponse(result));
+            auditTextSuccess(tenantAccess, result, prompt, auditStart, remoteAddr, intentName);
         } catch (Exception e) {
+            auditTextFailure(tenantAccess, prompt, auditStart, e.getMessage(), remoteAddr, intentName);
             // Failover
             try {
+                long failoverStart = System.nanoTime();
                 AiGatewayRequest fallback = new AiGatewayRequest("CHAT", prompt,
                         "completions-failover-" + UUID.randomUUID().toString().substring(0, 8), false);
                 AiGatewayInferenceResult result = gatewayService.infer(fallback);
@@ -89,11 +107,13 @@ public class AiTextCompletionServlet extends HttpServlet {
                 returnJson(resp);
                 applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
                 resp.getWriter().write(toCompletionResponse(result));
+                auditTextSuccess(tenantAccess, result, prompt, failoverStart, remoteAddr, intentName);
             } catch (Exception fallbackErr) {
                 returnJson(resp);
                 resp.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
                 resp.getWriter().write("{\"error\":{\"message\":\"" + AiGatewayServlet.escapeJson(e.getMessage())
                         + "\",\"type\":\"server_error\"}}");
+                auditTextFailure(tenantAccess, prompt, auditStart, "failover: " + fallbackErr.getMessage(), remoteAddr, intentName);
             }
         }
         resp.getWriter().flush();
@@ -175,5 +195,36 @@ public class AiTextCompletionServlet extends HttpServlet {
             }
         }
         return "";
+    }
+
+    // ── 감사 기록 헬퍼 ──
+
+    private void auditTextSuccess(AiTenantAccessGrant tenant, AiGatewayInferenceResult result,
+                                   String prompt, long startNanos, String remoteAddr, String intentType) {
+        if (auditLog == null) return;
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        auditLog.recordSuccess(
+                tenant != null ? tenant.tenantId() : null,
+                "v1/completions",
+                result.decision().modelName(),
+                result.decision().provider(),
+                "COMPLETION", prompt,
+                durationMs, result.estimatedTokens(), false,
+                remoteAddr, result.decision().routePolicy(), intentType,
+                "text");
+    }
+
+    private void auditTextFailure(AiTenantAccessGrant tenant, String prompt, long startNanos,
+                                   String errorMsg, String remoteAddr, String intentType) {
+        if (auditLog == null) return;
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        auditLog.recordFailure(
+                tenant != null ? tenant.tenantId() : null,
+                "v1/completions",
+                null, null,
+                "COMPLETION", prompt,
+                durationMs, 0, false,
+                errorMsg, remoteAddr, null, intentType,
+                "text");
     }
 }

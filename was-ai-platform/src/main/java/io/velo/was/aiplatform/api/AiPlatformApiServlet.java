@@ -1,5 +1,7 @@
 package io.velo.was.aiplatform.api;
 
+import io.velo.was.aiplatform.audit.AiGatewayAuditLog;
+import io.velo.was.aiplatform.audit.AiGatewayAuditEntry;
 import io.velo.was.aiplatform.edge.AiEdgeService;
 import io.velo.was.aiplatform.intent.*;
 import io.velo.was.aiplatform.plugin.AiPluginRegistry;
@@ -51,6 +53,7 @@ public class AiPlatformApiServlet extends HttpServlet {
     private final IntentRoutingPolicyService intentPolicyService;
     private final RouteAuditLogger auditLogger;
     private final RouteDecisionEngine intentEngine;
+    private volatile AiGatewayAuditLog gatewayAuditLog;
 
     public AiPlatformApiServlet(ServerConfiguration configuration,
                                 AiModelRegistryService registryService,
@@ -116,6 +119,11 @@ public class AiPlatformApiServlet extends HttpServlet {
         this.intentPolicyService = intentPolicyService;
         this.auditLogger = auditLogger;
         this.intentEngine = intentEngine;
+    }
+
+    /** 게이트웨이 감사 로그를 설정한다. */
+    public void setGatewayAuditLog(AiGatewayAuditLog gatewayAuditLog) {
+        this.gatewayAuditLog = gatewayAuditLog;
     }
 
     @Override
@@ -232,6 +240,22 @@ public class AiPlatformApiServlet extends HttpServlet {
         if ("/intent/export".equals(path) && intentPolicyService != null) {
             usageService.recordControlPlaneAccess("/api/intent/export");
             resp.getWriter().write(buildExportJson());
+            return;
+        }
+        // ── 게이트웨이 감사 API ──
+        if ("/gateway-audit".equals(path) && gatewayAuditLog != null) {
+            usageService.recordControlPlaneAccess("/api/gateway-audit");
+            int limit = parseInteger(req.getParameter("limit"), 50);
+            String filterEndpoint = req.getParameter("endpoint");
+            String filterTenant = req.getParameter("tenantId");
+            String filterModel = req.getParameter("modelName");
+            String filterModality = req.getParameter("modality");
+            resp.getWriter().write(buildGatewayAuditJson(limit, filterEndpoint, filterTenant, filterModel, filterModality));
+            return;
+        }
+        if ("/gateway-audit/stats".equals(path) && gatewayAuditLog != null) {
+            usageService.recordControlPlaneAccess("/api/gateway-audit/stats");
+            resp.getWriter().write(buildGatewayAuditStatsJson());
             return;
         }
         notFound(resp, "Not Found");
@@ -913,6 +937,57 @@ public class AiPlatformApiServlet extends HttpServlet {
             throw new IllegalArgumentException("JSON 파싱 오류: " + e.getMessage());
         }
         return imported;
+    }
+
+    // ── 게이트웨이 감사 JSON builders ──
+
+    private String buildGatewayAuditJson(int limit, String endpoint, String tenantId, String modelName, String modality) {
+        java.util.List<AiGatewayAuditEntry> entries = gatewayAuditLog.query(limit, endpoint, tenantId, modelName, modality);
+        StringBuilder sb = new StringBuilder(8192);
+        sb.append("{\"total\":").append(gatewayAuditLog.size());
+        sb.append(",\"returned\":").append(entries.size());
+        sb.append(",\"entries\":[");
+        boolean first = true;
+        for (AiGatewayAuditEntry e : entries) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append(e.toJson());
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    private String buildGatewayAuditStatsJson() {
+        AiGatewayAuditLog.AuditStats stats = gatewayAuditLog.stats();
+        StringBuilder sb = new StringBuilder(2048);
+        sb.append("{\"totalEntries\":").append(stats.totalEntries());
+        sb.append(",\"successCount\":").append(stats.successCount());
+        sb.append(",\"successRate\":").append(String.format(java.util.Locale.US, "%.1f", stats.successRate()));
+        sb.append(",\"avgDurationMs\":").append(String.format(java.util.Locale.US, "%.1f", stats.avgDurationMs()));
+        sb.append(",\"totalTokens\":").append(stats.totalTokens());
+        sb.append(",\"endpointDistribution\":{");
+        boolean first = true;
+        for (var entry : stats.endpointDistribution().entrySet()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(esc(entry.getKey())).append("\":").append(entry.getValue());
+        }
+        sb.append("},\"modelDistribution\":{");
+        first = true;
+        for (var entry : stats.modelDistribution().entrySet()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(esc(entry.getKey())).append("\":").append(entry.getValue());
+        }
+        sb.append("},\"modalityDistribution\":{");
+        first = true;
+        for (var entry : stats.modalityDistribution().entrySet()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(esc(entry.getKey())).append("\":").append(entry.getValue());
+        }
+        sb.append("}}");
+        return sb.toString();
     }
 
     private static String esc(String s) {

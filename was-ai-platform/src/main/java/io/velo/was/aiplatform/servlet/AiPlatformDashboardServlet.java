@@ -540,6 +540,211 @@ public class AiPlatformDashboardServlet extends HttpServlet {
 
         b.append("</div>\n");
 
+        // ===== TAB: gateway-audit — 게이트웨이 감사 =====
+        b.append("<div class=\"tab-panel\" id=\"tab-gateway-audit\">\n");
+        b.append("<div class=\"hero\"><div class=\"hero-eyebrow\">AI Gateway Audit</div>");
+        b.append("<h1>\uac8c\uc774\ud2b8\uc6e8\uc774 \uac10\uc0ac \ub85c\uadf8</h1>");
+        b.append("<p>AI \ubaa8\ub378 \uac8c\uc774\ud2b8\uc6e8\uc774\ub97c \ud1b5\uacfc\ud558\ub294 \ubaa8\ub4e0 \uc694\uccad\uc758 \ud504\ub86c\ud504\ud2b8, \ubaa8\ub378 \uc120\ud0dd, \uc751\ub2f5 \uc2dc\uac04, \ud1a0\ud070 \uc0ac\uc6a9\ub7c9\uc744 \uac10\uc0ac\ud569\ub2c8\ub2e4.</p>");
+        b.append("<div class=\"chips\" id=\"auditHealthChips\">\ub85c\ub529 \uc911...</div></div>\n");
+
+        // 감사 통계 메트릭
+        b.append("<div class=\"metrics\" id=\"auditMetrics\">");
+        metric(b, "\ucd1d \uc694\uccad", "0", "\uac10\uc0ac \ub85c\uadf8 \ucd1d \uac74\uc218", "auditTotal");
+        metric(b, "\uc131\uacf5\ub960", "0%", "\uc694\uccad \uc131\uacf5 \ube44\uc728", "auditSuccessRate");
+        metric(b, "\ud3c9\uade0 \uc751\ub2f5", "0ms", "\ud3c9\uade0 \ucc98\ub9ac \uc2dc\uac04", "auditAvgDuration");
+        metric(b, "\ud1a0\ud070 \ud569\uacc4", "0", "\ucd1d \ucd94\uc815 \ud1a0\ud070 \uc0ac\uc6a9\ub7c9", "auditTotalTokens");
+        b.append("</div>\n");
+
+        // 필터 폼
+        b.append("<div class=\"card\">");
+        b.append("<div class=\"card-header\">\uac10\uc0ac \ub85c\uadf8 \uc870\ud68c</div>");
+        b.append("<div class=\"card-desc\">\uc5d4\ub4dc\ud3ec\uc778\ud2b8, \ud14c\ub10c\ud2b8, \ubaa8\ub378\ubcc4 \ud544\ud130 \uac80\uc0c9 \uc9c0\uc6d0</div>");
+        b.append("<div class=\"form-grid cols-3\">");
+        input(b, "auditFilterEndpoint", "", "\uc5d4\ub4dc\ud3ec\uc778\ud2b8 \ud544\ud130");
+        input(b, "auditFilterTenant", "", "\ud14c\ub10c\ud2b8 ID \ud544\ud130");
+        input(b, "auditFilterModel", "", "\ubaa8\ub378\uba85 \ud544\ud130");
+        b.append("</div>");
+        b.append("<div class=\"form-grid cols-3\">");
+        input(b, "auditFilterLimit", "50", "\uc870\ud68c \uac74\uc218");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"auditFilterModality\">\ubaa8\ub2ec\ub9ac\ud2f0</label>");
+        b.append("<select id=\"auditFilterModality\" class=\"form-select\"><option value=\"\">\uc804\uccb4</option>");
+        b.append("<option value=\"text\">text</option><option value=\"vision\">vision</option>");
+        b.append("<option value=\"image_gen\">image_gen</option><option value=\"stt\">stt</option>");
+        b.append("<option value=\"tts\">tts</option><option value=\"embedding\">embedding</option>");
+        b.append("</select></div>");
+        b.append("<div class=\"form-field\"><label class=\"form-label\">&nbsp;</label>");
+        b.append("<div class=\"btns\" style=\"margin:0;\">");
+        b.append("<button class=\"btn btn-primary\" onclick=\"refreshGatewayAudit()\">\uc870\ud68c</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshGatewayAuditStats()\">\ud1b5\uacc4 \uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div></div>");
+        b.append("</div>");
+
+        // 감사 로그 테이블
+        b.append("<div id=\"gatewayAuditTable\"></div>");
+        b.append("</div>\n");
+
+        // 통계 JSON
+        b.append("<div class=\"card\">");
+        b.append("<div class=\"card-header\">\uac10\uc0ac \ud1b5\uacc4</div>");
+        b.append("<div class=\"card-desc\">\uc5d4\ub4dc\ud3ec\uc778\ud2b8\ubcc4 \ud638\ucd9c \uc218, \ubaa8\ub378\ubcc4 \ubd84\ud3ec, \uc131\uacf5\ub960</div>");
+        b.append("<pre class=\"json-box\" id=\"gatewayAuditStatsJson\">\ud1b5\uacc4 \ub85c\ub529 \uc911...</pre>");
+        b.append("</div>\n");
+
+        b.append("</div>\n");
+
+        // ===== TAB: acp — ACP 에이전트 통신 =====
+        b.append("<div class=\"tab-panel\" id=\"tab-acp\">\n");
+        b.append("<div class=\"hero\"><div class=\"hero-eyebrow\">Agent Communication Protocol</div>");
+        b.append("<h1>ACP \uc5d0\uc774\uc804\ud2b8 \ud1b5\uc2e0</h1>");
+        b.append("<p>\uc5d0\uc774\uc804\ud2b8 \uac04 \ud0dc\uc2a4\ud06c \uae30\ubc18 \ube44\ub3d9\uae30 \ud1b5\uc2e0, \uba40\ud2f0\ubaa8\ub2ec \uba54\uc2dc\uc9d5, \uc758\ub3c4 \uae30\ubc18 \ub77c\uc6b0\ud305\uc744 \uc9c0\uc6d0\ud569\ub2c8\ub2e4.</p>");
+        b.append("<div class=\"chips\" id=\"acpChips\">\ub85c\ub529 \uc911...</div></div>\n");
+
+        // 에이전트 등록 폼
+        b.append("<div class=\"card\"><div class=\"card-header\">\uc5d0\uc774\uc804\ud2b8 \ub4f1\ub85d</div>");
+        b.append("<div class=\"card-desc\">\uc678\ubd80 \uc5d0\uc774\uc804\ud2b8\ub97c AGP \uac8c\uc774\ud2b8\uc6e8\uc774\uc5d0 \ub4f1\ub85d\ud569\ub2c8\ub2e4.</div>");
+        b.append("<div class=\"form-grid cols-3\">");
+        input(b, "acpAgentName", "", "\uc5d0\uc774\uc804\ud2b8 \uc774\ub984 *");
+        input(b, "acpAgentEndpoint", "http://", "\uc5d4\ub4dc\ud3ec\uc778\ud2b8 URL");
+        input(b, "acpAgentCapabilities", "chat,vision", "\ub2a5\ub825 (,\uad6c\ubd84)");
+        b.append("</div>");
+        b.append("<div class=\"form-grid cols-3\">");
+        input(b, "acpAgentModalities", "text", "\ubaa8\ub2ec\ub9ac\ud2f0 (,\uad6c\ubd84)");
+        input(b, "acpAgentProtocols", "acp", "\ud504\ub85c\ud1a0\ucf5c (,\uad6c\ubd84)");
+        input(b, "acpAgentProvider", "", "\ud504\ub85c\ubc14\uc774\ub354");
+        b.append("</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-primary\" onclick=\"registerAcpAgent()\">\ub4f1\ub85d</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshAcpAgents()\">\uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div>");
+        b.append("<div id=\"acpAgentsTable\"></div>");
+        b.append("</div>\n");
+
+        // 태스크 관리
+        b.append("<div class=\"card\"><div class=\"card-header\">\ud0dc\uc2a4\ud06c \uad00\ub9ac</div>");
+        b.append("<div class=\"card-desc\">\uc5d0\uc774\uc804\ud2b8 \uac04 \ud0dc\uc2a4\ud06c \uc0dd\uc131 \ubc0f \ubaa9\ub85d \uc870\ud68c</div>");
+        b.append("<div class=\"form-grid cols-3\">");
+        input(b, "acpTaskTo", "", "\ub300\uc0c1 \uc5d0\uc774\uc804\ud2b8 ID");
+        input(b, "acpTaskCapability", "", "\ub2a5\ub825 (\uc790\ub3d9 \ub77c\uc6b0\ud305)");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"acpTaskText\">\uba54\uc2dc\uc9c0</label>");
+        b.append("<textarea id=\"acpTaskText\" class=\"form-textarea\" style=\"min-height:40px;\">\uc548\ub155\ud558\uc138\uc694</textarea></div>");
+        b.append("</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-primary\" onclick=\"createAcpTask()\">\ud0dc\uc2a4\ud06c \uc0dd\uc131</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshAcpTasks()\">\ubaa9\ub85d \uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div>");
+        b.append("<div id=\"acpTasksTable\"></div>");
+        b.append("<pre class=\"json-box\" id=\"acpTaskDetail\">\ud0dc\uc2a4\ud06c\ub97c \uc0dd\uc131\ud558\uba74 \uacb0\uacfc\uac00 \uc5ec\uae30\uc5d0 \ud45c\uc2dc\ub429\ub2c8\ub2e4.</pre>");
+        b.append("</div>\n");
+        b.append("</div>\n");
+
+        // ===== TAB: agp — AGP 게이트웨이 허브 =====
+        b.append("<div class=\"tab-panel\" id=\"tab-agp\">\n");
+        b.append("<div class=\"hero\"><div class=\"hero-eyebrow\">Agent Gateway Protocol</div>");
+        b.append("<h1>AGP \uc5d0\uc774\uc804\ud2b8 \uac8c\uc774\ud2b8\uc6e8\uc774 \ud5c8\ube0c</h1>");
+        b.append("<p>\uc5d0\uc774\uc804\ud2b8 \ub4f1\ub85d/\ubc1c\uacac/\ub77c\uc6b0\ud305 \uc911\uc559 \ud5c8\ube0c. MCP(\ub3c4\uad6c), ACP(\uc5d0\uc774\uc804\ud2b8 \uac04), AGP(\ud5c8\ube0c)\ub97c \ud1b5\ud569\ud569\ub2c8\ub2e4.</p>");
+        b.append("<div class=\"chips\" id=\"agpChips\">\ub85c\ub529 \uc911...</div></div>\n");
+
+        // 게이트웨이 통계 메트릭
+        b.append("<div class=\"metrics\" id=\"agpMetrics\">");
+        metric(b, "\ub4f1\ub85d \uc5d0\uc774\uc804\ud2b8", "0", "\ub808\uc9c0\uc2a4\ud2b8\ub9ac \ub4f1\ub85d \uc218", "agpAgents");
+        metric(b, "\ud65c\uc131 \ucc44\ub110", "0", "\uc5d0\uc774\uc804\ud2b8 \uac04 \ud1b5\uc2e0 \ucc44\ub110", "agpChannels");
+        metric(b, "\ub77c\uc6b0\ud305 \uaddc\uce59", "0", "\ub2a5\ub825\u2192\uc5d0\uc774\uc804\ud2b8 \ub9e4\ud551", "agpRoutes");
+        metric(b, "\ucd1d \ud0dc\uc2a4\ud06c", "0", "\uc0dd\uc131\ub41c \ud0dc\uc2a4\ud06c \uc218", "agpTasks");
+        b.append("</div>\n");
+
+        // 라우팅 테이블
+        b.append("<div class=\"card\"><div class=\"card-header\">\ub77c\uc6b0\ud305 \ud14c\uc774\ube14</div>");
+        b.append("<div class=\"card-desc\">\ub2a5\ub825(capability) \u2192 \uc5d0\uc774\uc804\ud2b8 \ub9e4\ud551 \ubc0f \uc758\ub3c4 \uae30\ubc18 \ud0d0\uc0c9</div>");
+        b.append("<div class=\"form-grid cols-3\">");
+        input(b, "agpRouteCapability", "chat", "\ub2a5\ub825 *");
+        input(b, "agpRouteAgentId", "", "\uc5d0\uc774\uc804\ud2b8 ID *");
+        input(b, "agpRoutePriority", "50", "\uc6b0\uc120\uc21c\uc704");
+        b.append("</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-primary\" onclick=\"addAgpRoute()\">\uaddc\uce59 \ucd94\uac00</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshAgpRoutes()\">\uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div>");
+        b.append("<div id=\"agpRoutesTable\"></div>");
+        b.append("</div>\n");
+
+        // 의도 기반 탐색 테스트
+        b.append("<div class=\"card\"><div class=\"card-header\">\uc758\ub3c4 \uae30\ubc18 \uc5d0\uc774\uc804\ud2b8 \ud0d0\uc0c9</div>");
+        b.append("<div class=\"card-desc\">\ub2a5\ub825, \ubaa8\ub2ec\ub9ac\ud2f0, \ub610\ub294 \uc790\uc5f0\uc5b4 \uc758\ub3c4\ub85c \uc801\ud569\ud55c \uc5d0\uc774\uc804\ud2b8\ub97c \ucc3e\uc2b5\ub2c8\ub2e4.</div>");
+        b.append("<div class=\"form-grid cols-2\">");
+        input(b, "agpResolveCapability", "", "\ub2a5\ub825 \ub610\ub294 \uc758\ub3c4 \ud14d\uc2a4\ud2b8");
+        input(b, "agpResolveModality", "", "\ubaa8\ub2ec\ub9ac\ud2f0 \ud544\ud130");
+        b.append("</div>");
+        b.append("<div class=\"btns\"><button class=\"btn btn-primary\" onclick=\"resolveAgpAgent()\">\ud0d0\uc0c9</button></div>");
+        b.append("<pre class=\"json-box\" id=\"agpResolveResult\">\ud0d0\uc0c9 \uacb0\uacfc\uac00 \uc5ec\uae30\uc5d0 \ud45c\uc2dc\ub429\ub2c8\ub2e4.</pre>");
+        b.append("</div>\n");
+
+        // 활성 채널 & 감사 로그
+        b.append("<div class=\"card\"><div class=\"card-header\">\ud65c\uc131 \ucc44\ub110 \ubc0f \uac10\uc0ac \ub85c\uadf8</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshAgpChannels()\">\ucc44\ub110 \uc0c8\ub85c\uace0\uce68</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshAgpAudit()\">\uac10\uc0ac \uc0c8\ub85c\uace0\uce68</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshAgpStats()\">\ud1b5\uacc4 \uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div>");
+        b.append("<div id=\"agpChannelsTable\"></div>");
+        b.append("<pre class=\"json-box\" id=\"agpAuditJson\">\uac10\uc0ac \ub85c\uadf8 \ub85c\ub529 \uc911...</pre>");
+        b.append("<pre class=\"json-box\" id=\"agpStatsJson\">\ud1b5\uacc4 \ub85c\ub529 \uc911...</pre>");
+        b.append("</div>\n");
+        b.append("</div>\n");
+
+        // ===== TAB: a2a — A2A 에이전트 협업 =====
+        b.append("<div class=\"tab-panel\" id=\"tab-a2a\">\n");
+        b.append("<div class=\"hero\"><div class=\"hero-eyebrow\">Agent-to-Agent Protocol</div>");
+        b.append("<h1>A2A \uc5d0\uc774\uc804\ud2b8 \ud611\uc5c5</h1>");
+        b.append("<p>Google A2A \ud45c\uc900 JSON-RPC 2.0 \ud504\ub85c\ud1a0\ucf5c\ub85c \uc5d0\uc774\uc804\ud2b8 \uac04 \uc9c1\uc811 \ud611\uc5c5\ud569\ub2c8\ub2e4. tasks/send, tasks/get, tasks/cancel, message/send \uba54\uc11c\ub4dc\ub97c \uc9c0\uc6d0\ud569\ub2c8\ub2e4.</p>");
+        b.append("<div class=\"chips\">");
+        b.append("<span class=\"chip green\">JSON-RPC 2.0</span>");
+        b.append("<span class=\"chip\">SSE \uc2a4\ud2b8\ub9ac\ubc0d</span>");
+        b.append("<span class=\"chip\">A2A + ACP + AGP + MCP</span>");
+        b.append("</div></div>\n");
+
+        // A2A JSON-RPC 테스트
+        b.append("<div class=\"card\"><div class=\"card-header\">A2A JSON-RPC \ud14c\uc2a4\ud2b8</div>");
+        b.append("<div class=\"card-desc\">A2A \ud45c\uc900 JSON-RPC 2.0 \uc694\uccad\uc744 \uc9c1\uc811 \uc804\uc1a1\ud569\ub2c8\ub2e4.</div>");
+        b.append("<div class=\"form-grid cols-2\">");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"a2aMethod\">\uba54\uc11c\ub4dc</label>");
+        b.append("<select id=\"a2aMethod\" class=\"form-select\">");
+        b.append("<option value=\"tasks/send\">tasks/send</option>");
+        b.append("<option value=\"tasks/sendSubscribe\">tasks/sendSubscribe</option>");
+        b.append("<option value=\"tasks/get\">tasks/get</option>");
+        b.append("<option value=\"tasks/cancel\">tasks/cancel</option>");
+        b.append("<option value=\"message/send\">message/send</option>");
+        b.append("<option value=\"agent/authenticatedExtendedCard\">agent/authenticatedExtendedCard</option>");
+        b.append("</select></div>");
+        input(b, "a2aId", "1", "JSON-RPC ID");
+        b.append("</div>");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"a2aParams\">Params (JSON)</label>");
+        b.append("<textarea id=\"a2aParams\" class=\"form-textarea\" style=\"min-height:100px;font-family:monospace;\">{\"message\":{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"text\":\"\uc548\ub155\ud558\uc138\uc694\"}]},\"capability\":\"chat\"}</textarea></div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-primary\" onclick=\"sendA2aRequest()\">\uc804\uc1a1</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"document.getElementById('a2aResult').textContent=''\">\ucd08\uae30\ud654</button>");
+        b.append("</div>");
+        b.append("<pre class=\"json-box\" id=\"a2aResult\">\uc694\uccad \uacb0\uacfc\uac00 \uc5ec\uae30\uc5d0 \ud45c\uc2dc\ub429\ub2c8\ub2e4.</pre>");
+        b.append("</div>\n");
+
+        // A2A 에이전트 카드
+        b.append("<div class=\"card\"><div class=\"card-header\">\uc5d0\uc774\uc804\ud2b8 \uce74\ub4dc</div>");
+        b.append("<div class=\"card-desc\">/.well-known/agent.json (A2A \ud45c\uc900) \ubc0f /.well-known/agent-card.json (ACP)</div>");
+        b.append("<div class=\"btns\"><button class=\"btn btn-secondary\" onclick=\"fetchAgentCard()\">\uc5d0\uc774\uc804\ud2b8 \uce74\ub4dc \uc870\ud68c</button></div>");
+        b.append("<pre class=\"json-box\" id=\"a2aAgentCard\">\ub85c\ub529 \uc911...</pre>");
+        b.append("</div>\n");
+
+        // 프로토콜 호환성 표
+        b.append("<div class=\"card\"><div class=\"card-header\">\ud504\ub85c\ud1a0\ucf5c \ud1b5\ud569 \ud604\ud669</div>");
+        b.append("<div class=\"card-desc\">\uc774 \ud50c\ub7ab\ud3fc\uc774 \uc9c0\uc6d0\ud558\ub294 \uc5d0\uc774\uc804\ud2b8 \ud1b5\uc2e0 \ud504\ub85c\ud1a0\ucf5c</div>");
+        b.append("<div class=\"tbl-wrap\"><table><thead><tr><th>\ud504\ub85c\ud1a0\ucf5c</th><th>\uc5ed\ud560</th><th>\uc5d4\ub4dc\ud3ec\uc778\ud2b8</th><th>\uc0c1\ud0dc</th></tr></thead><tbody>");
+        b.append("<tr><td><strong>A2A</strong></td><td>\uc5d0\uc774\uc804\ud2b8 \uac04 \ud611\uc5c5 (JSON-RPC 2.0)</td><td>/a2a</td><td><span class=\"status-on\">\ud65c\uc131</span></td></tr>");
+        b.append("<tr><td><strong>ACP</strong></td><td>\ud0dc\uc2a4\ud06c \uae30\ubc18 \uc5d0\uc774\uc804\ud2b8 \ud1b5\uc2e0</td><td>/acp/*</td><td><span class=\"status-on\">\ud65c\uc131</span></td></tr>");
+        b.append("<tr><td><strong>AGP</strong></td><td>\uc5d0\uc774\uc804\ud2b8 \uac8c\uc774\ud2b8\uc6e8\uc774 \ud5c8\ube0c</td><td>/agp/admin/*</td><td><span class=\"status-on\">\ud65c\uc131</span></td></tr>");
+        b.append("<tr><td><strong>MCP</strong></td><td>\uc5d0\uc774\uc804\ud2b8 \u2192 \ub3c4\uad6c/\ub9ac\uc18c\uc2a4</td><td>/mcp</td><td><span class=\"status-on\">\ud65c\uc131</span></td></tr>");
+        b.append("<tr><td><strong>OpenAI</strong></td><td>OpenAI \ud638\ud658 \ud504\ub85d\uc2dc</td><td>/v1/chat/completions</td><td><span class=\"status-on\">\ud65c\uc131</span></td></tr>");
+        b.append("</tbody></table></div></div>\n");
+        b.append("</div>\n");
+
         // ===== TAB: roadmap =====
         b.append("<div class=\"tab-panel\" id=\"tab-roadmap\">\n");
         b.append("<div class=\"card\"><div class=\"card-header\">\uc9c4\ud654 \ub85c\ub4dc\ub9f5</div><div class=\"card-desc\">\uae30\ubcf8 \uc11c\ube59\uc5d0\uc11c \ud50c\ub7ab\ud3fc \uc0c1\uc6a9\ud654\uae4c\uc9c0</div>");
@@ -626,9 +831,145 @@ public class AiPlatformDashboardServlet extends HttpServlet {
 
         // Plugin functions
         b.append("async function refreshPlugins(){showJson('pluginsJson',await api('/api/plugins'))}\n");
+
+        // ── Gateway Audit functions ──
+        b.append("async function refreshGatewayAudit(){\n");
+        b.append("  const ep=document.getElementById('auditFilterEndpoint').value.trim();\n");
+        b.append("  const tid=document.getElementById('auditFilterTenant').value.trim();\n");
+        b.append("  const mn=document.getElementById('auditFilterModel').value.trim();\n");
+        b.append("  const mod=document.getElementById('auditFilterModality').value;\n");
+        b.append("  const lim=document.getElementById('auditFilterLimit').value||'50';\n");
+        b.append("  let q='?limit='+lim;\n");
+        b.append("  if(ep)q+='&endpoint='+encodeURIComponent(ep);\n");
+        b.append("  if(tid)q+='&tenantId='+encodeURIComponent(tid);\n");
+        b.append("  if(mn)q+='&modelName='+encodeURIComponent(mn);\n");
+        b.append("  if(mod)q+='&modality='+encodeURIComponent(mod);\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await api('/api/gateway-audit'+q));\n");
+        b.append("    const el=document.getElementById('gatewayAuditTable');\n");
+        b.append("    if(!d.entries||!d.entries.length){el.innerHTML='<p style=\"color:var(--soft);font-size:13px;\">\uac10\uc0ac \ub85c\uadf8\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>\uc2dc\uac01</th><th>ID</th><th>\ud14c\ub10c\ud2b8</th><th>\uc5d4\ub4dc\ud3ec\uc778\ud2b8</th><th>\ubaa8\ub378</th><th>\ubaa8\ub2ec\ub9ac\ud2f0</th><th>\ud504\ub86c\ud504\ud2b8</th><th>\uc751\ub2f5(ms)</th><th>\ud1a0\ud070</th><th>\uacb0\uacfc</th><th>\uc758\ub3c4</th></tr></thead><tbody>';\n");
+        b.append("    d.entries.forEach(e=>{\n");
+        b.append("      const ts=e.timestamp?new Date(e.timestamp).toLocaleString('ko-KR',{hour12:false}):'?';\n");
+        b.append("      const pv=(e.prompt||'').substring(0,60)+(e.prompt&&e.prompt.length>60?'...':'');\n");
+        b.append("      const st=e.success?'<span class=\"status-on\">\uc131\uacf5</span>':'<span class=\"status-off\">\uc2e4\ud328</span>';\n");
+        b.append("      h+='<tr><td style=\"white-space:nowrap;font-size:11px;\">'+esc(ts)+'</td>';\n");
+        b.append("      h+='<td style=\"font-size:11px;\">'+esc((e.requestId||'').substring(0,12))+'</td>';\n");
+        b.append("      h+='<td>'+esc(e.tenantId||'-')+'</td>';\n");
+        b.append("      h+='<td><strong>'+esc(e.endpoint||'')+'</strong></td>';\n");
+        b.append("      h+='<td>'+esc(e.modelName||'-')+'</td>';\n");
+        b.append("      h+='<td><span class=\"pill '+(e.modality==='text'?'ok':'off')+'\">'+esc(e.modality||'text')+'</span></td>';\n");
+        b.append("      h+='<td style=\"max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;\" title=\"'+esc(e.prompt||'')+'\">'+esc(pv)+'</td>';\n");
+        b.append("      h+='<td>'+e.durationMs+'</td>';\n");
+        b.append("      h+='<td>'+e.estimatedTokens+'</td>';\n");
+        b.append("      h+='<td>'+st+'</td>';\n");
+        b.append("      h+='<td>'+esc(e.intentType||'-')+'</td></tr>';\n");
+        b.append("    });\n");
+        b.append("    h+='</tbody></table></div>';\n");
+        b.append("    h+='<p style=\"font-size:12px;color:var(--soft);margin-top:8px;\">\ud45c\uc2dc: '+d.returned+'\uac74 / \ucd1d: '+d.total+'\uac74</p>';\n");
+        b.append("    el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('gatewayAuditTable').textContent=e.message;}\n");
+        b.append("}\n");
+        b.append("async function refreshGatewayAuditStats(){\n");
+        b.append("  try{\n");
+        b.append("    const s=JSON.parse(await api('/api/gateway-audit/stats'));\n");
+        b.append("    document.getElementById('mv-auditTotal').textContent=s.totalEntries||0;\n");
+        b.append("    document.getElementById('mv-auditSuccessRate').textContent=(s.successRate||0).toFixed(1)+'%';\n");
+        b.append("    document.getElementById('mv-auditAvgDuration').textContent=(s.avgDurationMs||0).toFixed(0)+'ms';\n");
+        b.append("    document.getElementById('mv-auditTotalTokens').textContent=s.totalTokens||0;\n");
+        b.append("    const ch=document.getElementById('auditHealthChips');\n");
+        b.append("    ch.innerHTML='<span class=\"chip green\">\ucd1d '+s.totalEntries+'\uac74</span>';\n");
+        b.append("    if(s.endpointDistribution){Object.entries(s.endpointDistribution).forEach(([k,v])=>{ch.innerHTML+='<span class=\"chip\">'+esc(k)+': '+v+'</span>';});}\n");
+        b.append("    showJson('gatewayAuditStatsJson',JSON.stringify(s,null,2));\n");
+        b.append("  }catch(e){showJson('gatewayAuditStatsJson','{\"error\":\"'+e.message+'\"}');}\n");
+        b.append("}\n");
         // Intent keyword/policy delete functions
         b.append("async function deleteKeyword(id){if(!confirm('\\ud0a4\\uc6cc\\ub4dc '+id+'\\ub97c \\uc0ad\\uc81c\\ud558\\uc2dc\\uaca0\\uc2b5\\ub2c8\\uae4c?'))return;showJson('keywordResult',await api('/api/intent/keywords/'+encodeURIComponent(id),{method:'DELETE'}));refreshKeywords()}\n");
         b.append("async function deletePolicy(id){if(!confirm('\\uc815\\ucc45 '+id+'\\ub97c \\uc0ad\\uc81c\\ud558\\uc2dc\\uaca0\\uc2b5\\ub2c8\\uae4c?'))return;showJson('keywordResult',await api('/api/intent/policies/'+encodeURIComponent(id),{method:'DELETE'}));refreshPolicies()}\n");
+
+        // ── A2A functions ─────────────────────────────────────────────────
+        b.append("async function sendA2aRequest(){\n");
+        b.append("  const method=document.getElementById('a2aMethod').value;\n");
+        b.append("  const id=document.getElementById('a2aId').value||'1';\n");
+        b.append("  let params;\n");
+        b.append("  try{params=JSON.parse(document.getElementById('a2aParams').value);}catch(e){showJson('a2aResult','{\"error\":\"Invalid JSON: '+e.message+'\"}');return;}\n");
+        b.append("  const rpc={jsonrpc:'2.0',method:method,params:params,id:Number(id)};\n");
+        b.append("  showJson('a2aResult',await api('/a2a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rpc)}));\n");
+        b.append("}\n");
+        b.append("async function fetchAgentCard(){showJson('a2aAgentCard',await api('/.well-known/agent.json'))}\n");
+        b.append("fetchAgentCard();\n");
+
+        // ── ACP/AGP functions ─────────────────────────────────────────────
+        b.append("async function agpApi(p,o){try{return await(await fetch(CP+p,o)).text();}catch(e){return'{\"error\":\"'+e.message+'\"}';}}\n");
+
+        // ACP 에이전트 관리
+        b.append("async function registerAcpAgent(){const p={name:document.getElementById('acpAgentName').value,endpoint:document.getElementById('acpAgentEndpoint').value,capabilities:document.getElementById('acpAgentCapabilities').value,modalities:document.getElementById('acpAgentModalities').value,protocols:document.getElementById('acpAgentProtocols').value,provider:document.getElementById('acpAgentProvider').value};showJson('acpTaskDetail',await agpApi('/agp/admin/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}));refreshAcpAgents();refreshAgpStats();}\n");
+        b.append("async function refreshAcpAgents(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await agpApi('/agp/admin/agents'));\n");
+        b.append("    const el=document.getElementById('acpAgentsTable');\n");
+        b.append("    if(!d.agents||!d.agents.length){el.innerHTML='<p style=\"color:var(--soft);font-size:13px;\">\ub4f1\ub85d\ub41c \uc5d0\uc774\uc804\ud2b8\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>ID</th><th>\uc774\ub984</th><th>\ub2a5\ub825</th><th>\ubaa8\ub2ec\ub9ac\ud2f0</th><th>\ud504\ub85c\ud1a0\ucf5c</th><th>\uc5d4\ub4dc\ud3ec\uc778\ud2b8</th></tr></thead><tbody>';\n");
+        b.append("    d.agents.forEach(a=>{h+='<tr><td style=\"font-size:11px;\">'+esc(a.agentId||'')+'</td><td><strong>'+esc(a.name||'')+'</strong></td><td>'+((a.capabilities||[]).join(', '))+'</td><td>'+((a.modalities||[]).join(', '))+'</td><td>'+((a.protocols||[]).join(', '))+'</td><td style=\"font-size:11px;\">'+esc(a.endpoint||'')+'</td></tr>';});\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("    const ch=document.getElementById('acpChips');\n");
+        b.append("    ch.innerHTML='<span class=\"chip green\">\uc5d0\uc774\uc804\ud2b8: '+d.agents.length+'</span>';\n");
+        b.append("  }catch(e){document.getElementById('acpAgentsTable').textContent=e.message;}\n");
+        b.append("}\n");
+
+        // ACP 태스크 관리
+        b.append("async function createAcpTask(){const p={toAgent:document.getElementById('acpTaskTo').value,capability:document.getElementById('acpTaskCapability').value,text:document.getElementById('acpTaskText').value};showJson('acpTaskDetail',await agpApi('/acp/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}));refreshAcpTasks();}\n");
+        b.append("async function refreshAcpTasks(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await agpApi('/acp/tasks'));\n");
+        b.append("    const el=document.getElementById('acpTasksTable');\n");
+        b.append("    if(!d.tasks||!d.tasks.length){el.innerHTML='<p style=\"color:var(--soft);font-size:13px;\">\ud0dc\uc2a4\ud06c\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>ID</th><th>From</th><th>To</th><th>\uc0c1\ud0dc</th><th>\uc0dd\uc131\uc2dc\uac01</th><th>\uc791\uc5c5</th></tr></thead><tbody>';\n");
+        b.append("    d.tasks.forEach(t=>{const st=t.state==='COMPLETED'?'<span class=\"status-on\">'+t.state+'</span>':(t.state==='FAILED'?'<span class=\"status-off\">'+t.state+'</span>':t.state);h+='<tr><td style=\"font-size:11px;\">'+esc(t.taskId)+'</td><td>'+esc(t.fromAgent||'')+'</td><td>'+esc(t.toAgent||'')+'</td><td>'+st+'</td><td style=\"font-size:11px;\">'+esc(t.createdAt||'')+'</td><td><button class=\"btn btn-secondary\" style=\"padding:4px 8px;font-size:11px;\" onclick=\"viewAcpTask(\\''+esc(t.taskId)+'\\')\">\uc0c1\uc138</button></td></tr>';});\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('acpTasksTable').textContent=e.message;}\n");
+        b.append("}\n");
+        b.append("async function viewAcpTask(id){showJson('acpTaskDetail',await agpApi('/acp/tasks/'+encodeURIComponent(id)))}\n");
+
+        // AGP 게이트웨이 관리
+        b.append("async function addAgpRoute(){const p={capability:document.getElementById('agpRouteCapability').value,agentId:document.getElementById('agpRouteAgentId').value,priority:Number(document.getElementById('agpRoutePriority').value||50),weight:100};showJson('agpStatsJson',await agpApi('/agp/admin/routes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}));refreshAgpRoutes();}\n");
+        b.append("async function refreshAgpRoutes(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await agpApi('/agp/admin/routes'));\n");
+        b.append("    const el=document.getElementById('agpRoutesTable');\n");
+        b.append("    if(!d.routes||!d.routes.length){el.innerHTML='<p style=\"color:var(--soft);font-size:13px;\">\ub77c\uc6b0\ud305 \uaddc\uce59\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>\ub2a5\ub825</th><th>\uc5d0\uc774\uc804\ud2b8 ID</th><th>\uc6b0\uc120\uc21c\uc704</th><th>\uac00\uc911\uce58</th></tr></thead><tbody>';\n");
+        b.append("    d.routes.forEach(r=>{h+='<tr><td><strong>'+esc(r.capability)+'</strong></td><td>'+esc(r.agentId)+'</td><td>'+r.priority+'</td><td>'+r.weight+'</td></tr>';});\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('agpRoutesTable').textContent=e.message;}\n");
+        b.append("}\n");
+        b.append("async function resolveAgpAgent(){const cap=document.getElementById('agpResolveCapability').value;const mod=document.getElementById('agpResolveModality').value;const p={};if(cap)p.capability=cap;if(!cap&&mod)p.modality=mod;if(cap&&!mod)p.intent=cap;showJson('agpResolveResult',await agpApi('/agp/admin/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}))}\n");
+        b.append("async function refreshAgpChannels(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await agpApi('/agp/admin/channels'));\n");
+        b.append("    const el=document.getElementById('agpChannelsTable');\n");
+        b.append("    if(!d.channels||!d.channels.length){el.innerHTML='<p style=\"color:var(--soft);font-size:13px;\">\ud65c\uc131 \ucc44\ub110\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>\ucc44\ub110 ID</th><th>\uc5d0\uc774\uc804\ud2b8 A</th><th>\uc5d0\uc774\uc804\ud2b8 B</th><th>\uba54\uc2dc\uc9c0 \uc218</th><th>\ub9c8\uc9c0\ub9c9 \ud65c\ub3d9</th></tr></thead><tbody>';\n");
+        b.append("    d.channels.forEach(c=>{h+='<tr><td style=\"font-size:11px;\">'+esc(c.channelId)+'</td><td>'+esc(c.agentA)+'</td><td>'+esc(c.agentB)+'</td><td>'+c.messageCount+'</td><td style=\"font-size:11px;\">'+esc(c.lastActivityAt||'')+'</td></tr>';});\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('agpChannelsTable').textContent=e.message;}\n");
+        b.append("}\n");
+        b.append("async function refreshAgpAudit(){showJson('agpAuditJson',await agpApi('/agp/admin/audit?limit=20'))}\n");
+        b.append("async function refreshAgpStats(){\n");
+        b.append("  try{\n");
+        b.append("    const s=JSON.parse(await agpApi('/agp/admin/stats'));\n");
+        b.append("    document.getElementById('mv-agpAgents').textContent=s.registeredAgents||0;\n");
+        b.append("    document.getElementById('mv-agpChannels').textContent=s.activeChannels||0;\n");
+        b.append("    document.getElementById('mv-agpRoutes').textContent=s.routeRules||0;\n");
+        b.append("    document.getElementById('mv-agpTasks').textContent=s.tasks?s.tasks.totalCreated:0;\n");
+        b.append("    const ch=document.getElementById('agpChips');\n");
+        b.append("    ch.innerHTML='<span class=\"chip green\">\uc5d0\uc774\uc804\ud2b8: '+s.registeredAgents+'</span>';\n");
+        b.append("    ch.innerHTML+='<span class=\"chip\">\ud0dc\uc2a4\ud06c: '+(s.tasks?s.tasks.totalCreated:0)+'</span>';\n");
+        b.append("    ch.innerHTML+='<span class=\"chip\">\ub77c\uc6b0\ud305: '+s.routedTasks+'</span>';\n");
+        b.append("    ch.innerHTML+='<span class=\"chip\">\uba54\uc2dc\uc9c0: '+s.forwardedMessages+'</span>';\n");
+        b.append("    showJson('agpStatsJson',JSON.stringify(s,null,2));\n");
+        b.append("  }catch(e){showJson('agpStatsJson','{\"error\":\"'+e.message+'\"}');}\n");
+        b.append("}\n");
 
         // ── MCP management functions ──────────────────────────────────────
         b.append("async function mcpApi(p,o){try{const r=await fetch(CP+'/mcp'+p,o);const t=await r.text();if(!r.ok){showToast('\\u274c HTTP '+r.status+': '+t.substring(0,200),'error');}else{try{const j=JSON.parse(t);if(j.error){showToast('\\u274c '+JSON.stringify(j.error).substring(0,200),'error');}}catch(e){}}return t;}catch(e){showToast('\\u274c '+e.message,'error');return'{\"error\":\"'+e.message+'\"}';}}\n");
@@ -870,6 +1211,8 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("refreshMcpHealth();refreshMcpServers();refreshMcpTools();refreshMcpResources();refreshMcpPrompts();refreshMcpSessions();refreshMcpAudit();refreshMcpPolicies();\n");
         b.append("refreshGatewayStatus();refreshRoutingTable();\n");
         b.append("refreshAppMcpEndpoints();refreshAppMcpSessions();refreshAppMcpTraffic();\n");
+        b.append("refreshGatewayAudit();refreshGatewayAuditStats();\n");
+        b.append("refreshAcpAgents();refreshAcpTasks();refreshAgpRoutes();refreshAgpChannels();refreshAgpAudit();refreshAgpStats();\n");
         b.append("updateLiveDashboard();\n");
         b.append("setInterval(updateLiveDashboard,5000);\n");
         b.append("</script>\n");

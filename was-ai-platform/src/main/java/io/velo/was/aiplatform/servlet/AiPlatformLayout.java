@@ -43,6 +43,11 @@ public final class AiPlatformLayout {
         html.append("    <a href=\"#plugins\" class=\"nav-item\" onclick=\"showTab(event,'plugins')\">\ud83d\udd0c \ud50c\ub7ec\uadf8\uc778</a>\n");
         html.append("    <a href=\"#mcp\" class=\"nav-item\" onclick=\"showTab(event,'mcp')\">\ud83e\udd16 MCP \uc11c\ubc84</a>\n");
         html.append("    <a href=\"#app-mcp\" class=\"nav-item\" onclick=\"showTab(event,'app-mcp')\">\ud83d\udce1 \uc571 MCP \ubaa8\ub2c8\ud130\ub9c1</a>\n");
+        html.append("    <a href=\"#gateway-audit\" class=\"nav-item\" onclick=\"showTab(event,'gateway-audit')\">\ud83d\udccb \uac8c\uc774\ud2b8\uc6e8\uc774 \uac10\uc0ac</a>\n");
+        html.append("    <div class=\"nav-label\">\uc5d0\uc774\uc804\ud2b8 \ud1b5\uc2e0</div>\n");
+        html.append("    <a href=\"#acp\" class=\"nav-item\" onclick=\"showTab(event,'acp')\">\ud83e\udd1d ACP \uc5d0\uc774\uc804\ud2b8</a>\n");
+        html.append("    <a href=\"#agp\" class=\"nav-item\" onclick=\"showTab(event,'agp')\">\ud83d\udd00 AGP \uac8c\uc774\ud2b8\uc6e8\uc774</a>\n");
+        html.append("    <a href=\"#a2a\" class=\"nav-item\" onclick=\"showTab(event,'a2a')\">\ud83d\udd04 A2A \ud611\uc5c5</a>\n");
         html.append("    <div class=\"nav-label\">\uc124\uc815</div>\n");
         html.append("    <a href=\"#platform\" class=\"nav-item\" onclick=\"showTab(event,'platform')\">\ud83c\udfdb\ufe0f \ud50c\ub7ab\ud3fc</a>\n");
         html.append("    <a href=\"#config\" class=\"nav-item\" onclick=\"showTab(event,'config')\">\ud83d\udcdd YAML \uc124\uc815</a>\n");

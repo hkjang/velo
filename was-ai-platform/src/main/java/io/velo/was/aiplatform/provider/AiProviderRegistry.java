@@ -71,6 +71,30 @@ public class AiProviderRegistry {
         return adapter.chatCompletion(request);
     }
 
+    /**
+     * Try to call a provider with modality-aware dispatch.
+     * Routes to the appropriate adapter method based on the modality.
+     *
+     * @param providerId provider to call
+     * @param request    the inference request
+     * @param modality   modality hint: text, vision, image_gen, stt, tts, embedding
+     * @return response or null if no adapter registered
+     */
+    public AiProviderResponse tryInferMultimodal(String providerId, AiProviderRequest request, String modality) {
+        AiProviderAdapter adapter = resolve(providerId);
+        if (adapter == null) {
+            return null;
+        }
+        return switch (modality != null ? modality : "text") {
+            case "vision" -> adapter.chatCompletion(request); // vision uses chat with image content
+            case "image_gen" -> adapter.imageGeneration(request);
+            case "stt" -> adapter.speechToText(request);
+            case "tts" -> adapter.textToSpeech(request);
+            case "embedding" -> adapter.embeddings(request);
+            default -> adapter.chatCompletion(request);
+        };
+    }
+
     public record AiProviderInfo(String providerId,
                                  String displayName,
                                  String protocol,

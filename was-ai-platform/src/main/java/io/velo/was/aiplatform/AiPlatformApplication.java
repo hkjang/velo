@@ -2,8 +2,18 @@ package io.velo.was.aiplatform;
 
 import io.velo.was.admin.client.AdminClient;
 import io.velo.was.admin.client.LocalAdminClient;
+import io.velo.was.aiplatform.acp.AcpTaskManager;
+import io.velo.was.aiplatform.acp.servlet.A2aServlet;
+import io.velo.was.aiplatform.acp.servlet.AcpAgentCardServlet;
+import io.velo.was.aiplatform.acp.servlet.AcpTaskServlet;
+import io.velo.was.aiplatform.acp.servlet.AgpAdminServlet;
+import io.velo.was.aiplatform.agp.AgpAgentRegistry;
+import io.velo.was.aiplatform.agp.AgpGateway;
+import io.velo.was.aiplatform.agp.AgpRouteTable;
 import io.velo.was.aiplatform.api.AiPlatformApiDocsServlet;
 import io.velo.was.aiplatform.api.AiPlatformApiServlet;
+import io.velo.was.aiplatform.audit.AiGatewayAuditFileLogger;
+import io.velo.was.aiplatform.audit.AiGatewayAuditLog;
 import io.velo.was.aiplatform.billing.AiBillingService;
 import io.velo.was.aiplatform.plugin.AiContentFilterPlugin;
 import io.velo.was.aiplatform.plugin.AiPluginRegistry;
@@ -66,19 +76,39 @@ public final class AiPlatformApplication {
         RouteDecisionEngine intentEngine = new RouteDecisionEngine(intentPolicyService, defaultModel, analysisWindow);
         gatewayService.setIntentEngine(intentEngine);
 
+        // 게이트웨이 감사 로그 설정
+        // 게이트웨이 감사 로그 설정
+        AiGatewayAuditLog gatewayAuditLog = new AiGatewayAuditLog();
+        AiGatewayAuditFileLogger gatewayAuditFileLogger = new AiGatewayAuditFileLogger(
+                java.nio.file.Path.of("logs"));
+        gatewayAuditLog.setFileLogger(gatewayAuditFileLogger);
+
+        // ACP/AGP 에이전트 통신 허브 설정
+        AcpTaskManager acpTaskManager = new AcpTaskManager();
+        AgpAgentRegistry agpAgentRegistry = new AgpAgentRegistry();
+        AgpRouteTable agpRouteTable = new AgpRouteTable(agpAgentRegistry);
+        AgpGateway agpGateway = new AgpGateway(agpAgentRegistry, agpRouteTable, acpTaskManager);
+
+        AiPlatformApiServlet apiServlet = new AiPlatformApiServlet(configuration, registryService, gatewayService, usageService,
+                publishedApiService, billingService, tenantService, pluginRegistry, providerRegistry,
+                new io.velo.was.aiplatform.edge.AiEdgeService(), intentPolicyService, auditLogger, intentEngine);
+        apiServlet.setGatewayAuditLog(gatewayAuditLog);
+
         var builder = SimpleServletApplication.builder(APP_NAME, contextPath)
                 .filter(new AiPlatformAuthFilter())
                 .servlet("/", new AiPlatformDashboardServlet(configuration, registryService, gatewayService, usageService, tenantService))
                 .servlet("/login", new AiPlatformLoginServlet(configuration, adminClient))
                 .servlet("/logout", new AiPlatformLogoutServlet())
-                .servlet("/api/*", new AiPlatformApiServlet(configuration, registryService, gatewayService, usageService,
-                        publishedApiService, billingService, tenantService, pluginRegistry, providerRegistry,
-                        new io.velo.was.aiplatform.edge.AiEdgeService(), intentPolicyService, auditLogger, intentEngine))
-                .servlet("/gateway/*", new AiGatewayServlet(configuration, gatewayService, usageService, tenantService))
+                .servlet("/api/*", apiServlet)
+                .servlet("/gateway/*", new AiGatewayServlet(configuration, gatewayService, usageService, tenantService, gatewayAuditLog))
                 .servlet("/invoke/*", new AiPublishedApiServlet(publishedApiService, usageService, tenantService))
-                .servlet("/v1/chat/completions", new AiChatCompletionServlet(configuration, gatewayService, usageService, tenantService))
-                .servlet("/v1/completions", new AiTextCompletionServlet(configuration, gatewayService, usageService, tenantService))
-                .servlet("/v1/models", new AiChatCompletionServlet(configuration, gatewayService, usageService, tenantService));
+                .servlet("/v1/chat/completions", new AiChatCompletionServlet(configuration, gatewayService, usageService, tenantService, gatewayAuditLog))
+                .servlet("/v1/completions", new AiTextCompletionServlet(configuration, gatewayService, usageService, tenantService, gatewayAuditLog))
+                .servlet("/v1/models", new AiChatCompletionServlet(configuration, gatewayService, usageService, tenantService, gatewayAuditLog))
+                .servlet("/acp/*", new AcpTaskServlet(agpGateway))
+                .servlet("/a2a/*", new A2aServlet(agpGateway))
+                .servlet("/.well-known/*", new AcpAgentCardServlet(configuration, agpAgentRegistry))
+                .servlet("/agp/admin/*", new AgpAdminServlet(agpGateway));
 
         if (configuration.getServer().getAiPlatform().getPlatform().isDeveloperPortalEnabled()) {
             builder.servlet("/api-docs/*", new AiPlatformApiDocsServlet(configuration));

@@ -1,5 +1,6 @@
 package io.velo.was.aiplatform.gateway;
 
+import io.velo.was.aiplatform.audit.AiGatewayAuditLog;
 import io.velo.was.aiplatform.observability.AiPlatformUsageService;
 import io.velo.was.aiplatform.tenant.AiTenantAccessGrant;
 import io.velo.was.aiplatform.tenant.AiTenantService;
@@ -26,15 +27,25 @@ public class AiGatewayServlet extends HttpServlet {
     private final AiGatewayService gatewayService;
     private final AiPlatformUsageService usageService;
     private final AiTenantService tenantService;
+    private final AiGatewayAuditLog auditLog;
 
     public AiGatewayServlet(ServerConfiguration configuration,
                             AiGatewayService gatewayService,
                             AiPlatformUsageService usageService,
                             AiTenantService tenantService) {
+        this(configuration, gatewayService, usageService, tenantService, null);
+    }
+
+    public AiGatewayServlet(ServerConfiguration configuration,
+                            AiGatewayService gatewayService,
+                            AiPlatformUsageService usageService,
+                            AiTenantService tenantService,
+                            AiGatewayAuditLog auditLog) {
         this.configuration = configuration;
         this.gatewayService = gatewayService;
         this.usageService = usageService;
         this.tenantService = tenantService;
+        this.auditLog = auditLog;
     }
 
     @Override
@@ -62,36 +73,77 @@ public class AiGatewayServlet extends HttpServlet {
 
         returnJson(resp);
         AiGatewayRequest gatewayRequest = readGatewayRequest(req);
+        long auditStart = System.nanoTime();
+        String remoteAddr = req.getRemoteAddr();
         switch (pathInfo) {
             case "/route" -> {
-                AiGatewayRouteDecision decision = gatewayService.route(gatewayRequest);
-                usageService.recordRoute(decision);
-                tenantService.recordUsage(tenantAccess, 0);
-                applyTenantHeaders(resp, tenantAccess, 0);
-                resp.getWriter().write(routeDecisionToJson(decision));
+                try {
+                    AiGatewayRouteDecision decision = gatewayService.route(gatewayRequest);
+                    usageService.recordRoute(decision);
+                    tenantService.recordUsage(tenantAccess, 0);
+                    applyTenantHeaders(resp, tenantAccess, 0);
+                    resp.getWriter().write(routeDecisionToJson(decision));
+                    auditSuccess(tenantAccess, "gateway/route", decision.modelName(), decision.provider(),
+                            gatewayRequest, 0, auditStart, remoteAddr, decision.routePolicy(), null);
+                } catch (Exception e) {
+                    auditFailure(tenantAccess, "gateway/route", null, null,
+                            gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+                    throw e;
+                }
             }
             case "/infer" -> {
-                AiGatewayInferenceResult result = gatewayService.infer(gatewayRequest);
-                usageService.recordInference(result, false);
-                tenantService.recordUsage(tenantAccess, result.estimatedTokens());
-                applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
-                resp.getWriter().write(inferenceResultToJson(result));
+                try {
+                    AiGatewayInferenceResult result = gatewayService.infer(gatewayRequest);
+                    usageService.recordInference(result, false);
+                    tenantService.recordUsage(tenantAccess, result.estimatedTokens());
+                    applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
+                    resp.getWriter().write(inferenceResultToJson(result));
+                    auditSuccess(tenantAccess, "gateway/infer", result.decision().modelName(), result.decision().provider(),
+                            gatewayRequest, result.estimatedTokens(), auditStart, remoteAddr,
+                            result.decision().routePolicy(), null);
+                } catch (Exception e) {
+                    auditFailure(tenantAccess, "gateway/infer", null, null,
+                            gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+                    throw e;
+                }
             }
-            case "/stream" -> streamInference(resp, gatewayRequest, tenantAccess);
+            case "/stream" -> {
+                streamInference(resp, gatewayRequest, tenantAccess, auditStart, remoteAddr);
+            }
             case "/ensemble" -> {
-                AiEnsembleResult ensembleResult = gatewayService.inferEnsemble(gatewayRequest);
-                usageService.recordInference(ensembleResult.selected(), false);
-                tenantService.recordUsage(tenantAccess, ensembleResult.totalEstimatedTokens());
-                applyTenantHeaders(resp, tenantAccess, ensembleResult.totalEstimatedTokens());
-                resp.getWriter().write(ensembleResultToJson(ensembleResult));
+                try {
+                    AiEnsembleResult ensembleResult = gatewayService.inferEnsemble(gatewayRequest);
+                    usageService.recordInference(ensembleResult.selected(), false);
+                    tenantService.recordUsage(tenantAccess, ensembleResult.totalEstimatedTokens());
+                    applyTenantHeaders(resp, tenantAccess, ensembleResult.totalEstimatedTokens());
+                    resp.getWriter().write(ensembleResultToJson(ensembleResult));
+                    auditSuccess(tenantAccess, "gateway/ensemble",
+                            ensembleResult.selected().decision().modelName(),
+                            ensembleResult.selected().decision().provider(),
+                            gatewayRequest, ensembleResult.totalEstimatedTokens(), auditStart, remoteAddr,
+                            ensembleResult.selected().decision().routePolicy(), null);
+                } catch (Exception e) {
+                    auditFailure(tenantAccess, "gateway/ensemble", null, null,
+                            gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+                    throw e;
+                }
             }
             case "/intent-route" -> {
-                io.velo.was.aiplatform.intent.IntentRouteDecision intentDecision =
-                        gatewayService.intentRoute(gatewayRequest.prompt(), tenantAccess.tenantId());
-                usageService.recordIntentRoute();
-                tenantService.recordUsage(tenantAccess, 0);
-                applyTenantHeaders(resp, tenantAccess, 0);
-                resp.getWriter().write(intentDecisionToJson(intentDecision));
+                try {
+                    io.velo.was.aiplatform.intent.IntentRouteDecision intentDecision =
+                            gatewayService.intentRoute(gatewayRequest.prompt(), tenantAccess.tenantId());
+                    usageService.recordIntentRoute();
+                    tenantService.recordUsage(tenantAccess, 0);
+                    applyTenantHeaders(resp, tenantAccess, 0);
+                    resp.getWriter().write(intentDecisionToJson(intentDecision));
+                    auditSuccess(tenantAccess, "gateway/intent-route", intentDecision.modelName(), null,
+                            gatewayRequest, 0, auditStart, remoteAddr,
+                            intentDecision.policyId(), intentDecision.resolvedIntent().name());
+                } catch (Exception e) {
+                    auditFailure(tenantAccess, "gateway/intent-route", null, null,
+                            gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+                    throw e;
+                }
             }
             default -> {
                 resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -142,7 +194,8 @@ public class AiGatewayServlet extends HttpServlet {
         resp.getWriter().flush();
     }
 
-    private void streamInference(HttpServletResponse resp, AiGatewayRequest gatewayRequest, AiTenantAccessGrant tenantAccess) throws IOException {
+    private void streamInference(HttpServletResponse resp, AiGatewayRequest gatewayRequest,
+                                  AiTenantAccessGrant tenantAccess, long auditStart, String remoteAddr) throws IOException {
         if (!configuration.getServer().getAiPlatform().getDifferentiation().isStreamingResponseEnabled()) {
             returnJson(resp);
             resp.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
@@ -151,27 +204,36 @@ public class AiGatewayServlet extends HttpServlet {
             return;
         }
 
-        AiGatewayInferenceResult result = gatewayService.infer(gatewayRequest);
-        usageService.recordInference(result, true);
-        tenantService.recordUsage(tenantAccess, result.estimatedTokens());
-        resp.setContentType("text/event-stream; charset=UTF-8");
-        resp.setCharacterEncoding("UTF-8");
-        resp.setHeader("Cache-Control", "no-cache");
-        applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
+        try {
+            AiGatewayInferenceResult result = gatewayService.infer(gatewayRequest);
+            usageService.recordInference(result, true);
+            tenantService.recordUsage(tenantAccess, result.estimatedTokens());
+            resp.setContentType("text/event-stream; charset=UTF-8");
+            resp.setCharacterEncoding("UTF-8");
+            resp.setHeader("Cache-Control", "no-cache");
+            applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
 
-        PrintWriter out = resp.getWriter();
-        out.write("event: meta\n");
-        out.write("data: " + routeDecisionToJson(result.decision()) + "\n\n");
+            PrintWriter out = resp.getWriter();
+            out.write("event: meta\n");
+            out.write("data: " + routeDecisionToJson(result.decision()) + "\n\n");
 
-        String[] tokens = result.outputText().split(" ");
-        for (int i = 0; i < tokens.length; i++) {
-            out.write("event: token\n");
-            out.write("data: {\"index\":" + i + ",\"token\":\"" + escapeJson(tokens[i]) + "\"}\n\n");
+            String[] tokens = result.outputText().split(" ");
+            for (int i = 0; i < tokens.length; i++) {
+                out.write("event: token\n");
+                out.write("data: {\"index\":" + i + ",\"token\":\"" + escapeJson(tokens[i]) + "\"}\n\n");
+            }
+
+            out.write("event: done\n");
+            out.write("data: " + inferenceResultToJson(result) + "\n\n");
+            out.flush();
+            auditSuccess(tenantAccess, "gateway/stream", result.decision().modelName(),
+                    result.decision().provider(), gatewayRequest, result.estimatedTokens(),
+                    auditStart, remoteAddr, result.decision().routePolicy(), null);
+        } catch (Exception e) {
+            auditFailure(tenantAccess, "gateway/stream", null, null,
+                    gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+            throw e;
         }
-
-        out.write("event: done\n");
-        out.write("data: " + inferenceResultToJson(result) + "\n\n");
-        out.flush();
     }
 
     private void applyTenantHeaders(HttpServletResponse resp, AiTenantAccessGrant tenantAccess, int estimatedTokens) {
@@ -209,7 +271,13 @@ public class AiGatewayServlet extends HttpServlet {
         String prompt = firstNonBlank(req.getParameter("prompt"), extractJsonString(body, "prompt"));
         String sessionId = firstNonBlank(req.getParameter("sessionId"), extractJsonString(body, "sessionId"));
         boolean stream = parseBoolean(req.getParameter("stream"), extractJsonBoolean(body, "stream"));
-        return new AiGatewayRequest(requestType, prompt, sessionId, stream);
+        String imageUrl = firstNonBlank(req.getParameter("imageUrl"), extractJsonString(body, "imageUrl"));
+        String audioData = firstNonBlank(req.getParameter("audioData"), extractJsonString(body, "audioData"));
+        String modality = firstNonBlank(req.getParameter("modality"), extractJsonString(body, "modality"));
+        return new AiGatewayRequest(requestType, prompt, sessionId, stream,
+                imageUrl.isBlank() ? null : imageUrl,
+                audioData.isBlank() ? null : audioData,
+                modality.isBlank() ? "text" : modality);
     }
 
     private static String firstNonBlank(String primary, String secondary) {
@@ -350,5 +418,35 @@ public class AiGatewayServlet extends HttpServlet {
 
     private static String encode(String value) {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    // ── 감사 기록 헬퍼 ──
+
+    private void auditSuccess(AiTenantAccessGrant tenant, String endpoint, String modelName,
+                               String provider, AiGatewayRequest request, int tokens,
+                               long startNanos, String remoteAddr, String routePolicy, String intentType) {
+        if (auditLog == null) return;
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        auditLog.recordSuccess(
+                tenant != null ? tenant.tenantId() : null,
+                endpoint, modelName, provider,
+                request.requestType(), request.prompt(),
+                durationMs, tokens, request.streamingRequested(),
+                remoteAddr, routePolicy, intentType,
+                request.effectiveModality());
+    }
+
+    private void auditFailure(AiTenantAccessGrant tenant, String endpoint, String modelName,
+                               String provider, AiGatewayRequest request,
+                               long startNanos, String errorMsg, String remoteAddr) {
+        if (auditLog == null) return;
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        auditLog.recordFailure(
+                tenant != null ? tenant.tenantId() : null,
+                endpoint, modelName, provider,
+                request.requestType(), request.prompt(),
+                durationMs, 0, request.streamingRequested(),
+                errorMsg, remoteAddr, null, null,
+                request.effectiveModality());
     }
 }

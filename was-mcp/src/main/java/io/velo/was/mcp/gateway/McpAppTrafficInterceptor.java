@@ -98,6 +98,7 @@ public class McpAppTrafficInterceptor implements Filter {
             String jsonRpcMethod = extractJsonField(body, "method");
             String toolName = extractToolName(body, jsonRpcMethod);
             String clientName = extractClientName(body, jsonRpcMethod);
+            String prompt = extractPromptData(body, jsonRpcMethod);
 
             // Track session on initialize
             if ("initialize".equals(jsonRpcMethod) && clientName != null) {
@@ -121,7 +122,7 @@ public class McpAppTrafficInterceptor implements Filter {
                 gatewayService.recordTraffic(contextPath, appName, sessionId,
                         clientName, jsonRpcMethod != null ? jsonRpcMethod : "unknown",
                         toolName, durationMs, success, errorCode, errorMsg,
-                        httpReq.getRemoteAddr());
+                        httpReq.getRemoteAddr(), prompt);
             }
         } else {
             // ── SSE — register endpoint & record connection event ──────────
@@ -215,6 +216,36 @@ public class McpAppTrafficInterceptor implements Filter {
             return version != null ? version : "unknown";
         }
         return "unknown";
+    }
+
+    /**
+     * Extract user prompt/arguments from the JSON-RPC body for audit logging.
+     * Supports tools/call (arguments section), prompts/get (arguments), resources/read (uri).
+     * Uses lightweight substring extraction (no full JSON parsing).
+     */
+    private static String extractPromptData(String body, String jsonRpcMethod) {
+        if (body == null || jsonRpcMethod == null) return null;
+        return switch (jsonRpcMethod) {
+            case "tools/call", "prompts/get" -> {
+                // Extract "arguments" object as raw substring (up to 1000 chars)
+                int idx = body.indexOf("\"arguments\"");
+                if (idx < 0) yield null;
+                int braceStart = body.indexOf('{', idx);
+                if (braceStart < 0) yield null;
+                // Find matching closing brace (simple nesting counter)
+                int depth = 0;
+                int end = braceStart;
+                for (int i = braceStart; i < body.length() && i < braceStart + 2000; i++) {
+                    char c = body.charAt(i);
+                    if (c == '{') depth++;
+                    else if (c == '}') { depth--; if (depth == 0) { end = i + 1; break; } }
+                }
+                String args = body.substring(braceStart, Math.min(end, braceStart + 1000));
+                yield args.length() >= 1000 ? args + "..." : args;
+            }
+            case "resources/read" -> extractJsonField(body, "uri");
+            default -> null;
+        };
     }
 
     // ═══════════════════════════════════════════════════════════════════════

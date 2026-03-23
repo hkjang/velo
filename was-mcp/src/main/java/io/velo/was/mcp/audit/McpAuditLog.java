@@ -13,19 +13,41 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * In-memory ring-buffer audit log for MCP operations.
  *
  * <p>Keeps the most recent {@code maxEntries} audit records. Thread-safe.
- * All mutations also log to SLF4J at INFO level for downstream shipping.
+ * All mutations are logged to two SLF4J loggers:
+ * <ul>
+ *   <li>{@code io.velo.was.mcp.audit.McpAuditLog} — standard application log (INFO/WARN)</li>
+ *   <li>{@code MCP_AUDIT} — dedicated audit logger that outputs JSON lines,
+ *       ideal for routing to a separate file via logback/log4j configuration</li>
+ * </ul>
  *
- * <p>For production, replace with a persistent store (database, Elasticsearch, etc.).
+ * <h3>Logback configuration example</h3>
+ * <pre>{@code
+ * <appender name="MCP_AUDIT_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+ *   <file>logs/mcp-audit.log</file>
+ *   <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+ *     <fileNamePattern>logs/mcp-audit.%d{yyyy-MM-dd}.log</fileNamePattern>
+ *     <maxHistory>90</maxHistory>
+ *   </rollingPolicy>
+ *   <encoder><pattern>%msg%n</pattern></encoder>
+ * </appender>
+ * <logger name="MCP_AUDIT" level="INFO" additivity="false">
+ *   <appender-ref ref="MCP_AUDIT_FILE" />
+ * </logger>
+ * }</pre>
  */
 public class McpAuditLog {
 
     private static final Logger log = LoggerFactory.getLogger(McpAuditLog.class);
+
+    /** Dedicated audit logger — outputs JSON lines for file-based audit trail. */
+    private static final Logger auditLogger = LoggerFactory.getLogger("MCP_AUDIT");
 
     private static final int DEFAULT_MAX_ENTRIES = 10_000;
 
     private final List<McpAuditEntry> buffer;
     private final int maxEntries;
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    private volatile McpAuditFileLogger fileLogger;
 
     public McpAuditLog() {
         this(DEFAULT_MAX_ENTRIES);
@@ -34,6 +56,19 @@ public class McpAuditLog {
     public McpAuditLog(int maxEntries) {
         this.maxEntries = maxEntries;
         this.buffer = new ArrayList<>(Math.min(maxEntries, 1024));
+    }
+
+    /**
+     * Attach a file-based audit logger for persistent JSON-line output.
+     * When set, every audit entry is also written to a daily-rotating file.
+     */
+    public void setFileLogger(McpAuditFileLogger fileLogger) {
+        this.fileLogger = fileLogger;
+    }
+
+    /** Get the attached file logger, or null. */
+    public McpAuditFileLogger fileLogger() {
+        return fileLogger;
     }
 
     /**
@@ -50,6 +85,7 @@ public class McpAuditLog {
             lock.writeLock().unlock();
         }
 
+        // ── Standard application log ──
         if (entry.success()) {
             log.info("MCP audit: method={} tool={} session={} client={} duration={}ms addr={}",
                     entry.method(), entry.toolName(), entry.sessionId(),
@@ -59,6 +95,17 @@ public class McpAuditLog {
                     entry.method(), entry.toolName(), entry.sessionId(),
                     entry.clientName(), entry.errorCode(), entry.errorMsg(), entry.remoteAddr());
         }
+
+        // ── Dedicated audit log (JSON line) ──
+        if (auditLogger.isInfoEnabled()) {
+            auditLogger.info(entry.toJson());
+        }
+
+        // ── File-based persistence (daily-rotating JSON lines) ──
+        McpAuditFileLogger fl = fileLogger;
+        if (fl != null) {
+            fl.write(entry);
+        }
     }
 
     /**
@@ -66,8 +113,17 @@ public class McpAuditLog {
      */
     public void recordSuccess(String sessionId, String clientName, String method,
                               String toolName, long durationMs, String remoteAddr) {
+        recordSuccess(sessionId, clientName, method, toolName, durationMs, remoteAddr, null);
+    }
+
+    /**
+     * Record a successful call with prompt/arguments data.
+     */
+    public void recordSuccess(String sessionId, String clientName, String method,
+                              String toolName, long durationMs, String remoteAddr,
+                              String prompt) {
         record(new McpAuditEntry(Instant.now(), sessionId, clientName, method,
-                toolName, durationMs, true, 0, null, remoteAddr));
+                toolName, durationMs, true, 0, null, remoteAddr, prompt));
     }
 
     /**
@@ -76,8 +132,17 @@ public class McpAuditLog {
     public void recordFailure(String sessionId, String clientName, String method,
                               String toolName, long durationMs, int errorCode,
                               String errorMsg, String remoteAddr) {
+        recordFailure(sessionId, clientName, method, toolName, durationMs, errorCode, errorMsg, remoteAddr, null);
+    }
+
+    /**
+     * Record a failed call with prompt/arguments data.
+     */
+    public void recordFailure(String sessionId, String clientName, String method,
+                              String toolName, long durationMs, int errorCode,
+                              String errorMsg, String remoteAddr, String prompt) {
         record(new McpAuditEntry(Instant.now(), sessionId, clientName, method,
-                toolName, durationMs, false, errorCode, errorMsg, remoteAddr));
+                toolName, durationMs, false, errorCode, errorMsg, remoteAddr, prompt));
     }
 
     /**

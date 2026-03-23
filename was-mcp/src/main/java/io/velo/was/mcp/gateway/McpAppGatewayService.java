@@ -126,12 +126,28 @@ public class McpAppGatewayService implements AutoCloseable {
      * Record a MCP request/response from an application endpoint.
      * This writes to the shared audit log with the app context prefix.
      */
+    /**
+     * Record MCP traffic without prompt data (backwards-compatible).
+     */
     public void recordTraffic(String contextPath, String appName,
                               String sessionId, String clientName,
                               String method, String toolName,
                               long durationMs, boolean success,
                               int errorCode, String errorMsg,
                               String remoteAddr) {
+        recordTraffic(contextPath, appName, sessionId, clientName, method, toolName,
+                durationMs, success, errorCode, errorMsg, remoteAddr, null);
+    }
+
+    /**
+     * Record MCP traffic with prompt/arguments data for audit logging.
+     */
+    public void recordTraffic(String contextPath, String appName,
+                              String sessionId, String clientName,
+                              String method, String toolName,
+                              long durationMs, boolean success,
+                              int errorCode, String errorMsg,
+                              String remoteAddr, String prompt) {
         // Update endpoint stats
         McpAppEndpoint ep = endpoints.get(contextPath);
         if (ep != null) {
@@ -146,10 +162,10 @@ public class McpAppGatewayService implements AutoCloseable {
         // Write to shared audit log with app-prefixed source
         String auditMethod = "[" + contextPath + "] " + method;
         if (success) {
-            auditLog.recordSuccess(sessionId, clientName, auditMethod, toolName, durationMs, remoteAddr);
+            auditLog.recordSuccess(sessionId, clientName, auditMethod, toolName, durationMs, remoteAddr, prompt);
         } else {
             auditLog.recordFailure(sessionId, clientName, auditMethod, toolName, durationMs,
-                    errorCode, errorMsg, remoteAddr);
+                    errorCode, errorMsg, remoteAddr, prompt);
         }
     }
 

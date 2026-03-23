@@ -371,20 +371,23 @@ public class McpServer {
         if (auditLog == null) return;
         long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
         String toolName = extractToolName(req);
+        String prompt = extractPrompt(req);
         McpSession session = sessionId != null ? sessionManager.get(sessionId) : null;
         String clientName = session != null ? session.clientName() : null;
-        auditLog.recordSuccess(sessionId, clientName, req.method(), toolName, durationMs, remoteAddr);
+        auditLog.recordSuccess(sessionId, clientName, req.method(), toolName, durationMs, remoteAddr, prompt);
     }
 
     private void auditFailure(JsonRpcRequest req, String sessionId, String method,
                               String toolName, long startNanos, int errorCode, String errorMsg, String remoteAddr) {
         if (auditLog == null) return;
         long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        String prompt = req != null ? extractPrompt(req) : null;
         McpSession session = sessionId != null ? sessionManager.get(sessionId) : null;
         String clientName = session != null ? session.clientName() : null;
         String resolvedMethod = req != null ? req.method() : method;
         String resolvedTool = toolName != null ? toolName : (req != null ? extractToolName(req) : null);
-        auditLog.recordFailure(sessionId, clientName, resolvedMethod, resolvedTool, durationMs, errorCode, errorMsg, remoteAddr);
+        auditLog.recordFailure(sessionId, clientName, resolvedMethod, resolvedTool, durationMs,
+                errorCode, errorMsg, remoteAddr, prompt);
     }
 
     @SuppressWarnings("unchecked")
@@ -395,6 +398,63 @@ public class McpServer {
         Object uri = req.params().get("uri");
         if (uri instanceof String s) return s;
         return null;
+    }
+
+    /**
+     * Extract user prompt/arguments from the JSON-RPC request for audit logging.
+     * Covers: tools/call (arguments), prompts/get (arguments), resources/read (uri),
+     * completion/complete (argument.value).
+     * Returns a summary string (truncated to 1000 chars to limit memory usage).
+     */
+    @SuppressWarnings("unchecked")
+    private static String extractPrompt(JsonRpcRequest req) {
+        if (req == null || req.params() == null) return null;
+        Map<String, Object> params = req.params();
+        String method = req.method();
+
+        return switch (method) {
+            case "tools/call" -> {
+                Object args = params.get("arguments");
+                yield args != null ? truncate(mapToString(args), 1000) : null;
+            }
+            case "prompts/get" -> {
+                Object args = params.get("arguments");
+                yield args != null ? truncate(mapToString(args), 1000) : null;
+            }
+            case "resources/read" -> {
+                Object uri = params.get("uri");
+                yield uri instanceof String s ? s : null;
+            }
+            case "completion/complete" -> {
+                if (params.get("argument") instanceof Map<?, ?> arg) {
+                    Object value = ((Map<String, Object>) arg).get("value");
+                    yield value instanceof String s ? truncate(s, 1000) : null;
+                }
+                yield null;
+            }
+            default -> null;
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String mapToString(Object obj) {
+        if (obj instanceof Map<?, ?> map) {
+            StringBuilder sb = new StringBuilder("{");
+            boolean first = true;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!first) sb.append(", ");
+                first = false;
+                sb.append(entry.getKey()).append("=").append(entry.getValue());
+            }
+            sb.append("}");
+            return sb.toString();
+        }
+        return obj.toString();
+    }
+
+    private static String truncate(String s, int maxLen) {
+        if (s == null) return null;
+        return s.length() <= maxLen ? s : s.substring(0, maxLen) + "...";
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────

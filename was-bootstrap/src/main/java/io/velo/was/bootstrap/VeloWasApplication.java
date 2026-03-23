@@ -191,6 +191,13 @@ public final class VeloWasApplication {
                     mcpAdminClient, "velo-mcp",
                     configuration.getServer().getName() + "-" + configuration.getServer().getNodeId());
 
+            // ── MCP audit file logger (daily-rotating JSON lines) ──
+            Path auditLogDir = Path.of(deployConfig.getDirectory()).getParent().resolve("logs");
+            io.velo.was.mcp.audit.McpAuditFileLogger auditFileLogger =
+                    new io.velo.was.mcp.audit.McpAuditFileLogger(auditLogDir);
+            mcpResult.auditLog().setFileLogger(auditFileLogger);
+            log.info("MCP audit file logger enabled: {}", auditLogDir.toAbsolutePath());
+
             // ── Wire App MCP Gateway for monitoring deployed app MCP traffic ──
             io.velo.was.mcp.gateway.McpAppGatewayService appMcpGateway =
                     new io.velo.was.mcp.gateway.McpAppGatewayService(mcpResult.auditLog());

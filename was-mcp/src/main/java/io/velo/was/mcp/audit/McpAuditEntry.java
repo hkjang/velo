@@ -28,8 +28,18 @@ public record McpAuditEntry(
         boolean success,
         int errorCode,
         String errorMsg,
-        String remoteAddr
+        String remoteAddr,
+        String prompt
 ) {
+
+    /** Backwards-compatible constructor without prompt field. */
+    public McpAuditEntry(Instant timestamp, String sessionId, String clientName,
+                         String method, String toolName, long durationMs,
+                         boolean success, int errorCode, String errorMsg,
+                         String remoteAddr) {
+        this(timestamp, sessionId, clientName, method, toolName, durationMs,
+                success, errorCode, errorMsg, remoteAddr, null);
+    }
 
     /** Serialize to a JSON string for the admin audit API response. */
     public String toJson() {
@@ -43,6 +53,7 @@ public record McpAuditEntry(
                 + ",\"errorCode\":" + errorCode
                 + ",\"errorMsg\":" + jsonStr(errorMsg)
                 + ",\"remoteAddr\":" + jsonStr(remoteAddr)
+                + ",\"prompt\":" + jsonStr(prompt)
                 + "}";
     }
 

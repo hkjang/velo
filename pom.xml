@@ -6,7 +6,7 @@
 
     <groupId>io.velo.was</groupId>
     <artifactId>velo-was</artifactId>
-    <version>0.5.22</version>
+    <version>0.5.24</version>
     <packaging>pom</packaging>
 
     <name>velo-was</name>

@@ -6,18 +6,18 @@ public final class McpEndpointPaths {
     private McpEndpointPaths() {}
 
     /** Main MCP endpoint — handles both POST (JSON-RPC) and GET (SSE). */
-    public static final String MCP_PATH = "/mcp";
+    public static final String MCP_PATH = "/ai-platform/mcp";
 
     /** Health/liveness endpoint. */
-    public static final String HEALTH_PATH = "/mcp/health";
+    public static final String HEALTH_PATH = "/ai-platform/mcp/health";
 
     // ── Admin control-plane paths ────────────────────────────────────────────
 
-    public static final String ADMIN_SERVERS   = "/mcp/admin/servers";
-    public static final String ADMIN_TOOLS     = "/mcp/admin/tools";
-    public static final String ADMIN_RESOURCES = "/mcp/admin/resources";
-    public static final String ADMIN_PROMPTS   = "/mcp/admin/prompts";
-    public static final String ADMIN_SESSIONS  = "/mcp/admin/sessions";
-    public static final String ADMIN_AUDIT     = "/mcp/admin/audit";
-    public static final String ADMIN_POLICIES  = "/mcp/admin/policies";
+    public static final String ADMIN_SERVERS   = "/ai-platform/mcp/admin/servers";
+    public static final String ADMIN_TOOLS     = "/ai-platform/mcp/admin/tools";
+    public static final String ADMIN_RESOURCES = "/ai-platform/mcp/admin/resources";
+    public static final String ADMIN_PROMPTS   = "/ai-platform/mcp/admin/prompts";
+    public static final String ADMIN_SESSIONS  = "/ai-platform/mcp/admin/sessions";
+    public static final String ADMIN_AUDIT     = "/ai-platform/mcp/admin/audit";
+    public static final String ADMIN_POLICIES  = "/ai-platform/mcp/admin/policies";
 }

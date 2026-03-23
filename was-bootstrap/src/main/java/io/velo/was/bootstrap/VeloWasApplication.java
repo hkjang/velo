@@ -189,7 +189,7 @@ public final class VeloWasApplication {
             io.velo.was.mcp.McpApplication.install(registry, sseRegistry, mcpRegistryService, mcpGatewayService,
                     mcpAdminClient, "velo-mcp",
                     configuration.getServer().getName() + "-" + configuration.getServer().getNodeId());
-            log.info("MCP server installed at /mcp (admin at /mcp/admin/*) with {} admin CLI tools",
+            log.info("MCP server installed at /ai-platform/mcp (admin at /ai-platform/mcp/admin/*) with {} admin CLI tools",
                     "full");
         }
 

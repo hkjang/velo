@@ -373,6 +373,104 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("</div>\n");
         b.append("</div>\n");
 
+        // ===== TAB: mcp — MCP 서버 관리 =====
+        b.append("<div class=\"tab-panel\" id=\"tab-mcp\">\n");
+        b.append("<div class=\"hero\"><div class=\"hero-eyebrow\">Model Context Protocol</div>");
+        b.append("<h1>MCP \uc11c\ubc84 \uad00\ub9ac</h1>");
+        b.append("<p>\uc678\ubd80 MCP \ud074\ub77c\uc774\uc5b8\ud2b8(Claude Desktop, IDE \ud50c\ub7ec\uadf8\uc778 \ub4f1)\uc774 AI \ud50c\ub7ab\ud3fc \uae30\ub2a5\uc744 \ud638\ucd9c\ud560 \uc218 \uc788\ub294 MCP \uc11c\ubc84\ub97c \ubaa8\ub2c8\ud130\ub9c1\ud558\uace0 \uad00\ub9ac\ud569\ub2c8\ub2e4.</p>");
+        b.append("<div class=\"chips\" id=\"mcpHealthChips\">");
+        chip(b, "\ub85c\ub529 \uc911...", false);
+        b.append("</div></div>\n");
+
+        // Health metrics
+        b.append("<div class=\"metrics\" id=\"mcpMetrics\">");
+        metric(b, "\uc0c1\ud0dc", "-", "\uc11c\ubc84 \uc0c1\ud0dc", "mcpStatus");
+        metric(b, "\ud65c\uc131 \uc138\uc158", "0", "MCP \ud074\ub77c\uc774\uc5b8\ud2b8 \uc5f0\uacb0", "mcpSessions");
+        metric(b, "\ub4f1\ub85d \ub3c4\uad6c", "0", "MCP \ud234 \uc218", "mcpTools");
+        metric(b, "\ub9ac\uc18c\uc2a4", "0", "MCP \ub9ac\uc18c\uc2a4 \uc218", "mcpResources");
+        b.append("</div>\n");
+
+        // MCP Servers
+        b.append("<div class=\"card\"><div class=\"card-header\">\ub4f1\ub85d\ub41c MCP \uc11c\ubc84</div>");
+        b.append("<div class=\"card-desc\">\ub85c\uceec \ubc0f \uc6d0\uaca9 MCP \uc11c\ubc84 \uc778\uc2a4\ud134\uc2a4 \uad00\ub9ac</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshMcpServers()\">\uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div>");
+        b.append("<div id=\"mcpServersTable\"></div>");
+        // Register form
+        b.append("<div class=\"card-header\" style=\"margin-top:16px;font-size:14px;\">\uc6d0\uaca9 \uc11c\ubc84 \ub4f1\ub85d</div>");
+        b.append("<div class=\"form-grid cols-3\" style=\"margin-top:8px;\">");
+        input(b, "mcpSrvName", "", "\uc11c\ubc84\uba85 *");
+        input(b, "mcpSrvEndpoint", "https://", "\uc5d4\ub4dc\ud3ec\uc778\ud2b8 URL *");
+        input(b, "mcpSrvVersion", "1.0", "\ubc84\uc804");
+        b.append("</div>");
+        b.append("<div class=\"btns\"><button class=\"btn btn-primary\" onclick=\"registerMcpServer()\">\uc11c\ubc84 \ub4f1\ub85d</button></div>");
+        b.append("<pre class=\"json-box\" id=\"mcpServerResult\"></pre>");
+        b.append("</div>\n");
+
+        // MCP Tools
+        b.append("<div class=\"card\"><div class=\"card-header\">\ub3c4\uad6c \uce74\ud0c8\ub85c\uadf8</div>");
+        b.append("<div class=\"card-desc\">MCP \ud234 \ubaa9\ub85d \uc870\ud68c \ubc0f \ucc28\ub2e8/\ud574\uc81c \uad00\ub9ac</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshMcpTools()\">\uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div>");
+        b.append("<div id=\"mcpToolsTable\"></div>");
+        b.append("</div>\n");
+
+        // Resources & Prompts
+        b.append("<div class=\"two-col\">");
+        b.append("<div class=\"card\"><div class=\"card-header\">\ub9ac\uc18c\uc2a4</div>");
+        b.append("<div class=\"btns\"><button class=\"btn btn-secondary\" onclick=\"refreshMcpResources()\">\uc0c8\ub85c\uace0\uce68</button></div>");
+        b.append("<pre class=\"json-box\" id=\"mcpResourcesJson\">\ub85c\ub529 \uc911...</pre></div>");
+        b.append("<div class=\"card\"><div class=\"card-header\">\ud504\ub86c\ud504\ud2b8</div>");
+        b.append("<div class=\"btns\"><button class=\"btn btn-secondary\" onclick=\"refreshMcpPrompts()\">\uc0c8\ub85c\uace0\uce68</button></div>");
+        b.append("<pre class=\"json-box\" id=\"mcpPromptsJson\">\ub85c\ub529 \uc911...</pre></div>");
+        b.append("</div>\n");
+
+        // Sessions
+        b.append("<div class=\"card\"><div class=\"card-header\">\ud65c\uc131 \uc138\uc158</div>");
+        b.append("<div class=\"card-desc\">\ud604\uc7ac \uc5f0\uacb0\ub41c MCP \ud074\ub77c\uc774\uc5b8\ud2b8 \uc138\uc158 \ubaa9\ub85d</div>");
+        b.append("<div class=\"btns\"><button class=\"btn btn-secondary\" onclick=\"refreshMcpSessions()\">\uc0c8\ub85c\uace0\uce68</button></div>");
+        b.append("<div id=\"mcpSessionsTable\"></div>");
+        b.append("</div>\n");
+
+        // Audit Log
+        b.append("<div class=\"card\"><div class=\"card-header\">\uac10\uc0ac \ub85c\uadf8</div>");
+        b.append("<div class=\"card-desc\">MCP \uc694\uccad \ucc98\ub9ac \uae30\ub85d \uc870\ud68c (\ucd5c\ub300 10,000\uac74 \ub9c1 \ubc84\ud37c)</div>");
+        b.append("<div class=\"form-grid cols-3\">");
+        input(b, "mcpAuditLimit", "20", "\uc870\ud68c \uac74\uc218");
+        input(b, "mcpAuditMethod", "", "\uba54\uc11c\ub4dc \ud544\ud130 (tools/call \ub4f1)");
+        b.append("<div class=\"form-field\"><label class=\"form-label\">&nbsp;</label>");
+        b.append("<button class=\"btn btn-primary\" onclick=\"refreshMcpAudit()\" style=\"height:42px;\">\uac10\uc0ac \ub85c\uadf8 \uc870\ud68c</button></div>");
+        b.append("</div>");
+        b.append("<div id=\"mcpAuditTable\"></div>");
+        b.append("</div>\n");
+
+        // Policies
+        b.append("<div class=\"card\"><div class=\"card-header\">\uc815\ucc45 \uad00\ub9ac</div>");
+        b.append("<div class=\"card-desc\">\uc778\uc99d, Rate Limit, \ucc28\ub2e8 \uc815\ucc45 \uc124\uc815 \ubc0f \uc800\uc7a5</div>");
+        b.append("<div class=\"form-grid cols-2\">");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"mcpPolicyAuth\">\uc778\uc99d \ud544\uc218</label>");
+        b.append("<select id=\"mcpPolicyAuth\" class=\"form-select\"><option value=\"false\">\ube44\ud65c\uc131</option><option value=\"true\">\ud65c\uc131</option></select></div>");
+        input(b, "mcpPolicyApiKeyHeader", "X-Api-Key", "API \ud0a4 \ud5e4\ub354\uba85");
+        input(b, "mcpPolicyRateLimit", "0", "Rate Limit (\ubd84\ub2f9, 0=\ubb34\uc81c\ud55c)");
+        input(b, "mcpPolicyMaxConcurrent", "0", "\ucd5c\ub300 \ub3d9\uc2dc \ud234 \ud638\ucd9c (0=\ubb34\uc81c\ud55c)");
+        b.append("</div>");
+        b.append("<div class=\"form-grid\">");
+        input(b, "mcpPolicyBlockedTools", "", "\ucc28\ub2e8 \ub3c4\uad6c (\uc27c\ud45c \uad6c\ubd84)");
+        input(b, "mcpPolicyBlockedClients", "", "\ucc28\ub2e8 \ud074\ub77c\uc774\uc5b8\ud2b8 \ud328\ud134 (\uc27c\ud45c \uad6c\ubd84)");
+        input(b, "mcpPolicyBlockedPrompts", "", "\ucc28\ub2e8 \ud504\ub86c\ud504\ud2b8 \ud328\ud134 (\uc27c\ud45c \uad6c\ubd84)");
+        input(b, "mcpPolicyDataMasking", "", "\ub370\uc774\ud130 \ub9c8\uc2a4\ud0b9 \ud328\ud134 (\uc27c\ud45c \uad6c\ubd84)");
+        b.append("</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-primary\" onclick=\"saveMcpPolicies()\">\uc815\ucc45 \uc800\uc7a5</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshMcpPolicies()\">\uc0c8\ub85c\uace0\uce68</button>");
+        b.append("</div>");
+        b.append("<pre class=\"json-box\" id=\"mcpPolicyResult\"></pre>");
+        b.append("</div>\n");
+
+        b.append("</div>\n");
+
         // ===== TAB: roadmap =====
         b.append("<div class=\"tab-panel\" id=\"tab-roadmap\">\n");
         b.append("<div class=\"card\"><div class=\"card-header\">\uc9c4\ud654 \ub85c\ub4dc\ub9f5</div><div class=\"card-desc\">\uae30\ubcf8 \uc11c\ube59\uc5d0\uc11c \ud50c\ub7ab\ud3fc \uc0c1\uc6a9\ud654\uae4c\uc9c0</div>");
@@ -463,8 +561,130 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("async function deleteKeyword(id){if(!confirm('\\ud0a4\\uc6cc\\ub4dc '+id+'\\ub97c \\uc0ad\\uc81c\\ud558\\uc2dc\\uaca0\\uc2b5\\ub2c8\\uae4c?'))return;showJson('keywordResult',await api('/api/intent/keywords/'+encodeURIComponent(id),{method:'DELETE'}));refreshKeywords()}\n");
         b.append("async function deletePolicy(id){if(!confirm('\\uc815\\ucc45 '+id+'\\ub97c \\uc0ad\\uc81c\\ud558\\uc2dc\\uaca0\\uc2b5\\ub2c8\\uae4c?'))return;showJson('keywordResult',await api('/api/intent/policies/'+encodeURIComponent(id),{method:'DELETE'}));refreshPolicies()}\n");
 
+        // ── MCP management functions ──────────────────────────────────────
+        b.append("async function mcpApi(p,o){try{return await(await fetch(CP+'/mcp'+p,o)).text();}catch(e){return'{\"error\":\"'+e.message+'\"}';}}\n");
+
+        // MCP Health
+        b.append("async function refreshMcpHealth(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await mcpApi('/health'));\n");
+        b.append("    document.getElementById('mv-mcpStatus').textContent=d.status||'?';\n");
+        b.append("    document.getElementById('mv-mcpSessions').textContent=d.sessions||0;\n");
+        b.append("    document.getElementById('mv-mcpTools').textContent=d.tools||0;\n");
+        b.append("    document.getElementById('mv-mcpResources').textContent=d.resources||0;\n");
+        b.append("    const ch=document.getElementById('mcpHealthChips');\n");
+        b.append("    ch.innerHTML='<span class=\"chip green\">'+(d.status||'?')+'</span>'");
+        b.append("      +'<span class=\"chip\">'+(d.server||'')+'</span>'");
+        b.append("      +'<span class=\"chip\">\\ud504\\ub85c\\ud1a0\\ucf5c: '+(d.protocol||'?')+'</span>'");
+        b.append("      +'<span class=\"chip\">\\ud504\\ub86c\\ud504\\ud2b8: '+(d.prompts||0)+'\\uac1c</span>';\n");
+        b.append("  }catch(e){}\n");
+        b.append("}\n");
+
+        // MCP Servers
+        b.append("async function refreshMcpServers(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await mcpApi('/admin/servers'));\n");
+        b.append("    const el=document.getElementById('mcpServersTable');\n");
+        b.append("    if(!d.servers||!d.servers.length){el.innerHTML='<p style=\"color:var(--soft);font-size:13px;\">\\ub4f1\\ub85d\\ub41c \\uc11c\\ubc84\\uac00 \\uc5c6\\uc2b5\\ub2c8\\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>ID</th><th>\\uc774\\ub984</th><th>\\uc5d4\\ub4dc\\ud3ec\\uc778\\ud2b8</th><th>\\ud658\\uacbd</th><th>\\ubc84\\uc804</th><th>\\uc0c1\\ud0dc</th></tr></thead><tbody>';\n");
+        b.append("    d.servers.forEach(s=>{h+='<tr><td>'+esc(s.id||'').substring(0,8)+'...</td><td><strong>'+esc(s.name||'')+'</strong></td><td>'+esc(s.endpoint||'')+'</td><td>'+esc(s.environment||'')+'</td><td>'+esc(s.version||'')+'</td><td><span class=\"status-on\">'+(s.status||'UP')+'</span></td></tr>';});\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('mcpServersTable').textContent=e.message;}\n");
+        b.append("}\n");
+
+        b.append("async function registerMcpServer(){\n");
+        b.append("  const p={name:document.getElementById('mcpSrvName').value,endpoint:document.getElementById('mcpSrvEndpoint').value,environment:'remote',version:document.getElementById('mcpSrvVersion').value};\n");
+        b.append("  showJson('mcpServerResult',await mcpApi('/admin/servers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}));\n");
+        b.append("  refreshMcpServers();\n");
+        b.append("}\n");
+
+        // MCP Tools
+        b.append("async function refreshMcpTools(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await mcpApi('/admin/tools'));\n");
+        b.append("    const el=document.getElementById('mcpToolsTable');\n");
+        b.append("    if(!d.tools||!d.tools.length){el.innerHTML='<p style=\"color:var(--soft);font-size:13px;\">\\ub4f1\\ub85d\\ub41c \\ub3c4\\uad6c\\uac00 \\uc5c6\\uc2b5\\ub2c8\\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>\\ub3c4\\uad6c\\uba85</th><th>\\uc124\\uba85</th><th>\\uc561\\uc158</th></tr></thead><tbody>';\n");
+        b.append("    d.tools.forEach(t=>{h+='<tr><td><strong>'+esc(t.name||'')+'</strong></td><td style=\"max-width:400px;white-space:normal;\">'+esc(t.description||'')+'</td><td><button class=\"btn btn-danger\" style=\"padding:5px 10px;font-size:11px;\" onclick=\"toggleMcpTool(\\''+esc(t.name)+'\\',\\'block\\')\">\ucc28\ub2e8</button> <button class=\"btn btn-secondary\" style=\"padding:5px 10px;font-size:11px;\" onclick=\"toggleMcpTool(\\''+esc(t.name)+'\\',\\'unblock\\')\">\ud574\uc81c</button></td></tr>';});\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('mcpToolsTable').textContent=e.message;}\n");
+        b.append("}\n");
+
+        b.append("async function toggleMcpTool(name,action){\n");
+        b.append("  await mcpApi('/admin/tools',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,action:action})});\n");
+        b.append("  refreshMcpTools();refreshMcpPolicies();\n");
+        b.append("}\n");
+
+        // MCP Resources & Prompts
+        b.append("async function refreshMcpResources(){showJson('mcpResourcesJson',await mcpApi('/admin/resources'))}\n");
+        b.append("async function refreshMcpPrompts(){showJson('mcpPromptsJson',await mcpApi('/admin/prompts'))}\n");
+
+        // MCP Sessions
+        b.append("async function refreshMcpSessions(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await mcpApi('/admin/sessions'));\n");
+        b.append("    const el=document.getElementById('mcpSessionsTable');\n");
+        b.append("    if(!d.sessions||!d.sessions.length){el.innerHTML='<p style=\"color:var(--soft);font-size:13px;\">\\ud65c\\uc131 \\uc138\\uc158\\uc774 \\uc5c6\\uc2b5\\ub2c8\\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>\\uc138\\uc158 ID</th><th>\\ud074\\ub77c\\uc774\\uc5b8\\ud2b8</th><th>\\ubc84\\uc804</th><th>\\ucd08\\uae30\\ud654</th><th>SSE</th><th>\\uc0dd\\uc131\\uc2dc\\uac04</th><th>\\ub9c8\\uc9c0\\ub9c9 \\ud65c\\ub3d9</th></tr></thead><tbody>';\n");
+        b.append("    d.sessions.forEach(s=>{h+='<tr><td>'+esc(s.id||'').substring(0,8)+'...</td><td><strong>'+esc(s.clientName||'')+'</strong></td><td>'+esc(s.clientVersion||'')+'</td><td>'+(s.initialized?'\\u2705':'\\u274c')+'</td><td>'+(s.hasSseConnection?'\\u2705':'\\u274c')+'</td><td>'+esc(s.createdAt||'')+'</td><td>'+esc(s.lastActivityAt||'')+'</td></tr>';});\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('mcpSessionsTable').textContent=e.message;}\n");
+        b.append("}\n");
+
+        // MCP Audit
+        b.append("async function refreshMcpAudit(){\n");
+        b.append("  try{\n");
+        b.append("    const limit=document.getElementById('mcpAuditLimit').value||20;\n");
+        b.append("    const method=document.getElementById('mcpAuditMethod').value;\n");
+        b.append("    let url='/admin/audit?limit='+limit;\n");
+        b.append("    if(method)url+='&method='+encodeURIComponent(method);\n");
+        b.append("    const d=JSON.parse(await mcpApi(url));\n");
+        b.append("    const el=document.getElementById('mcpAuditTable');\n");
+        b.append("    if(!d.entries||!d.entries.length){el.innerHTML='<p style=\"color:var(--soft);font-size:13px;\">\\uac10\\uc0ac \\ub85c\\uadf8\\uac00 \\uc5c6\\uc2b5\\ub2c8\\ub2e4. (\\uc804\\uccb4: '+d.total+'\\uac74)</p>';return;}\n");
+        b.append("    let h='<p style=\"font-size:12px;color:var(--soft);margin-bottom:8px;\">\\uc804\\uccb4: '+d.total+'\\uac74 / \\uc870\\ud68c: '+d.returned+'\\uac74</p>';\n");
+        b.append("    h+='<div class=\"tbl-wrap\"><table><thead><tr><th>\\uc2dc\\uac04</th><th>\\uba54\\uc11c\\ub4dc</th><th>\\ub3c4\\uad6c</th><th>\\ud074\\ub77c\\uc774\\uc5b8\\ud2b8</th><th>\\uc18c\\uc694(ms)</th><th>\\uacb0\\uacfc</th></tr></thead><tbody>';\n");
+        b.append("    d.entries.forEach(e=>{h+='<tr><td>'+esc(e.timestamp||'')+'</td><td>'+esc(e.method||'')+'</td><td>'+esc(e.toolName||'-')+'</td><td>'+esc(e.clientName||'-')+'</td><td>'+(e.durationMs||0)+'</td><td>'+(e.success?'<span class=\"status-on\">\\uc131\\uacf5</span>':'<span style=\"color:var(--danger);\">\\uc2e4\\ud328 ('+e.errorCode+')</span>')+'</td></tr>';});\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('mcpAuditTable').textContent=e.message;}\n");
+        b.append("}\n");
+
+        // MCP Policies
+        b.append("async function refreshMcpPolicies(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await mcpApi('/admin/policies'));\n");
+        b.append("    document.getElementById('mcpPolicyAuth').value=String(d.authRequired||false);\n");
+        b.append("    document.getElementById('mcpPolicyApiKeyHeader').value=d.apiKeyHeader||'X-Api-Key';\n");
+        b.append("    document.getElementById('mcpPolicyRateLimit').value=d.rateLimitPerMinute||0;\n");
+        b.append("    document.getElementById('mcpPolicyMaxConcurrent').value=d.maxConcurrentToolCalls||0;\n");
+        b.append("    document.getElementById('mcpPolicyBlockedTools').value=(d.blockedTools||[]).join(', ');\n");
+        b.append("    document.getElementById('mcpPolicyBlockedClients').value=(d.blockedClients||[]).join(', ');\n");
+        b.append("    document.getElementById('mcpPolicyBlockedPrompts').value=(d.blockedPromptPatterns||[]).join(', ');\n");
+        b.append("    document.getElementById('mcpPolicyDataMasking').value=(d.dataMaskingPatterns||[]).join(', ');\n");
+        b.append("    showJson('mcpPolicyResult',JSON.stringify(d,null,2));\n");
+        b.append("  }catch(e){showJson('mcpPolicyResult','{\"error\":\"'+e.message+'\"}');}\n");
+        b.append("}\n");
+
+        b.append("async function saveMcpPolicies(){\n");
+        b.append("  const toArr=s=>s.split(',').map(x=>x.trim()).filter(x=>x);\n");
+        b.append("  const p={\n");
+        b.append("    authRequired:document.getElementById('mcpPolicyAuth').value==='true',\n");
+        b.append("    apiKeyHeader:document.getElementById('mcpPolicyApiKeyHeader').value,\n");
+        b.append("    rateLimitPerMinute:Number(document.getElementById('mcpPolicyRateLimit').value||0),\n");
+        b.append("    maxConcurrentToolCalls:Number(document.getElementById('mcpPolicyMaxConcurrent').value||0),\n");
+        b.append("    blockedTools:toArr(document.getElementById('mcpPolicyBlockedTools').value),\n");
+        b.append("    blockedClients:toArr(document.getElementById('mcpPolicyBlockedClients').value),\n");
+        b.append("    blockedPromptPatterns:toArr(document.getElementById('mcpPolicyBlockedPrompts').value),\n");
+        b.append("    dataMaskingPatterns:toArr(document.getElementById('mcpPolicyDataMasking').value)\n");
+        b.append("  };\n");
+        b.append("  showJson('mcpPolicyResult',await mcpApi('/admin/policies',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}));\n");
+        b.append("}\n");
+
+        // HTML escape helper
+        b.append("function esc(s){if(!s)return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}\n");
+
         // Init
         b.append("refreshOverview();refreshRegistry();refreshUsage();refreshPublishedApis();refreshBilling();refreshTenants();refreshConfig();refreshKeywords();refreshPolicies();refreshIntentStats();refreshPlugins();\n");
+        b.append("refreshMcpHealth();refreshMcpServers();refreshMcpTools();refreshMcpResources();refreshMcpPrompts();refreshMcpSessions();refreshMcpAudit();refreshMcpPolicies();\n");
         b.append("updateLiveDashboard();\n");
         b.append("setInterval(updateLiveDashboard,5000);\n");
         b.append("</script>\n");

@@ -37,16 +37,16 @@ import io.velo.was.mcp.transport.McpSseHandler;
  * <h3>Registered endpoints</h3>
  * <table>
  *   <tr><th>Path</th><th>Method</th><th>Description</th></tr>
- *   <tr><td>/mcp</td><td>POST</td><td>JSON-RPC 2.0 over HTTP</td></tr>
- *   <tr><td>/mcp</td><td>GET (SSE)</td><td>Server-Sent Events stream</td></tr>
- *   <tr><td>/mcp/health</td><td>GET</td><td>Liveness/readiness</td></tr>
- *   <tr><td>/mcp/admin/servers</td><td>GET, POST</td><td>MCP server management</td></tr>
- *   <tr><td>/mcp/admin/tools</td><td>GET, POST, PUT</td><td>Tool catalog management</td></tr>
- *   <tr><td>/mcp/admin/resources</td><td>GET, POST, PUT</td><td>Resource management</td></tr>
- *   <tr><td>/mcp/admin/prompts</td><td>GET, POST, PUT</td><td>Prompt management</td></tr>
- *   <tr><td>/mcp/admin/sessions</td><td>GET</td><td>Session/connection listing</td></tr>
- *   <tr><td>/mcp/admin/audit</td><td>GET</td><td>Audit log query</td></tr>
- *   <tr><td>/mcp/admin/policies</td><td>GET, PUT</td><td>Policy management</td></tr>
+ *   <tr><td>/ai-platform/mcp</td><td>POST</td><td>JSON-RPC 2.0 over HTTP</td></tr>
+ *   <tr><td>/ai-platform/mcp</td><td>GET (SSE)</td><td>Server-Sent Events stream</td></tr>
+ *   <tr><td>/ai-platform/mcp/health</td><td>GET</td><td>Liveness/readiness</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/servers</td><td>GET, POST</td><td>MCP server management</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/tools</td><td>GET, POST, PUT</td><td>Tool catalog management</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/resources</td><td>GET, POST, PUT</td><td>Resource management</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/prompts</td><td>GET, POST, PUT</td><td>Prompt management</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/sessions</td><td>GET</td><td>Session/connection listing</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/audit</td><td>GET</td><td>Audit log query</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/policies</td><td>GET, PUT</td><td>Policy management</td></tr>
  * </table>
  */
 public final class McpApplication {

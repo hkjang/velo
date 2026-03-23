@@ -29,25 +29,25 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * HTTP handler for the MCP admin control-plane API ({@code /mcp/admin/*}).
+ * HTTP handler for the MCP admin control-plane API ({@code /ai-platform/mcp/admin/*}).
  *
  * <h3>Endpoints</h3>
  * <table>
  *   <tr><th>Path</th><th>Methods</th><th>Description</th></tr>
- *   <tr><td>/mcp/admin/servers</td><td>GET, POST</td><td>MCP server registration</td></tr>
- *   <tr><td>/mcp/admin/tools</td><td>GET, POST, PUT</td><td>Tool catalog management</td></tr>
- *   <tr><td>/mcp/admin/resources</td><td>GET, POST, PUT</td><td>Resource management</td></tr>
- *   <tr><td>/mcp/admin/prompts</td><td>GET, POST, PUT</td><td>Prompt management</td></tr>
- *   <tr><td>/mcp/admin/sessions</td><td>GET</td><td>Session/connection listing</td></tr>
- *   <tr><td>/mcp/admin/audit</td><td>GET</td><td>Audit log query</td></tr>
- *   <tr><td>/mcp/admin/policies</td><td>GET, PUT</td><td>Policy management</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/servers</td><td>GET, POST</td><td>MCP server registration</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/tools</td><td>GET, POST, PUT</td><td>Tool catalog management</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/resources</td><td>GET, POST, PUT</td><td>Resource management</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/prompts</td><td>GET, POST, PUT</td><td>Prompt management</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/sessions</td><td>GET</td><td>Session/connection listing</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/audit</td><td>GET</td><td>Audit log query</td></tr>
+ *   <tr><td>/ai-platform/mcp/admin/policies</td><td>GET, PUT</td><td>Policy management</td></tr>
  * </table>
  */
 public class McpAdminHandler implements HttpHandler {
 
     private static final Logger log = LoggerFactory.getLogger(McpAdminHandler.class);
 
-    private static final String PREFIX = "/mcp/admin/";
+    private static final String PREFIX = "/ai-platform/mcp/admin/";
 
     private final McpServer server;
     private final McpServerRegistry serverRegistry;
@@ -93,7 +93,7 @@ public class McpAdminHandler implements HttpHandler {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  /mcp/admin/servers — GET, POST
+    //  /ai-platform/mcp/admin/servers — GET, POST
     // ═══════════════════════════════════════════════════════════════════════
 
     private FullHttpResponse handleServers(HttpMethod method, FullHttpRequest request) {
@@ -118,7 +118,7 @@ public class McpAdminHandler implements HttpHandler {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  /mcp/admin/tools — GET, POST, PUT
+    //  /ai-platform/mcp/admin/tools — GET, POST, PUT
     // ═══════════════════════════════════════════════════════════════════════
 
     private FullHttpResponse handleTools(HttpMethod method, FullHttpRequest request) {
@@ -161,7 +161,7 @@ public class McpAdminHandler implements HttpHandler {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  /mcp/admin/resources — GET, POST, PUT
+    //  /ai-platform/mcp/admin/resources — GET, POST, PUT
     // ═══════════════════════════════════════════════════════════════════════
 
     private FullHttpResponse handleResources(HttpMethod method, FullHttpRequest request) {
@@ -181,7 +181,7 @@ public class McpAdminHandler implements HttpHandler {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  /mcp/admin/prompts — GET, POST, PUT
+    //  /ai-platform/mcp/admin/prompts — GET, POST, PUT
     // ═══════════════════════════════════════════════════════════════════════
 
     private FullHttpResponse handlePrompts(HttpMethod method, FullHttpRequest request) {
@@ -201,7 +201,7 @@ public class McpAdminHandler implements HttpHandler {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  /mcp/admin/sessions — GET
+    //  /ai-platform/mcp/admin/sessions — GET
     // ═══════════════════════════════════════════════════════════════════════
 
     private FullHttpResponse handleSessions(HttpMethod method) {
@@ -231,7 +231,7 @@ public class McpAdminHandler implements HttpHandler {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  /mcp/admin/audit — GET
+    //  /ai-platform/mcp/admin/audit — GET
     // ═══════════════════════════════════════════════════════════════════════
 
     private FullHttpResponse handleAudit(HttpMethod method, FullHttpRequest request) {
@@ -260,7 +260,7 @@ public class McpAdminHandler implements HttpHandler {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  /mcp/admin/policies — GET, PUT
+    //  /ai-platform/mcp/admin/policies — GET, PUT
     // ═══════════════════════════════════════════════════════════════════════
 
     @SuppressWarnings("unchecked")

@@ -37,9 +37,9 @@ External MCP clients (Claude Desktop, IDE plugins, custom agents, etc.) can invo
 ```
 MCP Client (Claude, IDE, Agent)
     |
-    +-- POST /mcp          -> JSON-RPC 2.0 request/response
-    +-- GET  /mcp (SSE)    -> Server event stream
-    +-- GET  /mcp/health   -> Health check
+    +-- POST /ai-platform/mcp          -> JSON-RPC 2.0 request/response
+    +-- GET  /ai-platform/mcp (SSE)    -> Server event stream
+    +-- GET  /ai-platform/mcp/health   -> Health check
          |
     +----+----------------------------+
     |   McpServer (JSON-RPC)          |
@@ -75,13 +75,13 @@ java -jar was-bootstrap/target/was-bootstrap-0.5.11-jar-with-dependencies.jar
 
 Look for this log line:
 ```
-MCP server installed at /mcp (admin at /mcp/admin/*) with full admin CLI tools
+MCP server installed at /ai-platform/mcp (admin at /ai-platform/mcp/admin/*) with full admin CLI tools
 ```
 
 ### 2.2 Health Check
 
 ```bash
-curl http://localhost:8080/mcp/health
+curl http://localhost:8080/ai-platform/mcp/health
 ```
 
 ```json
@@ -99,7 +99,7 @@ curl http://localhost:8080/mcp/health
 
 ### 2.3 Test Console
 
-Open `http://localhost:8080/mcp-test/` in a browser for an interactive web-based MCP test console with buttons for all 40 tools, resources, prompts, and admin APIs.
+Open `http://localhost:8080/mcp-test/` in a browser for an interactive web-based MCP test console that communicates with the MCP server at `/ai-platform/mcp`.
 
 ---
 
@@ -108,18 +108,18 @@ Open `http://localhost:8080/mcp-test/` in a browser for an interactive web-based
 ### 3.1 Connection Flow
 
 ```
-1. Client -> POST /mcp  { initialize }            -> Server
+1. Client -> POST /ai-platform/mcp  { initialize }            -> Server
 2. Server -> 200 OK     { capabilities }           -> Client  (Mcp-Session-Id header)
-3. Client -> POST /mcp  { notifications/initialized } -> Server  (204 No Content)
-4. Client -> POST /mcp  { tools/list }             -> Server
-5. Client -> POST /mcp  { tools/call }             -> Server
-6. (optional) Client -> GET /mcp (SSE)             -> Server events
+3. Client -> POST /ai-platform/mcp  { notifications/initialized } -> Server  (204 No Content)
+4. Client -> POST /ai-platform/mcp  { tools/list }             -> Server
+5. Client -> POST /ai-platform/mcp  { tools/call }             -> Server
+6. (optional) Client -> GET /ai-platform/mcp (SSE)             -> Server events
 ```
 
 ### 3.2 initialize
 
 ```bash
-curl -X POST http://localhost:8080/mcp \
+curl -X POST http://localhost:8080/ai-platform/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -138,7 +138,7 @@ The response includes `Mcp-Session-Id` header. Include it in all subsequent requ
 ### 3.3 notifications/initialized
 
 ```bash
-curl -X POST http://localhost:8080/mcp \
+curl -X POST http://localhost:8080/ai-platform/mcp \
   -H "Content-Type: application/json" \
   -H "Mcp-Session-Id: <session-id>" \
   -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
@@ -149,7 +149,7 @@ Response: `204 No Content`
 ### 3.4 tools/list
 
 ```bash
-curl -X POST http://localhost:8080/mcp \
+curl -X POST http://localhost:8080/ai-platform/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 ```
@@ -160,13 +160,13 @@ Returns all 40 tools with their input schemas.
 
 ```bash
 # infer
-curl -X POST http://localhost:8080/mcp \
+curl -X POST http://localhost:8080/ai-platform/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call",
        "params":{"name":"infer","arguments":{"prompt":"Explain quantum computing","requestType":"CHAT"}}}'
 
 # route
-curl -X POST http://localhost:8080/mcp \
+curl -X POST http://localhost:8080/ai-platform/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":4,"method":"tools/call",
        "params":{"name":"route","arguments":{"prompt":"Recommend a movie","requestType":"AUTO"}}}'
@@ -176,23 +176,23 @@ curl -X POST http://localhost:8080/mcp \
 
 ```bash
 # Server status
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"server_info","arguments":{"serverName":"velo-was"}}}'
 
 # List applications
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"list_applications","arguments":{}}}'
 
 # Memory info
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"memory_info","arguments":{}}}'
 
 # Set log level
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"set_log_level","arguments":{"loggerName":"io.velo.was","level":"DEBUG"}}}'
 
 # Deploy WAR
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"deploy_application","arguments":{"warPath":"/path/to/app.war"}}}'
 ```
 
@@ -242,30 +242,30 @@ curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
 ### 3.8 resources/list & resources/read
 
 ```bash
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":10,"method":"resources/list"}'
 
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":11,"method":"resources/read","params":{"uri":"mcp://models"}}'
 
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":12,"method":"resources/read","params":{"uri":"mcp://platform/status"}}'
 ```
 
 ### 3.9 prompts/list & prompts/get
 
 ```bash
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":13,"method":"prompts/list"}'
 
-curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/ai-platform/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":14,"method":"prompts/get","params":{"name":"chat","arguments":{"task":"Explain microservices","language":"English"}}}'
 ```
 
 ### 3.10 SSE Stream
 
 ```bash
-curl -N -H "Accept: text/event-stream" http://localhost:8080/mcp
+curl -N -H "Accept: text/event-stream" http://localhost:8080/ai-platform/mcp
 ```
 
 The server sends an `endpoint` event immediately, then `: ping` comments every 25 seconds. Add `Mcp-Session-Id` header to link the stream to a session.
@@ -274,24 +274,24 @@ The server sends an `endpoint` event immediately, then `: ping` comments every 2
 
 ## 4. Administrator Guide — Admin Control Plane API
 
-All admin APIs are under `/mcp/admin/*`.
+All admin APIs are under `/ai-platform/mcp/admin/*`.
 
 | Endpoint | Methods | Description |
 |----------|---------|-------------|
-| `/mcp/admin/servers` | GET, POST | MCP server instance management |
-| `/mcp/admin/tools` | GET, PUT | Tool catalog (PUT to block/unblock) |
-| `/mcp/admin/resources` | GET | Resource catalog |
-| `/mcp/admin/prompts` | GET | Prompt catalog |
-| `/mcp/admin/sessions` | GET | Active session listing |
-| `/mcp/admin/audit` | GET | Audit log query (?limit=N&method=X) |
-| `/mcp/admin/policies` | GET, PUT | Auth/rate-limit/block policy CRUD |
+| `/ai-platform/mcp/admin/servers` | GET, POST | MCP server instance management |
+| `/ai-platform/mcp/admin/tools` | GET, PUT | Tool catalog (PUT to block/unblock) |
+| `/ai-platform/mcp/admin/resources` | GET | Resource catalog |
+| `/ai-platform/mcp/admin/prompts` | GET | Prompt catalog |
+| `/ai-platform/mcp/admin/sessions` | GET | Active session listing |
+| `/ai-platform/mcp/admin/audit` | GET | Audit log query (?limit=N&method=X) |
+| `/ai-platform/mcp/admin/policies` | GET, PUT | Auth/rate-limit/block policy CRUD |
 
 ### 4.1 Server Registry
 
 ```bash
-curl http://localhost:8080/mcp/admin/servers
+curl http://localhost:8080/ai-platform/mcp/admin/servers
 
-curl -X POST http://localhost:8080/mcp/admin/servers \
+curl -X POST http://localhost:8080/ai-platform/mcp/admin/servers \
   -H "Content-Type: application/json" \
   -d '{"name":"mcp-prod-1","endpoint":"https://prod.example.com/mcp","environment":"production","version":"0.5.11"}'
 ```
@@ -299,11 +299,11 @@ curl -X POST http://localhost:8080/mcp/admin/servers \
 ### 4.2 Tool Block/Unblock
 
 ```bash
-curl -X PUT http://localhost:8080/mcp/admin/tools \
+curl -X PUT http://localhost:8080/ai-platform/mcp/admin/tools \
   -H "Content-Type: application/json" \
   -d '{"name":"infer","action":"block"}'
 
-curl -X PUT http://localhost:8080/mcp/admin/tools \
+curl -X PUT http://localhost:8080/ai-platform/mcp/admin/tools \
   -H "Content-Type: application/json" \
   -d '{"name":"infer","action":"unblock"}'
 ```
@@ -311,33 +311,33 @@ curl -X PUT http://localhost:8080/mcp/admin/tools \
 ### 4.3 Sessions
 
 ```bash
-curl http://localhost:8080/mcp/admin/sessions
+curl http://localhost:8080/ai-platform/mcp/admin/sessions
 ```
 
 ### 4.4 Audit Log
 
 ```bash
-curl "http://localhost:8080/mcp/admin/audit?limit=20&method=tools/call"
+curl "http://localhost:8080/ai-platform/mcp/admin/audit?limit=20&method=tools/call"
 ```
 
 ### 4.5 Policy Management
 
 ```bash
 # View current policies
-curl http://localhost:8080/mcp/admin/policies
+curl http://localhost:8080/ai-platform/mcp/admin/policies
 
 # Set rate limit (60 req/min)
-curl -X PUT http://localhost:8080/mcp/admin/policies \
+curl -X PUT http://localhost:8080/ai-platform/mcp/admin/policies \
   -H "Content-Type: application/json" \
   -d '{"rateLimitPerMinute":60}'
 
 # Block prompt patterns
-curl -X PUT http://localhost:8080/mcp/admin/policies \
+curl -X PUT http://localhost:8080/ai-platform/mcp/admin/policies \
   -H "Content-Type: application/json" \
   -d '{"blockedPromptPatterns":["(?i)password|secret|credential"]}'
 
 # Enable authentication
-curl -X PUT http://localhost:8080/mcp/admin/policies \
+curl -X PUT http://localhost:8080/ai-platform/mcp/admin/policies \
   -H "Content-Type: application/json" \
   -d '{"authRequired":true,"apiKeyHeader":"X-Api-Key"}'
 ```
@@ -393,7 +393,7 @@ server:
 {
   "mcpServers": {
     "velo-ai": {
-      "url": "http://localhost:8080/mcp",
+      "url": "http://localhost:8080/ai-platform/mcp",
       "transport": "streamable-http"
     }
   }
@@ -405,7 +405,7 @@ server:
 ```python
 import httpx
 
-base = "http://localhost:8080/mcp"
+base = "http://localhost:8080/ai-platform/mcp"
 headers = {"Content-Type": "application/json"}
 
 resp = httpx.post(base, headers=headers, json={
@@ -429,13 +429,13 @@ print(resp.json())
 
 | Path | Method | Description |
 |------|--------|-------------|
-| `/mcp` | POST | JSON-RPC 2.0 requests |
-| `/mcp` | GET (SSE) | Server-Sent Events (Accept: text/event-stream) |
-| `/mcp/health` | GET | Liveness / readiness |
-| `/mcp/admin/servers` | GET, POST | MCP server registry |
-| `/mcp/admin/tools` | GET, PUT | Tool catalog & block control |
-| `/mcp/admin/resources` | GET | Resource catalog |
-| `/mcp/admin/prompts` | GET | Prompt catalog |
-| `/mcp/admin/sessions` | GET | Active sessions |
-| `/mcp/admin/audit` | GET | Audit log |
-| `/mcp/admin/policies` | GET, PUT | Policy management |
+| `/ai-platform/mcp` | POST | JSON-RPC 2.0 requests |
+| `/ai-platform/mcp` | GET (SSE) | Server-Sent Events (Accept: text/event-stream) |
+| `/ai-platform/mcp/health` | GET | Liveness / readiness |
+| `/ai-platform/mcp/admin/servers` | GET, POST | MCP server registry |
+| `/ai-platform/mcp/admin/tools` | GET, PUT | Tool catalog & block control |
+| `/ai-platform/mcp/admin/resources` | GET | Resource catalog |
+| `/ai-platform/mcp/admin/prompts` | GET | Prompt catalog |
+| `/ai-platform/mcp/admin/sessions` | GET | Active sessions |
+| `/ai-platform/mcp/admin/audit` | GET | Audit log |
+| `/ai-platform/mcp/admin/policies` | GET, PUT | Policy management |

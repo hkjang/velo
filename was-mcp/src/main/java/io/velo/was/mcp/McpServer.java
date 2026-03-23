@@ -1,6 +1,7 @@
 package io.velo.was.mcp;
 
 import io.velo.was.mcp.audit.McpAuditLog;
+import io.velo.was.mcp.gateway.McpGatewayRouter;
 import io.velo.was.mcp.policy.McpPolicyEnforcer;
 import io.velo.was.mcp.prompt.McpPrompt;
 import io.velo.was.mcp.prompt.McpPromptGetResult;
@@ -57,6 +58,7 @@ public class McpServer {
     private final McpSessionManager sessionManager;
     private volatile McpAuditLog auditLog;
     private volatile McpPolicyEnforcer policyEnforcer;
+    private volatile McpGatewayRouter gatewayRouter;
 
     public McpServer(McpServerInfo serverInfo,
                      McpToolRegistry toolRegistry,
@@ -75,6 +77,9 @@ public class McpServer {
 
     /** Attach policy enforcement (called from McpApplication after construction). */
     public void setPolicyEnforcer(McpPolicyEnforcer policyEnforcer) { this.policyEnforcer = policyEnforcer; }
+
+    /** Attach the gateway router for proxying to remote MCP servers. */
+    public void setGatewayRouter(McpGatewayRouter gatewayRouter) { this.gatewayRouter = gatewayRouter; }
 
     /**
      * Handle a raw JSON-RPC request string (from POST body) and return the response JSON,
@@ -177,7 +182,8 @@ public class McpServer {
     // ── tools ─────────────────────────────────────────────────────────────────
 
     private String handleToolsList(JsonRpcRequest req) {
-        List<McpTool> tools = toolRegistry.list();
+        List<McpTool> tools = gatewayRouter != null
+                ? gatewayRouter.allTools(toolRegistry) : toolRegistry.list();
         StringBuilder sb = new StringBuilder(1024).append("{\"tools\":[");
         boolean first = true;
         for (McpTool tool : tools) {
@@ -207,13 +213,30 @@ public class McpServer {
             }
         }
 
+        Map<String, Object> arguments = params.get("arguments") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m
+                : Map.of();
+
+        // Gateway routing: if name contains "::", route to remote server
+        if (gatewayRouter != null) {
+            try {
+                String result = gatewayRouter.routeToolCall(name, arguments, toolRegistry);
+                if (result != null) {
+                    return JsonRpcResponse.success(req.id(), result);
+                }
+                // null means "not found" — fall through to error
+                return JsonRpcResponse.error(req.id(), JsonRpcError.toolNotFound(name));
+            } catch (Exception e) {
+                log.warn("Tool '{}' execution failed: {}", name, e.getMessage(), e);
+                return JsonRpcResponse.success(req.id(), McpToolCallResult.error(e.getMessage()).toJson());
+            }
+        }
+
+        // Local-only fallback (no gateway)
         McpToolExecutor executor = toolRegistry.executor(name);
         if (executor == null) {
             return JsonRpcResponse.error(req.id(), JsonRpcError.toolNotFound(name));
         }
-        Map<String, Object> arguments = params.get("arguments") instanceof Map<?, ?> m
-                ? (Map<String, Object>) m
-                : Map.of();
         try {
             McpToolCallResult result = executor.execute(arguments);
             return JsonRpcResponse.success(req.id(), result.toJson());
@@ -226,7 +249,8 @@ public class McpServer {
     // ── resources ─────────────────────────────────────────────────────────────
 
     private String handleResourcesList(JsonRpcRequest req) {
-        List<McpResource> resources = resourceRegistry.list();
+        List<McpResource> resources = gatewayRouter != null
+                ? gatewayRouter.allResources(resourceRegistry) : resourceRegistry.list();
         StringBuilder sb = new StringBuilder(512).append("{\"resources\":[");
         boolean first = true;
         for (McpResource resource : resources) {
@@ -247,6 +271,15 @@ public class McpServer {
         if (uri == null || uri.isBlank()) {
             return JsonRpcResponse.error(req.id(), JsonRpcError.invalidParams("uri is required"));
         }
+        // Gateway routing for remote resources
+        if (gatewayRouter != null && uri.contains(McpGatewayRouter.NS_SEPARATOR)) {
+            String result = gatewayRouter.routeResourceRead(uri, resourceRegistry);
+            if (result != null) {
+                return JsonRpcResponse.success(req.id(), result);
+            }
+            return JsonRpcResponse.error(req.id(), JsonRpcError.resourceNotFound(uri));
+        }
+
         McpResourceProvider provider = resourceRegistry.provider(uri);
         if (provider == null) {
             return JsonRpcResponse.error(req.id(), JsonRpcError.resourceNotFound(uri));
@@ -259,7 +292,8 @@ public class McpServer {
     // ── prompts ───────────────────────────────────────────────────────────────
 
     private String handlePromptsList(JsonRpcRequest req) {
-        List<McpPrompt> prompts = promptRegistry.list();
+        List<McpPrompt> prompts = gatewayRouter != null
+                ? gatewayRouter.allPrompts(promptRegistry) : promptRegistry.list();
         StringBuilder sb = new StringBuilder(512).append("{\"prompts\":[");
         boolean first = true;
         for (McpPrompt prompt : prompts) {
@@ -281,10 +315,6 @@ public class McpServer {
         if (name == null || name.isBlank()) {
             return JsonRpcResponse.error(req.id(), JsonRpcError.invalidParams("name is required"));
         }
-        McpPromptProvider provider = promptRegistry.provider(name);
-        if (provider == null) {
-            return JsonRpcResponse.error(req.id(), JsonRpcError.promptNotFound(name));
-        }
         // arguments is Map<String, String> per spec
         Map<String, String> arguments = Map.of();
         if (params.get("arguments") instanceof Map<?, ?> rawArgs) {
@@ -292,6 +322,20 @@ public class McpServer {
             Map<String, String> stringArgs = new java.util.LinkedHashMap<>();
             rawMap.forEach((k, v) -> stringArgs.put(k, v != null ? v.toString() : ""));
             arguments = stringArgs;
+        }
+
+        // Gateway routing for remote prompts
+        if (gatewayRouter != null && name.contains(McpGatewayRouter.NS_SEPARATOR)) {
+            String result = gatewayRouter.routePromptGet(name, arguments, promptRegistry);
+            if (result != null) {
+                return JsonRpcResponse.success(req.id(), result);
+            }
+            return JsonRpcResponse.error(req.id(), JsonRpcError.promptNotFound(name));
+        }
+
+        McpPromptProvider provider = promptRegistry.provider(name);
+        if (provider == null) {
+            return JsonRpcResponse.error(req.id(), JsonRpcError.promptNotFound(name));
         }
         McpPromptGetResult result = provider.get(arguments);
         return JsonRpcResponse.success(req.id(), result.toJson());
@@ -361,4 +405,5 @@ public class McpServer {
     public McpPromptRegistry promptRegistry() { return promptRegistry; }
     public McpAuditLog auditLog() { return auditLog; }
     public McpPolicyEnforcer policyEnforcer() { return policyEnforcer; }
+    public McpGatewayRouter gatewayRouter() { return gatewayRouter; }
 }

@@ -469,6 +469,20 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("<pre class=\"json-box\" id=\"mcpPolicyResult\"></pre>");
         b.append("</div>\n");
 
+        // Gateway Status section (within MCP tab)
+        b.append("<div class=\"card\"><div class=\"card-header\">\uac8c\uc774\ud2b8\uc6e8\uc774 \uc0c1\ud0dc</div>");
+        b.append("<div class=\"card-desc\">\ub4f1\ub85d\ub41c \uc6d0\uaca9 MCP \uc11c\ubc84 \uc5f0\uacb0 \uc0c1\ud0dc \ubc0f \ud504\ub85d\uc2dc \uad00\ub9ac</div>");
+        b.append("<button onclick=\"refreshGatewayStatus()\" class=\"btn\">\uc0c8\ub85c\uace0\uce68</button>");
+        b.append("<div id=\"gatewayStatusTable\"></div>");
+        b.append("</div>\n");
+
+        // Routing Table
+        b.append("<div class=\"card\"><div class=\"card-header\">\ub77c\uc6b0\ud305 \ud14c\uc774\ube14</div>");
+        b.append("<div class=\"card-desc\">\ub85c\uceec + \uc6d0\uaca9 \ud1b5\ud569 \ub3c4\uad6c/\ub9ac\uc18c\uc2a4/\ud504\ub86c\ud504\ud2b8 \ub77c\uc6b0\ud305 \ub9f5</div>");
+        b.append("<button onclick=\"refreshRoutingTable()\" class=\"btn\">\uc870\ud68c</button>");
+        b.append("<div id=\"routingTable\"></div>");
+        b.append("</div>\n");
+
         b.append("</div>\n");
 
         // ===== TAB: app-mcp — 앱 MCP 모니터링 =====
@@ -726,6 +740,43 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         // HTML escape helper
         b.append("function esc(s){if(!s)return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}\n");
 
+        // ── Gateway management functions ─────────────────────────────────
+        b.append("async function refreshGatewayStatus(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await mcpApi('/admin/gateway/status'));\n");
+        b.append("    const el=document.getElementById('gatewayStatusTable');\n");
+        b.append("    if(!d.connections||d.connections.length===0){el.innerHTML='<p>\\uc5f0\\uacb0\\ub41c \\uc6d0\\uaca9 MCP \\uc11c\\ubc84\\uac00 \\uc5c6\\uc2b5\\ub2c8\\ub2e4. \\uc704\\uc758 \\uc11c\\ubc84 \\ub4f1\\ub85d \\ud3fc\\uc73c\\ub85c \\uc6d0\\uaca9 \\uc11c\\ubc84\\ub97c \\uc5f0\\uacb0\\ud558\\uc138\\uc694.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>\\uc11c\\ubc84\\uba85</th><th>\\uc5d4\\ub4dc\\ud3ec\\uc778\\ud2b8</th><th>\\uc0c1\\ud0dc</th><th>\\ub3c4\\uad6c</th><th>\\ub9ac\\uc18c\\uc2a4</th><th>\\ud504\\ub86c\\ud504\\ud2b8</th><th>\\uc561\\uc158</th></tr></thead><tbody>';\n");
+        b.append("    d.connections.forEach(c=>{\n");
+        b.append("      const st=c.state==='CONNECTED'?'<span class=\"status-on\">CONNECTED</span>':'<span class=\"status-off\">'+c.state+'</span>';\n");
+        b.append("      h+='<tr><td><strong>'+esc(c.serverName)+'</strong></td><td>'+esc(c.endpoint)+'</td><td>'+st+'</td><td>'+c.tools+'</td><td>'+c.resources+'</td><td>'+c.prompts+'</td>';\n");
+        b.append("      h+='<td><button class=\"btn btn-xs\" onclick=\"gatewayAction(\\'connect\\',\\''+c.serverId+'\\')\">\\uc5f0\\uacb0</button> ';\n");
+        b.append("      h+='<button class=\"btn btn-xs btn-secondary\" onclick=\"gatewayAction(\\'disconnect\\',\\''+c.serverId+'\\')\">\\ud574\\uc81c</button> ';\n");
+        b.append("      h+='<button class=\"btn btn-xs btn-secondary\" onclick=\"gatewayAction(\\'refresh\\',\\''+c.serverId+'\\')\">\\uac31\\uc2e0</button></td></tr>';\n");
+        b.append("    });\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('gatewayStatusTable').textContent=e.message;}\n");
+        b.append("}\n");
+
+        b.append("async function gatewayAction(action,serverId){\n");
+        b.append("  await mcpApi('/admin/gateway/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serverId:serverId})});\n");
+        b.append("  refreshGatewayStatus();refreshMcpServers();\n");
+        b.append("}\n");
+
+        b.append("async function refreshRoutingTable(){\n");
+        b.append("  try{\n");
+        b.append("    const d=JSON.parse(await mcpApi('/admin/gateway/routing-table'));\n");
+        b.append("    const el=document.getElementById('routingTable');\n");
+        b.append("    if(!d.routes||d.routes.length===0){el.innerHTML='<p>\\ub77c\\uc6b0\\ud305 \\ud14c\\uc774\\ube14\\uc774 \\ube44\\uc5b4 \\uc788\\uc2b5\\ub2c8\\ub2e4.</p>';return;}\n");
+        b.append("    let h='<div class=\"tbl-wrap\"><table><thead><tr><th>\\uc774\\ub984 (\\ub124\\uc784\\uc2a4\\ud398\\uc774\\uc2a4)</th><th>Origin</th><th>\\ud0c0\\uc785</th><th>\\uc6d0\\ubcf8 \\uc774\\ub984</th></tr></thead><tbody>';\n");
+        b.append("    d.routes.forEach(r=>{\n");
+        b.append("      const origin=r.origin==='local'?'<span class=\"chip green\">local</span>':'<span class=\"chip\">'+esc(r.origin)+'</span>';\n");
+        b.append("      h+='<tr><td><code>'+esc(r.name)+'</code></td><td>'+origin+'</td><td>'+esc(r.type)+'</td><td>'+esc(r.originalName)+'</td></tr>';\n");
+        b.append("    });\n");
+        b.append("    h+='</tbody></table></div>';el.innerHTML=h;\n");
+        b.append("  }catch(e){document.getElementById('routingTable').textContent=e.message;}\n");
+        b.append("}\n");
+
         // ── App MCP monitoring functions ─────────────────────────────────
         b.append("async function refreshAppMcpEndpoints(){\n");
         b.append("  try{\n");
@@ -780,6 +831,7 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         // Init
         b.append("refreshOverview();refreshRegistry();refreshUsage();refreshPublishedApis();refreshBilling();refreshTenants();refreshConfig();refreshKeywords();refreshPolicies();refreshIntentStats();refreshPlugins();\n");
         b.append("refreshMcpHealth();refreshMcpServers();refreshMcpTools();refreshMcpResources();refreshMcpPrompts();refreshMcpSessions();refreshMcpAudit();refreshMcpPolicies();\n");
+        b.append("refreshGatewayStatus();refreshRoutingTable();\n");
         b.append("refreshAppMcpEndpoints();refreshAppMcpSessions();refreshAppMcpTraffic();\n");
         b.append("updateLiveDashboard();\n");
         b.append("setInterval(updateLiveDashboard,5000);\n");

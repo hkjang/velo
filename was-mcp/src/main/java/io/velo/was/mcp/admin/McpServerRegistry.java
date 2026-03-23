@@ -1,5 +1,7 @@
 package io.velo.was.mcp.admin;
 
+import io.velo.was.mcp.gateway.McpGatewayRouter;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -11,10 +13,18 @@ import java.util.concurrent.ConcurrentMap;
  * Registry for MCP server instances managed via the admin control plane.
  *
  * <p>Thread-safe. Supports list, register, update, and remove operations.
+ * When a gateway router is attached, remote server registration automatically
+ * triggers connection and capability discovery.
  */
 public class McpServerRegistry {
 
     private final ConcurrentMap<String, McpServerDescriptor> servers = new ConcurrentHashMap<>();
+    private volatile McpGatewayRouter gatewayRouter;
+
+    /** Attach the gateway router for auto-connect on remote server registration. */
+    public void setGatewayRouter(McpGatewayRouter router) {
+        this.gatewayRouter = router;
+    }
 
     /**
      * Register the local server instance automatically (called at startup).
@@ -34,6 +44,10 @@ public class McpServerRegistry {
         McpServerDescriptor descriptor = new McpServerDescriptor(
                 UUID.randomUUID().toString(), name, endpoint, environment, version);
         servers.put(descriptor.id(), descriptor);
+        // Auto-connect remote servers via gateway
+        if (gatewayRouter != null && !"local".equals(environment)) {
+            gatewayRouter.registerRemoteServer(descriptor);
+        }
         return descriptor;
     }
 
@@ -49,7 +63,11 @@ public class McpServerRegistry {
 
     /** Remove a server by ID. Returns the removed descriptor, or null. */
     public McpServerDescriptor remove(String id) {
-        return servers.remove(id);
+        McpServerDescriptor removed = servers.remove(id);
+        if (removed != null && gatewayRouter != null) {
+            gatewayRouter.unregisterRemoteServer(id);
+        }
+        return removed;
     }
 
     public int size() { return servers.size(); }

@@ -10,6 +10,8 @@ import io.velo.was.mcp.McpServer;
 import io.velo.was.mcp.audit.McpAuditEntry;
 import io.velo.was.mcp.audit.McpAuditLog;
 import io.velo.was.mcp.gateway.McpAppGatewayService;
+import io.velo.was.mcp.gateway.McpGatewayRouter;
+import io.velo.was.mcp.gateway.McpRemoteServerConnection;
 import io.velo.was.mcp.policy.McpPolicy;
 import io.velo.was.mcp.policy.McpPolicyEnforcer;
 import io.velo.was.mcp.session.McpSession;
@@ -55,6 +57,7 @@ public class McpAdminHandler implements HttpHandler {
     private final McpAuditLog auditLog;
     private final McpPolicyEnforcer policyEnforcer;
     private volatile McpAppGatewayService appGatewayService;
+    private volatile McpGatewayRouter gatewayRouter;
 
     public McpAdminHandler(McpServer server,
                            McpServerRegistry serverRegistry,
@@ -69,6 +72,11 @@ public class McpAdminHandler implements HttpHandler {
     /** Set the app MCP gateway service for application-level MCP monitoring. */
     public void setAppGatewayService(McpAppGatewayService appGatewayService) {
         this.appGatewayService = appGatewayService;
+    }
+
+    /** Set the gateway router for remote MCP server management. */
+    public void setGatewayRouter(McpGatewayRouter gatewayRouter) {
+        this.gatewayRouter = gatewayRouter;
     }
 
     @Override
@@ -91,10 +99,15 @@ public class McpAdminHandler implements HttpHandler {
                 case "sessions"       -> handleSessions(method);
                 case "audit"          -> handleAudit(method, request);
                 case "policies"       -> handlePolicies(method, request);
-                case "app-endpoints"  -> handleAppEndpoints(method);
-                case "app-sessions"   -> handleAppSessions(method, request);
-                case "app-traffic"    -> handleAppTraffic(method, request);
-                default               -> HttpResponses.notFound("Unknown admin endpoint: " + sub);
+                case "app-endpoints"         -> handleAppEndpoints(method);
+                case "app-sessions"          -> handleAppSessions(method, request);
+                case "app-traffic"           -> handleAppTraffic(method, request);
+                case "gateway/status"        -> handleGatewayStatus(method);
+                case "gateway/connect"       -> handleGatewayConnect(method, request);
+                case "gateway/disconnect"    -> handleGatewayDisconnect(method, request);
+                case "gateway/refresh"       -> handleGatewayRefresh(method, request);
+                case "gateway/routing-table" -> handleGatewayRoutingTable(method);
+                default                      -> HttpResponses.notFound("Unknown admin endpoint: " + sub);
             };
         } catch (Exception e) {
             log.error("Admin API error: {} {}", method, path, e);
@@ -302,6 +315,92 @@ public class McpAdminHandler implements HttpHandler {
             return HttpResponses.jsonOk(policy.toJson());
         }
         return HttpResponses.methodNotAllowed("GET or PUT only");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Gateway admin endpoints
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private FullHttpResponse handleGatewayStatus(HttpMethod method) {
+        if (method != HttpMethod.GET) return HttpResponses.methodNotAllowed("GET only");
+        McpGatewayRouter gw = gatewayRouter;
+        if (gw == null) {
+            return HttpResponses.jsonOk("{\"gatewayEnabled\":false,\"connections\":[]}");
+        }
+        var conns = gw.listConnections();
+        long connected = conns.stream().filter(c -> c.state() == McpRemoteServerConnection.ConnectionState.CONNECTED).count();
+        StringBuilder sb = new StringBuilder(2048);
+        sb.append("{\"gatewayEnabled\":true,\"totalRemoteServers\":").append(conns.size());
+        sb.append(",\"connectedServers\":").append(connected);
+        sb.append(",\"connections\":[");
+        boolean first = true;
+        for (var conn : conns) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(conn.toJson());
+        }
+        sb.append("]}");
+        return HttpResponses.jsonOk(sb.toString());
+    }
+
+    private FullHttpResponse handleGatewayConnect(HttpMethod method, FullHttpRequest request) {
+        if (method != HttpMethod.POST) return HttpResponses.methodNotAllowed("POST only");
+        McpGatewayRouter gw = gatewayRouter;
+        if (gw == null) return HttpResponses.badRequest("Gateway not enabled");
+        Map<String, Object> body = parseBody(request);
+        String serverId = stringVal(body, "serverId", null);
+        if (serverId == null) return HttpResponses.badRequest("serverId is required");
+        boolean ok = gw.connect(serverId);
+        var conn = gw.getConnection(serverId);
+        String state = conn != null ? conn.state().name() : "UNKNOWN";
+        return HttpResponses.jsonOk("{\"serverId\":\"" + escape(serverId)
+                + "\",\"connected\":" + ok + ",\"state\":\"" + state + "\"}");
+    }
+
+    private FullHttpResponse handleGatewayDisconnect(HttpMethod method, FullHttpRequest request) {
+        if (method != HttpMethod.POST) return HttpResponses.methodNotAllowed("POST only");
+        McpGatewayRouter gw = gatewayRouter;
+        if (gw == null) return HttpResponses.badRequest("Gateway not enabled");
+        Map<String, Object> body = parseBody(request);
+        String serverId = stringVal(body, "serverId", null);
+        if (serverId == null) return HttpResponses.badRequest("serverId is required");
+        boolean ok = gw.disconnect(serverId);
+        return HttpResponses.jsonOk("{\"serverId\":\"" + escape(serverId) + "\",\"disconnected\":" + ok + "}");
+    }
+
+    private FullHttpResponse handleGatewayRefresh(HttpMethod method, FullHttpRequest request) {
+        if (method != HttpMethod.POST) return HttpResponses.methodNotAllowed("POST only");
+        McpGatewayRouter gw = gatewayRouter;
+        if (gw == null) return HttpResponses.badRequest("Gateway not enabled");
+        Map<String, Object> body = parseBody(request);
+        String serverId = stringVal(body, "serverId", null);
+        if (serverId == null) return HttpResponses.badRequest("serverId is required");
+        boolean ok = gw.refresh(serverId);
+        var conn = gw.getConnection(serverId);
+        int tools = conn != null ? conn.tools().size() : 0;
+        int resources = conn != null ? conn.resources().size() : 0;
+        int prompts = conn != null ? conn.prompts().size() : 0;
+        return HttpResponses.jsonOk("{\"serverId\":\"" + escape(serverId) + "\",\"refreshed\":" + ok
+                + ",\"tools\":" + tools + ",\"resources\":" + resources + ",\"prompts\":" + prompts + "}");
+    }
+
+    private FullHttpResponse handleGatewayRoutingTable(HttpMethod method) {
+        if (method != HttpMethod.GET) return HttpResponses.methodNotAllowed("GET only");
+        McpGatewayRouter gw = gatewayRouter;
+        if (gw == null) {
+            return HttpResponses.jsonOk("{\"routes\":[]}");
+        }
+        var routes = gw.routingTable(server.toolRegistry(), server.resourceRegistry(), server.promptRegistry());
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("{\"routes\":[");
+        boolean first = true;
+        for (var route : routes) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(route.toJson());
+        }
+        sb.append("],\"count\":").append(routes.size()).append('}');
+        return HttpResponses.jsonOk(sb.toString());
     }
 
     // ═══════════════════════════════════════════════════════════════════════

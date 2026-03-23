@@ -25,4 +25,11 @@ public final class McpEndpointPaths {
     public static final String ADMIN_APP_ENDPOINTS = "/ai-platform/mcp/admin/app-endpoints";
     public static final String ADMIN_APP_SESSIONS  = "/ai-platform/mcp/admin/app-sessions";
     public static final String ADMIN_APP_TRAFFIC   = "/ai-platform/mcp/admin/app-traffic";
+
+    // ── Gateway control paths ──────────────────────────────────────────────
+    public static final String ADMIN_GATEWAY_STATUS     = "/ai-platform/mcp/admin/gateway/status";
+    public static final String ADMIN_GATEWAY_CONNECT    = "/ai-platform/mcp/admin/gateway/connect";
+    public static final String ADMIN_GATEWAY_DISCONNECT = "/ai-platform/mcp/admin/gateway/disconnect";
+    public static final String ADMIN_GATEWAY_REFRESH    = "/ai-platform/mcp/admin/gateway/refresh";
+    public static final String ADMIN_GATEWAY_ROUTING    = "/ai-platform/mcp/admin/gateway/routing-table";
 }

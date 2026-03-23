@@ -8,6 +8,7 @@ import io.velo.was.http.SseHandlerRegistry;
 import io.velo.was.mcp.admin.McpAdminHandler;
 import io.velo.was.mcp.admin.McpServerRegistry;
 import io.velo.was.mcp.gateway.McpAppGatewayService;
+import io.velo.was.mcp.gateway.McpGatewayRouter;
 import io.velo.was.mcp.audit.McpAuditLog;
 import io.velo.was.mcp.builtin.McpAdminCliTools;
 import io.velo.was.mcp.builtin.McpChatPrompt;
@@ -58,7 +59,8 @@ public final class McpApplication {
      * Result of {@link #install} — exposes key components for further wiring
      * (e.g. connecting the app MCP gateway).
      */
-    public record InstallResult(McpServer server, McpAdminHandler adminHandler, McpAuditLog auditLog) {}
+    public record InstallResult(McpServer server, McpAdminHandler adminHandler,
+                                McpAuditLog auditLog, McpGatewayRouter gatewayRouter) {}
 
     /**
      * Construct the MCP server, admin control plane, and register all handlers.
@@ -133,9 +135,17 @@ public final class McpApplication {
         McpPolicyEnforcer policyEnforcer = new McpPolicyEnforcer(policy);
         mcpServer.setPolicyEnforcer(policyEnforcer);
 
+        // ── Gateway router (remote MCP proxying) ────────────────────────────
+        McpGatewayRouter gatewayRouter = new McpGatewayRouter(auditLog);
+        mcpServer.setGatewayRouter(gatewayRouter);
+
         // ── Server registry (control plane) ──────────────────────────────────
         McpServerRegistry serverRegistry = new McpServerRegistry();
+        serverRegistry.setGatewayRouter(gatewayRouter);
         serverRegistry.registerLocal(serverName, McpEndpointPaths.MCP_PATH, serverVersion);
+
+        // Start periodic health checks for remote servers (every 60 seconds)
+        gatewayRouter.startHealthChecks(60);
 
         // ── MCP protocol handlers ────────────────────────────────────────────
         McpPostHandler postHandler = new McpPostHandler(mcpServer);
@@ -148,6 +158,7 @@ public final class McpApplication {
 
         // ── Admin control-plane handler ──────────────────────────────────────
         McpAdminHandler adminHandler = new McpAdminHandler(mcpServer, serverRegistry, auditLog, policyEnforcer);
+        adminHandler.setGatewayRouter(gatewayRouter);
         httpRegistry.register(McpEndpointPaths.ADMIN_SERVERS, adminHandler);
         httpRegistry.register(McpEndpointPaths.ADMIN_TOOLS, adminHandler);
         httpRegistry.register(McpEndpointPaths.ADMIN_RESOURCES, adminHandler);
@@ -161,6 +172,13 @@ public final class McpApplication {
         httpRegistry.register(McpEndpointPaths.ADMIN_APP_SESSIONS, adminHandler);
         httpRegistry.register(McpEndpointPaths.ADMIN_APP_TRAFFIC, adminHandler);
 
-        return new InstallResult(mcpServer, adminHandler, auditLog);
+        // ── Gateway control endpoints ──────────────────────────────────────
+        httpRegistry.register(McpEndpointPaths.ADMIN_GATEWAY_STATUS, adminHandler);
+        httpRegistry.register(McpEndpointPaths.ADMIN_GATEWAY_CONNECT, adminHandler);
+        httpRegistry.register(McpEndpointPaths.ADMIN_GATEWAY_DISCONNECT, adminHandler);
+        httpRegistry.register(McpEndpointPaths.ADMIN_GATEWAY_REFRESH, adminHandler);
+        httpRegistry.register(McpEndpointPaths.ADMIN_GATEWAY_ROUTING, adminHandler);
+
+        return new InstallResult(mcpServer, adminHandler, auditLog, gatewayRouter);
     }
 }

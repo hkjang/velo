@@ -631,7 +631,17 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("async function deletePolicy(id){if(!confirm('\\uc815\\ucc45 '+id+'\\ub97c \\uc0ad\\uc81c\\ud558\\uc2dc\\uaca0\\uc2b5\\ub2c8\\uae4c?'))return;showJson('keywordResult',await api('/api/intent/policies/'+encodeURIComponent(id),{method:'DELETE'}));refreshPolicies()}\n");
 
         // ── MCP management functions ──────────────────────────────────────
-        b.append("async function mcpApi(p,o){try{return await(await fetch(CP+'/mcp'+p,o)).text();}catch(e){return'{\"error\":\"'+e.message+'\"}';}}\n");
+        b.append("async function mcpApi(p,o){try{const r=await fetch(CP+'/mcp'+p,o);const t=await r.text();if(!r.ok){showToast('\\u274c HTTP '+r.status+': '+t.substring(0,200),'error');}else{try{const j=JSON.parse(t);if(j.error){showToast('\\u274c '+JSON.stringify(j.error).substring(0,200),'error');}}catch(e){}}return t;}catch(e){showToast('\\u274c '+e.message,'error');return'{\"error\":\"'+e.message+'\"}';}}\n");
+        b.append("function showToast(msg,type){\n");
+        b.append("  const d=document.createElement('div');\n");
+        b.append("  d.style.cssText='position:fixed;top:20px;right:20px;z-index:9999;padding:14px 20px;border-radius:10px;font-size:13px;font-weight:600;max-width:500px;word-break:break-all;box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:opacity 0.3s;';\n");
+        b.append("  d.style.background=type==='error'?'#fef2f2':'#f0fdf4';\n");
+        b.append("  d.style.color=type==='error'?'#991b1b':'#166534';\n");
+        b.append("  d.style.border='1px solid '+(type==='error'?'#fecaca':'#bbf7d0');\n");
+        b.append("  d.textContent=msg;\n");
+        b.append("  document.body.appendChild(d);\n");
+        b.append("  setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),300);},5000);\n");
+        b.append("}\n");
 
         // MCP Health
         b.append("async function refreshMcpHealth(){\n");
@@ -676,7 +686,9 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("  const bu=document.getElementById('mcpSrvBasicUser').value.trim();\n");
         b.append("  const bp=document.getElementById('mcpSrvBasicPass').value;\n");
         b.append("  if(bu){p.basicAuthUser=bu;p.basicAuthPassword=bp;}\n");
-        b.append("  showJson('mcpServerResult',await mcpApi('/admin/servers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}));\n");
+        b.append("  const res=await mcpApi('/admin/servers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});\n");
+        b.append("  showJson('mcpServerResult',res);\n");
+        b.append("  try{const j=JSON.parse(res);if(j.id)showToast('\\u2705 \\uc11c\\ubc84 \\ub4f1\\ub85d \\uc644\\ub8cc: '+j.name,'success');}catch(e){}\n");
         b.append("  refreshMcpServers();refreshGatewayStatus();\n");
         b.append("}\n");
 
@@ -783,8 +795,9 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("}\n");
 
         b.append("async function gatewayAction(action,serverId){\n");
-        b.append("  await mcpApi('/admin/gateway/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serverId:serverId})});\n");
-        b.append("  refreshGatewayStatus();refreshMcpServers();\n");
+        b.append("  const res=await mcpApi('/admin/gateway/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serverId:serverId})});\n");
+        b.append("  try{const j=JSON.parse(res);if(j.error){showToast('\\u274c '+action+' \\uc2e4\\ud328: '+JSON.stringify(j.error).substring(0,200),'error');}else{showToast('\\u2705 '+action+' \\uc131\\uacf5','success');}}catch(e){}\n");
+        b.append("  refreshGatewayStatus();refreshMcpServers();refreshRoutingTable();\n");
         b.append("}\n");
 
         b.append("async function refreshRoutingTable(){\n");

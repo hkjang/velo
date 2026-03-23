@@ -210,7 +210,7 @@ public class McpRemoteClient implements AutoCloseable {
                 .uri(URI.create(endpoint))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
-                .header("Accept", "application/json")
+                .header("Accept", "application/json, text/event-stream")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
         // Add custom headers (API keys, auth tokens, etc.)
         for (var entry : extraHeaders.entrySet()) {

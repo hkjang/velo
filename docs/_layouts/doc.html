@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="{{ page.lang | default: 'ko' }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page.title | default: 'Documentation' }} — Velo WAS</title>
+<meta name="description" content="{{ page.description | default: site.description }}">
+<meta property="og:title" content="{{ page.title | default: 'Velo WAS Documentation' }}">
+<meta property="og:description" content="{{ page.description | default: site.description }}">
+<meta property="og:type" content="article">
+<meta property="og:url" content="{{ page.url | absolute_url }}">
+<meta property="og:site_name" content="Velo WAS">
+<link rel="canonical" href="{{ page.url | absolute_url }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+<style>
+:root{--bg:#0f172a;--surface:#1e293b;--border:#334155;--text:#e2e8f0;--soft:#94a3b8;--accent:#06b6d4;--accent2:#8b5cf6;--radius:12px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;color:var(--text);background:var(--bg);line-height:1.8;display:flex;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* SIDEBAR */
+.sidebar{width:280px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;left:0;overflow-y:auto;padding:20px 0;z-index:50}
+.sidebar .logo{padding:0 20px 20px;font-size:18px;font-weight:800;color:#fff;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sidebar .logo span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sidebar .nav-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);padding:16px 20px 6px}
+.sidebar a.nav-link{display:block;padding:6px 20px;font-size:13px;color:var(--soft);transition:all .15s}
+.sidebar a.nav-link:hover{color:#fff;background:rgba(255,255,255,.05);text-decoration:none}
+.sidebar .home-link{display:block;padding:10px 20px;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:8px}
+
+/* MAIN */
+.main{flex:1;margin-left:280px;padding:40px 48px 80px;max-width:900px}
+.main .breadcrumb{font-size:12px;color:var(--soft);margin-bottom:24px}
+.main .breadcrumb a{color:var(--accent)}
+
+/* MARKDOWN CONTENT */
+.content h1{font-size:32px;font-weight:800;color:#fff;margin:32px 0 16px;line-height:1.3}
+.content h1:first-child{margin-top:0}
+.content h2{font-size:24px;font-weight:700;color:#fff;margin:28px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.content h3{font-size:18px;font-weight:700;color:#fff;margin:24px 0 8px}
+.content h4{font-size:15px;font-weight:700;color:#e2e8f0;margin:20px 0 8px}
+.content p{margin:12px 0;color:var(--text)}
+.content ul,.content ol{margin:12px 0 12px 24px}
+.content li{margin:4px 0}
+.content code{background:rgba(6,182,212,.1);color:var(--accent);padding:2px 6px;border-radius:4px;font-size:13px;font-family:'JetBrains Mono',Consolas,monospace}
+.content pre{background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto;margin:16px 0;font-size:13px;line-height:1.6}
+.content pre code{background:none;color:#e6edf3;padding:0}
+.content table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+.content th{background:var(--surface);padding:10px 14px;text-align:left;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--soft);border:1px solid var(--border)}
+.content td{padding:10px 14px;border:1px solid var(--border)}
+.content blockquote{border-left:3px solid var(--accent);padding:8px 16px;margin:16px 0;background:rgba(6,182,212,.05);border-radius:0 8px 8px 0}
+.content img{max-width:100%;border-radius:8px;margin:12px 0}
+.content hr{border:0;border-top:1px solid var(--border);margin:32px 0}
+.content strong{color:#fff}
+
+/* MOBILE */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .main{margin-left:0;padding:24px 16px 60px}
+}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo"><a href="{{ site.baseurl }}/" style="color:inherit;text-decoration:none"><span>Velo</span> WAS</a></div>
+  <a href="{{ site.baseurl }}/" class="home-link">← Home</a>
+
+  <div class="nav-label">한국어 문서</div>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/architecture">아키텍처 개요</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/architecture-detail">상세 아키텍처</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/lifecycle">라이프사이클 / IPL</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/build-scripts">빌드/기동/종료</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/war-deployment">WAR 배포</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/hot-deploy">핫 디플로이</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/docker-k8s-deploy">Docker / K8s</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/admin-cli">Admin CLI</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/webadmin">Web Admin</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/ai-platform-console">AI Platform Console</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/intent-routing">의도 기반 라우팅</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/mcp-guide">MCP 서버 가이드</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/MCP-GATEWAY">MCP 게이트웨이</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/http2-websocket">HTTP/2 + WebSocket</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/session-management">세션 관리</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/cluster-session-guide">클러스터 세션</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/jndi-datasource">JNDI / DataSource</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/async-context">AsyncContext</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/structured-logging">구조화 로깅</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/api-docs">API 문서 (Swagger)</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/listeners">리스너 가이드</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/multi-node">멀티 노드 구성</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/testing">테스트 가이드</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/usage-user">사용자 가이드</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/usage-admin">관리자 가이드</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/roadmap">로드맵</a>
+
+  <div class="nav-label">Modules</div>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-config">was-config</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-transport-netty">was-transport-netty</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-protocol-http">was-protocol-http</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-servlet-core">was-servlet-core</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-deploy">was-deploy</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-classloader">was-classloader</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-jndi">was-jndi</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-observability">was-observability</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-tcp-listener">was-tcp-listener</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-jsp">was-jsp</a>
+  <a class="nav-link" href="{{ site.baseurl }}/ko/modules/was-operational">was-operational</a>
+
+  <div class="nav-label">English Docs</div>
+  <a class="nav-link" href="{{ site.baseurl }}/en/architecture-detail">Architecture</a>
+  <a class="nav-link" href="{{ site.baseurl }}/en/admin-cli">Admin CLI</a>
+  <a class="nav-link" href="{{ site.baseurl }}/en/ai-platform-console">AI Platform</a>
+  <a class="nav-link" href="{{ site.baseurl }}/en/intent-routing">Intent Routing</a>
+  <a class="nav-link" href="{{ site.baseurl }}/en/mcp-guide">MCP Guide</a>
+  <a class="nav-link" href="{{ site.baseurl }}/en/docker-k8s-deploy">Docker / K8s</a>
+  <a class="nav-link" href="{{ site.baseurl }}/en/webadmin">Web Admin</a>
+  <a class="nav-link" href="{{ site.baseurl }}/en/hot-deploy">Hot Deploy</a>
+  <a class="nav-link" href="{{ site.baseurl }}/en/usage-user">User Guide</a>
+  <a class="nav-link" href="{{ site.baseurl }}/en/usage-admin">Admin Guide</a>
+</aside>
+
+<main class="main">
+  <div class="breadcrumb">
+    <a href="{{ site.baseurl }}/">Velo WAS</a> /
+    {% if page.lang == 'en' %}English{% else %}한국어{% endif %} /
+    {{ page.title | default: page.name }}
+  </div>
+  <div class="content">
+    {{ content }}
+  </div>
+</main>
+
+</body>
+</html>

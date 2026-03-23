@@ -1,0 +1,30 @@
+title: Velo WAS — AI-Native Application Server
+description: >-
+  Netty 기반 엔터프라이즈 WAS + 멀티 LLM AI 게이트웨이 + A2A/ACP/AGP/MCP 에이전트 프로토콜 허브.
+  Jakarta Servlet 6.1, HTTP/2, WebSocket, 멀티모달 AI, 에이전트 협업을 하나의 서버로 통합.
+url: "https://hkjang.github.io"
+baseurl: "/velo"
+locale: ko_KR
+lang: ko
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+  syntax_highlighter: rouge
+
+exclude:
+  - images/
+  - "*.png"
+
+defaults:
+  - scope:
+      path: "ko"
+    values:
+      layout: doc
+      lang: ko
+  - scope:
+      path: "en"
+    values:
+      layout: doc
+      lang: en

@@ -3,12 +3,124 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Velo WAS — AI-Native Application Server</title>
-<meta name="description" content="Netty 기반 엔터프라이즈 WAS + 멀티 LLM 게이트웨이 + A2A/ACP/AGP/MCP 에이전트 프로토콜 허브">
+<title>Velo WAS — AI-Native Application Server | 멀티 LLM 게이트웨이 + 에이전트 프로토콜 허브</title>
+
+<!-- SEO Meta -->
+<meta name="description" content="Velo WAS는 Netty 기반 엔터프라이즈 WAS에 멀티 LLM AI 게이트웨이(OpenAI, Anthropic, vLLM)와 A2A/ACP/AGP/MCP 에이전트 프로토콜 허브를 통합한 AI-Native 차세대 애플리케이션 서버입니다.">
+<meta name="keywords" content="Velo WAS, AI Application Server, Multi-LLM Gateway, A2A Protocol, ACP, AGP, MCP, Agent Protocol Hub, vLLM, OpenAI Compatible, Jakarta Servlet, Netty, Java 21, AI Gateway, Intent Routing, Agent Communication, 에이전트 프로토콜, AI 게이트웨이">
+<meta name="author" content="Velo Project">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+<link rel="canonical" href="https://hkjang.github.io/velo/">
+
+<!-- Open Graph -->
 <meta property="og:title" content="Velo WAS — AI-Native Application Server">
-<meta property="og:description" content="Netty 기반 엔터프라이즈 WAS에 멀티 LLM AI 플랫폼과 에이전트 프로토콜 허브를 통합한 차세대 애플리케이션 서버">
+<meta property="og:description" content="Netty 기반 WAS + 멀티 LLM AI 게이트웨이 + A2A/ACP/AGP/MCP 에이전트 프로토콜 허브. Jakarta Servlet 6.1, HTTP/2, 멀티모달 AI, 에이전트 협업을 하나의 서버로 통합.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://hkjang.github.io/velo">
+<meta property="og:url" content="https://hkjang.github.io/velo/">
+<meta property="og:site_name" content="Velo WAS">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:locale:alternate" content="en_US">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Velo WAS — AI-Native Application Server">
+<meta name="twitter:description" content="멀티 LLM 게이트웨이 + 5개 에이전트 프로토콜 통합. Java 21, Netty, Jakarta Servlet 6.1 기반 AI-Native WAS.">
+
+<!-- AEO: Structured Data (JSON-LD) -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Velo WAS",
+  "alternateName": "Velo AI-Native Application Server",
+  "description": "Netty 기반 엔터프라이즈 WAS에 멀티 LLM AI 게이트웨이와 A2A/ACP/AGP/MCP 에이전트 프로토콜 허브를 통합한 AI-Native 차세대 애플리케이션 서버",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Cross-platform (Java 21)",
+  "softwareVersion": "0.6.0",
+  "url": "https://hkjang.github.io/velo/",
+  "downloadUrl": "https://github.com/hkjang/velo/releases/tag/v0.6.0",
+  "codeRepository": "https://github.com/hkjang/velo",
+  "programmingLanguage": "Java",
+  "runtimePlatform": "Java 21",
+  "license": "https://opensource.org/licenses/MIT",
+  "featureList": [
+    "Multi-LLM Gateway (OpenAI, Anthropic, vLLM, SGLang, Ollama)",
+    "A2A Agent-to-Agent Protocol (Google JSON-RPC 2.0)",
+    "ACP Agent Communication Protocol",
+    "AGP Agent Gateway Protocol Hub",
+    "MCP Model Context Protocol Server",
+    "OpenAI Compatible Proxy (/v1/chat/completions)",
+    "Multimodal AI (Vision, Image Gen, STT, TTS, Embedding)",
+    "Intent-Based Routing",
+    "Jakarta Servlet 6.1",
+    "Netty HTTP/2 + TLS + WebSocket",
+    "Multi-Tenant Management",
+    "Gateway Audit Logging"
+  ],
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
+
+<!-- AEO: FAQ Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Velo WAS란 무엇인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Velo WAS는 Netty 기반 Java 21 엔터프라이즈 애플리케이션 서버입니다. Jakarta Servlet 6.1 호환 WAS에 멀티 LLM AI 게이트웨이(OpenAI, Anthropic, vLLM 등)와 A2A/ACP/AGP/MCP 에이전트 프로토콜 허브를 통합하여, AI 에이전트 기반 애플리케이션을 단일 서버에서 구동할 수 있습니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "어떤 AI 프로바이더를 지원하나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "OpenAI (GPT-4o), Anthropic (Claude), vLLM, SGLang, Ollama를 지원하며, OpenAI 호환 API(/v1/chat/completions)를 통해 어떤 OpenAI SDK 클라이언트로도 접속할 수 있습니다. 멀티모달(Vision, 이미지 생성, STT, TTS, Embedding)도 지원합니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "A2A, ACP, AGP, MCP 프로토콜은 무엇인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A2A(Agent-to-Agent)는 Google의 에이전트 간 JSON-RPC 2.0 협업 프로토콜, ACP(Agent Communication Protocol)는 태스크 기반 비동기 에이전트 통신, AGP(Agent Gateway Protocol)는 에이전트 등록/발견/라우팅 중앙 허브, MCP(Model Context Protocol)는 에이전트가 도구/리소스에 접근하는 프로토콜입니다. Velo WAS는 이 4개 프로토콜을 모두 통합 지원합니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How to use Velo WAS as an OpenAI-compatible gateway?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Run the fat JAR with 'java -jar was-bootstrap-0.6.0-jar-with-dependencies.jar', then point any OpenAI SDK client to http://localhost:8080/ai-platform/v1 with your API key. The /v1/chat/completions endpoint is fully compatible with OpenAI's API format, including streaming support."
+      }
+    }
+  ]
+}
+</script>
+
+<!-- AEO: BreadcrumbList -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type":"ListItem","position":1,"name":"Home","item":"https://hkjang.github.io/velo/"},
+    {"@type":"ListItem","position":2,"name":"Documentation","item":"https://hkjang.github.io/velo/ko/architecture"},
+    {"@type":"ListItem","position":3,"name":"AI Platform","item":"https://hkjang.github.io/velo/ko/ai-platform-console"},
+    {"@type":"ListItem","position":4,"name":"GitHub","item":"https://github.com/hkjang/velo"}
+  ]
+}
+</script>
+
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
 <style>
 :root{--bg:#0f172a;--surface:#1e293b;--card:#1e293b;--border:#334155;--text:#e2e8f0;--soft:#94a3b8;--accent:#06b6d4;--accent2:#8b5cf6;--accent3:#f59e0b;--green:#22c55e;--radius:16px}
@@ -17,138 +129,114 @@ html{scroll-behavior:smooth}
 body{font-family:'Inter','Pretendard','Noto Sans KR',system-ui,sans-serif;color:var(--text);background:var(--bg);line-height:1.7}
 a{color:var(--accent);text-decoration:none;transition:color .2s}
 a:hover{color:#22d3ee}
-
-/* NAV */
 nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(15,23,42,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px}
 nav .inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px}
 nav .logo{font-size:20px;font-weight:800;color:#fff;display:flex;align-items:center;gap:10px}
 nav .logo span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-nav .links{display:flex;gap:24px;font-size:14px;font-weight:500}
+nav .links{display:flex;gap:20px;font-size:14px;font-weight:500}
 nav .links a{color:var(--soft)}
 nav .links a:hover{color:#fff}
 .btn-gh{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:13px;font-weight:600;transition:all .2s}
 .btn-gh:hover{background:var(--accent);border-color:var(--accent);color:#000}
-
-/* HERO */
 .hero{padding:140px 24px 80px;text-align:center;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(6,182,212,.12) 0%,transparent 70%);pointer-events:none}
 .hero .badge{display:inline-block;padding:6px 16px;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.3);border-radius:20px;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:24px}
 .hero h1{font-size:clamp(36px,6vw,64px);font-weight:800;line-height:1.1;margin-bottom:20px;background:linear-gradient(135deg,#fff 30%,var(--accent) 70%,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.hero p{font-size:18px;color:var(--soft);max-width:700px;margin:0 auto 32px;line-height:1.8}
+.hero p{font-size:18px;color:var(--soft);max-width:720px;margin:0 auto 32px;line-height:1.8}
 .hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
 .btn-primary{padding:14px 32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;color:#fff;font-size:15px;font-weight:700;transition:transform .2s,box-shadow .2s;border:0;cursor:pointer}
 .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(6,182,212,.3)}
 .btn-outline{padding:14px 32px;background:transparent;border:2px solid var(--border);border-radius:12px;color:#fff;font-size:15px;font-weight:700;transition:all .2s}
 .btn-outline:hover{border-color:var(--accent);color:var(--accent)}
-
-/* STATS */
 .stats{display:flex;justify-content:center;gap:48px;padding:40px 24px;flex-wrap:wrap}
 .stat{text-align:center}
 .stat-val{font-size:36px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .stat-label{font-size:13px;color:var(--soft);margin-top:4px}
-
-/* SECTIONS */
 section{padding:80px 24px}
 .container{max-width:1200px;margin:0 auto}
 .section-label{font-size:12px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
 .section-title{font-size:clamp(28px,4vw,40px);font-weight:800;margin-bottom:16px;color:#fff}
-.section-desc{font-size:16px;color:var(--soft);max-width:600px;margin-bottom:48px;line-height:1.8}
-
-/* CARDS GRID */
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.section-desc{font-size:16px;color:var(--soft);max-width:640px;margin-bottom:48px;line-height:1.8}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;transition:transform .2s,border-color .2s}
 .card:hover{transform:translateY(-4px);border-color:var(--accent)}
 .card-icon{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;font-size:24px;margin-bottom:16px}
-.card-icon.cyan{background:rgba(6,182,212,.15)}
-.card-icon.purple{background:rgba(139,92,246,.15)}
-.card-icon.amber{background:rgba(245,158,11,.15)}
-.card-icon.green{background:rgba(34,197,94,.15)}
-.card h3{font-size:18px;font-weight:700;margin-bottom:8px;color:#fff}
-.card p{font-size:14px;color:var(--soft);line-height:1.7}
-
-/* PROTOCOL TABLE */
-.proto-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.card-icon.c1{background:rgba(6,182,212,.15)}.card-icon.c2{background:rgba(139,92,246,.15)}.card-icon.c3{background:rgba(245,158,11,.15)}.card-icon.c4{background:rgba(34,197,94,.15)}
+.card h3{font-size:17px;font-weight:700;margin-bottom:8px;color:#fff}
+.card p{font-size:13px;color:var(--soft);line-height:1.7}
+.proto-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
 .proto-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;text-align:center;transition:transform .2s,border-color .2s}
 .proto-card:hover{transform:translateY(-3px);border-color:var(--accent2)}
-.proto-icon{font-size:36px;margin-bottom:12px}
+.proto-icon{font-size:32px;margin-bottom:12px}
 .proto-name{font-size:16px;font-weight:700;color:#fff;margin-bottom:4px}
-.proto-desc{font-size:13px;color:var(--soft)}
-.proto-ep{font-size:12px;color:var(--accent);font-family:monospace;margin-top:8px;padding:4px 10px;background:rgba(6,182,212,.1);border-radius:6px;display:inline-block}
+.proto-desc{font-size:12px;color:var(--soft);line-height:1.6}
+.proto-ep{font-size:11px;color:var(--accent);font-family:monospace;margin-top:8px;padding:4px 10px;background:rgba(6,182,212,.1);border-radius:6px;display:inline-block}
+.arch-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;overflow-x:auto}
+.arch-box pre{font-family:'JetBrains Mono','Cascadia Code',Consolas,monospace;font-size:12px;line-height:1.7;color:var(--accent)}
+.code-block{background:#0d1117;border:1px solid var(--border);border-radius:12px;padding:20px;overflow-x:auto;margin-bottom:16px}
+.code-block pre{font-family:'JetBrains Mono','Cascadia Code',Consolas,monospace;font-size:12px;line-height:1.6;color:#e6edf3}
+.cm{color:#8b949e}.kw{color:#ff7b72}.st{color:#a5d6ff}
 
-/* ARCH */
-.arch-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;overflow-x:auto}
-.arch-box pre{font-family:'JetBrains Mono','Cascadia Code',Consolas,monospace;font-size:13px;line-height:1.7;color:var(--accent)}
-
-/* CODE BLOCK */
-.code-block{background:#0d1117;border:1px solid var(--border);border-radius:12px;padding:24px;overflow-x:auto;margin-bottom:20px}
-.code-block pre{font-family:'JetBrains Mono','Cascadia Code',Consolas,monospace;font-size:13px;line-height:1.7;color:#e6edf3}
-.code-block .comment{color:#8b949e}
-.code-block .keyword{color:#ff7b72}
-.code-block .string{color:#a5d6ff}
+/* DOC LINKS */
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.doc-section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.doc-section h4{font-size:14px;font-weight:700;color:var(--accent);margin-bottom:12px;text-transform:uppercase;letter-spacing:.08em}
+.doc-section a{display:block;padding:5px 0;font-size:13px;color:var(--soft);transition:color .15s}
+.doc-section a:hover{color:#fff;text-decoration:none}
+.doc-section a::before{content:'→ ';color:var(--border)}
 
 /* MODULES */
-.modules{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-.module{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;font-size:13px;transition:border-color .2s}
+.modules{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.module{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;transition:border-color .2s}
 .module:hover{border-color:var(--accent)}
-.module strong{color:#fff;display:block;margin-bottom:2px;font-size:14px}
-.module span{color:var(--soft);font-size:12px}
+.module strong{color:#fff;display:block;font-size:13px}
+.module span{color:var(--soft);font-size:11px}
 
-/* FOOTER */
-footer{padding:48px 24px;border-top:1px solid var(--border);text-align:center;color:var(--soft);font-size:13px}
-footer a{color:var(--accent)}
-
-/* CTA */
-.cta{text-align:center;padding:80px 24px;background:linear-gradient(135deg,rgba(6,182,212,.08),rgba(139,92,246,.08))}
+/* CTA / FOOTER */
+.cta{text-align:center;padding:80px 24px;background:linear-gradient(135deg,rgba(6,182,212,.06),rgba(139,92,246,.06))}
 .cta h2{font-size:32px;font-weight:800;color:#fff;margin-bottom:12px}
 .cta p{color:var(--soft);margin-bottom:32px;font-size:16px}
-
-/* RESPONSIVE */
-@media(max-width:768px){
-  nav .links{display:none}
-  .stats{gap:24px}
-  .hero h1{font-size:32px}
-  .cards{grid-template-columns:1fr}
-}
+footer{padding:48px 24px;border-top:1px solid var(--border);text-align:center;color:var(--soft);font-size:13px}
+footer a{color:var(--accent)}
+@media(max-width:768px){nav .links{display:none}.stats{gap:24px}.hero h1{font-size:32px}.cards,.doc-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-<div class="inner">
+<nav><div class="inner">
   <div class="logo"><span>Velo</span> WAS</div>
   <div class="links">
     <a href="#features">Features</a>
     <a href="#protocols">Protocols</a>
     <a href="#architecture">Architecture</a>
-    <a href="#modules">Modules</a>
     <a href="#quickstart">Quick Start</a>
+    <a href="#docs">Documentation</a>
+    <a href="#modules">Modules</a>
   </div>
-  <a href="https://github.com/hkjang/velo" class="btn-gh" target="_blank">
+  <a href="https://github.com/hkjang/velo" class="btn-gh" target="_blank" rel="noopener">
     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-    GitHub
-  </a>
-</div>
-</nav>
+    GitHub</a>
+</div></nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="badge">v0.6.0 Released</div>
+  <div class="badge">v0.6.0 — A2A + ACP + AGP + MCP + OpenAI</div>
   <h1>AI-Native<br>Application Server</h1>
-  <p>Netty 기반 엔터프라이즈 WAS에 멀티 LLM AI 게이트웨이와<br>A2A / ACP / AGP / MCP 에이전트 프로토콜 허브를 통합한<br>차세대 애플리케이션 서버</p>
+  <p>Netty 기반 엔터프라이즈 WAS에 <strong>멀티 LLM AI 게이트웨이</strong>와<br><strong>A2A / ACP / AGP / MCP</strong> 에이전트 프로토콜 허브를 통합한<br>차세대 애플리케이션 서버</p>
   <div class="hero-btns">
-    <a href="https://github.com/hkjang/velo/releases/tag/v0.6.0" class="btn-primary" target="_blank">Download v0.6.0</a>
-    <a href="https://github.com/hkjang/velo" class="btn-outline" target="_blank">View on GitHub</a>
+    <a href="https://github.com/hkjang/velo/releases/tag/v0.6.0" class="btn-primary" target="_blank" rel="noopener">Download v0.6.0</a>
+    <a href="#docs" class="btn-outline">Documentation</a>
+    <a href="https://github.com/hkjang/velo" class="btn-outline" target="_blank" rel="noopener">GitHub</a>
   </div>
 </section>
 
-<!-- STATS -->
 <div class="stats">
   <div class="stat"><div class="stat-val">15</div><div class="stat-label">Modules</div></div>
   <div class="stat"><div class="stat-val">5</div><div class="stat-label">Agent Protocols</div></div>
   <div class="stat"><div class="stat-val">6</div><div class="stat-label">LLM Providers</div></div>
   <div class="stat"><div class="stat-val">6</div><div class="stat-label">Modalities</div></div>
-  <div class="stat"><div class="stat-val">Java 21</div><div class="stat-label">Runtime</div></div>
+  <div class="stat"><div class="stat-val">73</div><div class="stat-label">Admin Commands</div></div>
+  <div class="stat"><div class="stat-val">70+</div><div class="stat-label">Doc Pages</div></div>
 </div>
 
 <!-- FEATURES -->
@@ -156,49 +244,20 @@ footer a{color:var(--accent)}
 <div class="container">
   <div class="section-label">Core Features</div>
   <div class="section-title">WAS + AI Platform + Agent Hub</div>
-  <div class="section-desc">엔터프라이즈 WAS 기반 위에 AI 추론 게이트웨이와 에이전트 통신 허브를 하나로 통합</div>
-
+  <div class="section-desc">엔터프라이즈 WAS 기반 위에 AI 추론 게이트웨이와 에이전트 통신 허브를 하나로 통합한 올인원 AI 서버</div>
   <div class="cards">
-    <div class="card">
-      <div class="card-icon cyan">🌐</div>
-      <h3>Enterprise WAS</h3>
-      <p>Jakarta Servlet 6.1 호환, Netty 기반 HTTP/2 + TLS + WebSocket. WAR 배포, 핫디플로이, JNDI/DataSource, 세션 관리, 73개 관리 CLI 명령어</p>
-    </div>
-    <div class="card">
-      <div class="card-icon purple">🤖</div>
-      <h3>Multi-LLM AI Gateway</h3>
-      <p>OpenAI, Anthropic, vLLM, SGLang, Ollama 통합. 지능형 라우팅, A/B 테스트, 앙상블 서빙, 자동 장애 조치, OpenAI 호환 프록시</p>
-    </div>
-    <div class="card">
-      <div class="card-icon amber">🎯</div>
-      <h3>Intent-Based Routing</h3>
-      <p>프롬프트 키워드 분석으로 의도 감지 후 최적 모델 자동 선택. CHAT, VISION, IMAGE_GEN, STT, TTS, EMBEDDING 라우팅</p>
-    </div>
-    <div class="card">
-      <div class="card-icon green">🔗</div>
-      <h3>Agent Protocol Hub</h3>
-      <p>A2A (Google), ACP, AGP, MCP, OpenAI 5개 에이전트 프로토콜을 하나의 게이트웨이에서 통합 지원</p>
-    </div>
-    <div class="card">
-      <div class="card-icon cyan">🎨</div>
-      <h3>Multimodal Support</h3>
-      <p>텍스트, 이미지(Vision), 이미지 생성(DALL-E), 음성 인식(Whisper), 음성 합성(TTS), 벡터 임베딩 6개 모달리티</p>
-    </div>
-    <div class="card">
-      <div class="card-icon purple">📊</div>
-      <h3>Gateway Audit</h3>
-      <p>프롬프트, 모델, 토큰, 모달리티 전 요청 감사 기록. 인메모리 버퍼 + 일별 로테이션 JSON Lines 파일 로거</p>
-    </div>
-    <div class="card">
-      <div class="card-icon amber">🏢</div>
-      <h3>Multi-Tenant</h3>
-      <p>테넌트 격리, API 키 인증, 분당 요청 제한, 토큰 할당량, 사용량 추적, 구독 플랜 관리</p>
-    </div>
-    <div class="card">
-      <div class="card-icon green">📋</div>
-      <h3>Admin Dashboard</h3>
-      <p>실시간 메트릭, 모델 레지스트리, 테넌트 관리, 게이트웨이 샌드박스, 감사 로그, 에이전트 관리 통합 대시보드</p>
-    </div>
+    <div class="card"><div class="card-icon c1">🌐</div><h3>Enterprise WAS</h3><p>Jakarta Servlet 6.1 호환, Netty HTTP/2 + TLS ALPN + WebSocket. WAR 배포, 핫디플로이, JNDI/DataSource, 세션 클러스터, 73개 관리 CLI</p></div>
+    <div class="card"><div class="card-icon c2">🤖</div><h3>Multi-LLM AI Gateway</h3><p>OpenAI, Anthropic, vLLM, SGLang, Ollama 6개 프로바이더 통합. 지능형 라우팅, A/B 테스트, 앙상블 서빙, 자동 장애 조치, 컨텍스트 캐시</p></div>
+    <div class="card"><div class="card-icon c3">🎯</div><h3>Intent-Based Routing</h3><p>프롬프트 키워드 분석으로 의도 감지 후 최적 모델 자동 선택. CHAT, VISION, IMAGE_GEN, STT, TTS, EMBEDDING 6개 모달리티 라우팅</p></div>
+    <div class="card"><div class="card-icon c4">🔗</div><h3>Agent Protocol Hub</h3><p>A2A(Google JSON-RPC 2.0), ACP(태스크 기반), AGP(게이트웨이 허브), MCP(도구/리소스), OpenAI 호환 — 5개 프로토콜 통합</p></div>
+    <div class="card"><div class="card-icon c1">🎨</div><h3>Multimodal AI</h3><p>텍스트, Vision(이미지 분석), Image Gen(DALL-E), STT(Whisper), TTS(음성 합성), Embedding(벡터) 6개 모달리티</p></div>
+    <div class="card"><div class="card-icon c2">📊</div><h3>Gateway Audit</h3><p>프롬프트, 모델, 토큰, 모달리티 전 요청 감사. 인메모리 10K + 일별 JSON Lines 파일 + SLF4J 감사 로거 + 대시보드 UI</p></div>
+    <div class="card"><div class="card-icon c3">🏢</div><h3>Multi-Tenant</h3><p>테넌트 격리, API 키 인증, 분당 요청 제한, 월별 토큰 할당량, 사용량 추적, 과금 미터링, 구독 플랜</p></div>
+    <div class="card"><div class="card-icon c4">📋</div><h3>Admin Dashboard</h3><p>실시간 메트릭, 모델 레지스트리, 테넌트 관리, 게이트웨이 샌드박스, 감사 로그, ACP/AGP/A2A 에이전트 관리 탭</p></div>
+    <div class="card"><div class="card-icon c1">🔒</div><h3>Enterprise Security</h3><p>TLS ALPN 자동 구성, 세션 기반 인증, CSRF 보호, API 키/Bearer 토큰, 보안 헤더, 컨텐츠 필터 플러그인</p></div>
+    <div class="card"><div class="card-icon c2">🚀</div><h3>High Performance</h3><p>Netty Native Transport (epoll/kqueue), HTTP/2 멀티플렉싱, SSE 스트리밍, Gzip 압축, 비동기 서블릿(AsyncContext)</p></div>
+    <div class="card"><div class="card-icon c3">📦</div><h3>Zero-Downtime Deploy</h3><p>WAR 핫디플로이, 웹앱 클래스로더 격리, Exploded WAR 지원, 런타임 모델 등록/승격/퇴역</p></div>
+    <div class="card"><div class="card-icon c4">🐳</div><h3>Cloud Native</h3><p>단일 Fat JAR(9.6MB) 실행, Docker/Kubernetes 배포, 프로파일 기반 설정, 구조화 JSON 로깅</p></div>
   </div>
 </div>
 </section>
@@ -208,39 +267,13 @@ footer a{color:var(--accent)}
 <div class="container">
   <div class="section-label">Agent Protocols</div>
   <div class="section-title">5 Protocols, 1 Gateway</div>
-  <div class="section-desc">에이전트 생태계의 모든 주요 프로토콜을 하나의 서버에서 통합 지원</div>
-
+  <div class="section-desc">에이전트 생태계의 모든 주요 프로토콜을 하나의 서버에서 통합 — AI 에이전트 시대의 게이트웨이</div>
   <div class="proto-grid">
-    <div class="proto-card">
-      <div class="proto-icon">🔄</div>
-      <div class="proto-name">A2A</div>
-      <div class="proto-desc">Google Agent-to-Agent<br>JSON-RPC 2.0 에이전트 협업</div>
-      <div class="proto-ep">/a2a</div>
-    </div>
-    <div class="proto-card">
-      <div class="proto-icon">🤝</div>
-      <div class="proto-name">ACP</div>
-      <div class="proto-desc">Agent Communication Protocol<br>태스크 기반 비동기 통신</div>
-      <div class="proto-ep">/acp/*</div>
-    </div>
-    <div class="proto-card">
-      <div class="proto-icon">🔀</div>
-      <div class="proto-name">AGP</div>
-      <div class="proto-desc">Agent Gateway Protocol<br>에이전트 허브 / 라우팅</div>
-      <div class="proto-ep">/agp/admin/*</div>
-    </div>
-    <div class="proto-card">
-      <div class="proto-icon">🛠️</div>
-      <div class="proto-name">MCP</div>
-      <div class="proto-desc">Model Context Protocol<br>도구 / 리소스 / 프롬프트</div>
-      <div class="proto-ep">/mcp</div>
-    </div>
-    <div class="proto-card">
-      <div class="proto-icon">💬</div>
-      <div class="proto-name">OpenAI</div>
-      <div class="proto-desc">OpenAI Compatible Proxy<br>드롭인 SDK 호환</div>
-      <div class="proto-ep">/v1/chat/completions</div>
-    </div>
+    <div class="proto-card"><div class="proto-icon">🔄</div><div class="proto-name">A2A</div><div class="proto-desc">Google Agent-to-Agent<br>JSON-RPC 2.0 에이전트 협업<br>tasks/send, message/send</div><div class="proto-ep">/a2a</div></div>
+    <div class="proto-card"><div class="proto-icon">🤝</div><div class="proto-name">ACP</div><div class="proto-desc">Agent Communication Protocol<br>태스크 상태 머신, 멀티모달<br>비동기 에이전트 통신</div><div class="proto-ep">/acp/*</div></div>
+    <div class="proto-card"><div class="proto-icon">🔀</div><div class="proto-name">AGP</div><div class="proto-desc">Agent Gateway Protocol<br>에이전트 등록/발견/라우팅<br>중앙 허브 오케스트레이터</div><div class="proto-ep">/agp/admin/*</div></div>
+    <div class="proto-card"><div class="proto-icon">🛠️</div><div class="proto-name">MCP</div><div class="proto-desc">Model Context Protocol<br>도구/리소스/프롬프트<br>JSON-RPC 2.0 + SSE</div><div class="proto-ep">/mcp</div></div>
+    <div class="proto-card"><div class="proto-icon">💬</div><div class="proto-name">OpenAI</div><div class="proto-desc">OpenAI Compatible Proxy<br>드롭인 SDK 호환<br>스트리밍 + 의도 라우팅</div><div class="proto-ep">/v1/chat/completions</div></div>
   </div>
 </div>
 </section>
@@ -250,8 +283,7 @@ footer a{color:var(--accent)}
 <div class="container">
   <div class="section-label">Architecture</div>
   <div class="section-title">Unified AI Server Architecture</div>
-  <div class="section-desc">WAS 기반 위에 AI 게이트웨이, 에이전트 허브, MCP 서버를 하나로 통합</div>
-
+  <div class="section-desc">WAS + AI Gateway + Agent Hub + MCP Server를 단일 프로세스로 통합</div>
   <div class="arch-box"><pre>
 ┌──────────────────────────────────────────────────────────┐
 │                    Velo WAS (Netty)                       │
@@ -273,7 +305,6 @@ footer a{color:var(--accent)}
 │  ┌──────────────────────────────────────────────────┐    │
 │  │          Agent Protocol Hub                       │    │
 │  │  A2A (/a2a)  │  ACP (/acp)  │  AGP (/agp)       │    │
-│  │  ─────────────────────────────────────────        │    │
 │  │  MCP (/mcp)  │  Agent Card (/.well-known/)        │    │
 │  └──────────────────────────────────────────────────┘    │
 │                                                          │
@@ -294,52 +325,128 @@ footer a{color:var(--accent)}
 <section id="quickstart" style="background:rgba(139,92,246,.03)">
 <div class="container">
   <div class="section-label">Quick Start</div>
-  <div class="section-title">5분 만에 시작하기</div>
-  <div class="section-desc">단일 JAR 실행으로 WAS + AI 플랫폼 + 에이전트 허브를 즉시 가동</div>
-
-  <div class="code-block"><pre><span class="comment"># 1. Download & Run</span>
+  <div class="section-title">5 Minutes to AI Server</div>
+  <div class="section-desc">단일 JAR(9.6MB) 실행으로 WAS + AI 게이트웨이 + 에이전트 허브 즉시 가동</div>
+  <div class="code-block"><pre><span class="cm"># 1. Download & Run</span>
 java -jar was-bootstrap-0.6.0-jar-with-dependencies.jar
 
-<span class="comment"># 2. OpenAI-Compatible API</span>
+<span class="cm"># 2. OpenAI-Compatible Chat API</span>
 curl -X POST http://localhost:8080/ai-platform/v1/chat/completions \
-  -H <span class="string">"Authorization: Bearer velo-demo-key"</span> \
-  -H <span class="string">"Content-Type: application/json"</span> \
-  -d <span class="string">'{"messages":[{"role":"user","content":"Hello"}]}'</span>
+  -H <span class="st">"Authorization: Bearer velo-demo-key"</span> \
+  -H <span class="st">"Content-Type: application/json"</span> \
+  -d <span class="st">'{"messages":[{"role":"user","content":"Hello"}]}'</span>
 
-<span class="comment"># 3. A2A Agent-to-Agent (JSON-RPC 2.0)</span>
+<span class="cm"># 3. A2A Agent-to-Agent (Google JSON-RPC 2.0)</span>
 curl -X POST http://localhost:8080/ai-platform/a2a \
-  -d <span class="string">'{"jsonrpc":"2.0","method":"tasks/send","params":{"message":{"role":"user","parts":[{"type":"text","text":"번역해주세요"}]},"capability":"translation"},"id":1}'</span>
+  -d <span class="st">'{"jsonrpc":"2.0","method":"tasks/send","params":{"message":{"role":"user","parts":[{"type":"text","text":"Translate this"}]},"capability":"translation"},"id":1}'</span>
 
-<span class="comment"># 4. Agent Card Discovery</span>
+<span class="cm"># 4. Agent Card Discovery (A2A Standard)</span>
 curl http://localhost:8080/ai-platform/.well-known/agent.json
 
-<span class="comment"># 5. Dashboard</span>
-<span class="keyword">open</span> http://localhost:8080/ai-platform</pre></div>
+<span class="cm"># 5. MCP Tool Call (JSON-RPC 2.0)</span>
+curl -X POST http://localhost:8080/ai-platform/mcp \
+  -d <span class="st">'{"jsonrpc":"2.0","method":"tools/list","id":1}'</span>
 
-  <div class="code-block"><pre><span class="comment"># Python (OpenAI SDK)</span>
-<span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI
+<span class="cm"># 6. Dashboard</span>
+<span class="kw">open</span> http://localhost:8080/ai-platform</pre></div>
+
+  <div class="code-block"><pre><span class="cm"># Python — OpenAI SDK (drop-in replacement)</span>
+<span class="kw">from</span> openai <span class="kw">import</span> OpenAI
 
 client = OpenAI(
-    base_url=<span class="string">"http://localhost:8080/ai-platform/v1"</span>,
-    api_key=<span class="string">"velo-demo-key"</span>
+    base_url=<span class="st">"http://localhost:8080/ai-platform/v1"</span>,
+    api_key=<span class="st">"velo-demo-key"</span>
 )
-
 response = client.chat.completions.create(
-    model=<span class="string">"llm-general"</span>,
-    messages=[{<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"Hello"</span>}]
-)</pre></div>
+    model=<span class="st">"llm-general"</span>,
+    messages=[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Hello"</span>}]
+)
+print(response.choices[0].message.content)</pre></div>
+</div>
+</section>
+
+<!-- DOCUMENTATION -->
+<section id="docs">
+<div class="container">
+  <div class="section-label">Documentation</div>
+  <div class="section-title">70+ Pages of Docs</div>
+  <div class="section-desc">한국어 43페이지 + 영어 27페이지의 상세 문서. 아키텍처, 배포, 운영, AI, 모듈 가이드</div>
+
+  <div class="doc-grid">
+    <div class="doc-section">
+      <h4>Architecture</h4>
+      <a href="ko/architecture">아키텍처 개요</a>
+      <a href="ko/architecture-detail">상세 아키텍처 (요청 경로)</a>
+      <a href="ko/lifecycle">라이프사이클 / IPL 가이드</a>
+      <a href="ko/listeners">리스너 가이드 (HTTP/TCP)</a>
+      <a href="ko/http2-websocket">HTTP/2 + WebSocket</a>
+      <a href="en/architecture-detail">Architecture (EN)</a>
+    </div>
+    <div class="doc-section">
+      <h4>AI Platform</h4>
+      <a href="ko/ai-platform-console">AI Platform Console</a>
+      <a href="ko/intent-routing">의도 기반 라우팅</a>
+      <a href="ko/mcp-guide">MCP 서버 가이드</a>
+      <a href="ko/MCP-GATEWAY">MCP 게이트웨이 아키텍처</a>
+      <a href="en/ai-platform-console">AI Platform (EN)</a>
+      <a href="en/intent-routing">Intent Routing (EN)</a>
+      <a href="en/mcp-guide">MCP Guide (EN)</a>
+    </div>
+    <div class="doc-section">
+      <h4>Deployment</h4>
+      <a href="ko/war-deployment">WAR 배포 가이드</a>
+      <a href="ko/hot-deploy">핫 디플로이 (무중단 배포)</a>
+      <a href="ko/docker-k8s-deploy">Docker / Kubernetes</a>
+      <a href="ko/build-scripts">빌드/기동/종료 스크립트</a>
+      <a href="ko/multi-node">멀티 노드 구성</a>
+      <a href="en/docker-k8s-deploy">Docker / K8s (EN)</a>
+      <a href="en/hot-deploy">Hot Deploy (EN)</a>
+    </div>
+    <div class="doc-section">
+      <h4>Administration</h4>
+      <a href="ko/admin-cli">Admin CLI (73 명령어)</a>
+      <a href="ko/webadmin">Web Admin 가이드</a>
+      <a href="ko/webadmin-operations">Web Admin 운영 가이드</a>
+      <a href="ko/usage-admin">시스템 관리자 가이드</a>
+      <a href="ko/usage-user">사용자 가이드</a>
+      <a href="en/admin-cli">Admin CLI (EN)</a>
+      <a href="en/webadmin">Web Admin (EN)</a>
+    </div>
+    <div class="doc-section">
+      <h4>Configuration</h4>
+      <a href="ko/session-management">세션 관리</a>
+      <a href="ko/cluster-session-guide">클러스터 세션</a>
+      <a href="ko/jndi-datasource">JNDI / DataSource</a>
+      <a href="ko/structured-logging">구조화 로깅 (JSON)</a>
+      <a href="ko/async-context">AsyncContext (비동기)</a>
+      <a href="ko/api-docs">API 문서 (Swagger)</a>
+    </div>
+    <div class="doc-section">
+      <h4>Modules (15)</h4>
+      <a href="ko/modules/was-config">was-config</a>
+      <a href="ko/modules/was-transport-netty">was-transport-netty</a>
+      <a href="ko/modules/was-protocol-http">was-protocol-http</a>
+      <a href="ko/modules/was-servlet-core">was-servlet-core</a>
+      <a href="ko/modules/was-deploy">was-deploy</a>
+      <a href="ko/modules/was-classloader">was-classloader</a>
+      <a href="ko/modules/was-jndi">was-jndi</a>
+      <a href="ko/modules/was-observability">was-observability</a>
+      <a href="ko/modules/was-tcp-listener">was-tcp-listener</a>
+      <a href="ko/modules/was-operational">was-operational</a>
+      <a href="ko/modules/was-jsp">was-jsp</a>
+    </div>
+  </div>
 </div>
 </section>
 
 <!-- MODULES -->
-<section id="modules">
+<section id="modules" style="background:rgba(245,158,11,.03)">
 <div class="container">
   <div class="section-label">Modules</div>
   <div class="section-title">15 Modular Components</div>
-  <div class="section-desc">필요한 모듈만 선택하여 경량 구성 가능</div>
-
+  <div class="section-desc">필요한 모듈만 조합하여 경량 맞춤 서버 구성. 모든 모듈은 단일 Fat JAR에 포함</div>
   <div class="modules">
-    <div class="module"><strong>was-config</strong><span>서버 설정 모델</span></div>
+    <div class="module"><strong>was-config</strong><span>YAML 서버 설정 모델</span></div>
     <div class="module"><strong>was-transport-netty</strong><span>Netty HTTP/2, TLS ALPN</span></div>
     <div class="module"><strong>was-protocol-http</strong><span>HTTP 프로토콜 + WebSocket</span></div>
     <div class="module"><strong>was-servlet-core</strong><span>Servlet 6.1 컨테이너</span></div>
@@ -360,18 +467,17 @@ response = client.chat.completions.create(
 
 <!-- CTA -->
 <section class="cta">
-  <h2>Start Building with Velo</h2>
-  <p>AI-Native Application Server로 에이전트 기반 애플리케이션을 구축하세요.</p>
+  <h2>Start Building with Velo WAS</h2>
+  <p>AI-Native Application Server로 에이전트 기반 애플리케이션을 지금 바로 시작하세요.</p>
   <div class="hero-btns">
-    <a href="https://github.com/hkjang/velo/releases/tag/v0.6.0" class="btn-primary" target="_blank">Download v0.6.0</a>
-    <a href="https://github.com/hkjang/velo" class="btn-outline" target="_blank">Star on GitHub</a>
+    <a href="https://github.com/hkjang/velo/releases/tag/v0.6.0" class="btn-primary" target="_blank" rel="noopener">Download v0.6.0</a>
+    <a href="https://github.com/hkjang/velo" class="btn-outline" target="_blank" rel="noopener">Star on GitHub</a>
   </div>
 </section>
 
-<!-- FOOTER -->
 <footer>
   <p><strong>Velo WAS</strong> v0.6.0 &mdash; AI-Native Application Server</p>
-  <p style="margin-top:8px">Built with Java 21 + Netty &mdash; <a href="https://github.com/hkjang/velo" target="_blank">GitHub</a> &mdash; <a href="https://github.com/hkjang/velo/releases" target="_blank">Releases</a></p>
+  <p style="margin-top:8px">Java 21 + Netty + Jakarta Servlet 6.1 &mdash; <a href="https://github.com/hkjang/velo" target="_blank" rel="noopener">GitHub</a> &mdash; <a href="https://github.com/hkjang/velo/releases" target="_blank" rel="noopener">Releases</a> &mdash; <a href="ko/architecture">Documentation</a></p>
   <p style="margin-top:8px;color:#64748b">&copy; 2025-2026 Velo Project. Open Source.</p>
 </footer>
 

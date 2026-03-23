@@ -5,6 +5,7 @@ import io.velo.was.mcp.gateway.McpGatewayRouter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -41,8 +42,19 @@ public class McpServerRegistry {
      */
     public McpServerDescriptor register(String name, String endpoint,
                                         String environment, String version) {
+        return register(name, endpoint, environment, version, Map.of(), null, null);
+    }
+
+    /**
+     * Register a remote server with custom headers and optional Basic Auth.
+     */
+    public McpServerDescriptor register(String name, String endpoint,
+                                        String environment, String version,
+                                        Map<String, String> headers,
+                                        String basicAuthUser, String basicAuthPassword) {
         McpServerDescriptor descriptor = new McpServerDescriptor(
-                UUID.randomUUID().toString(), name, endpoint, environment, version);
+                UUID.randomUUID().toString(), name, endpoint, environment, version,
+                headers, basicAuthUser, basicAuthPassword);
         servers.put(descriptor.id(), descriptor);
         // Auto-connect remote servers via gateway
         if (gatewayRouter != null && !"local".equals(environment)) {

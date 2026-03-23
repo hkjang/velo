@@ -36,7 +36,8 @@ public class McpRemoteServerConnection implements AutoCloseable {
 
     public McpRemoteServerConnection(McpServerDescriptor descriptor) {
         this.descriptor = descriptor;
-        this.client = new McpRemoteClient(descriptor.id(), descriptor.endpoint());
+        this.client = new McpRemoteClient(descriptor.id(), descriptor.endpoint(),
+                descriptor.effectiveHeaders());
         this.lastHealthCheck = Instant.now();
     }
 

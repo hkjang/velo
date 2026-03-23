@@ -32,11 +32,20 @@ public class McpRemoteClient implements AutoCloseable {
     private final String endpoint;
     private final HttpClient httpClient;
     private final AtomicLong requestIdSeq = new AtomicLong(1);
+    private final Map<String, String> extraHeaders;
     private volatile String remoteSessionId;
 
     public McpRemoteClient(String serverId, String endpoint) {
+        this(serverId, endpoint, Map.of());
+    }
+
+    /**
+     * @param extraHeaders additional headers sent with every request (API keys, auth tokens, etc.)
+     */
+    public McpRemoteClient(String serverId, String endpoint, Map<String, String> extraHeaders) {
         this.serverId = serverId;
         this.endpoint = endpoint;
+        this.extraHeaders = extraHeaders != null ? Map.copyOf(extraHeaders) : Map.of();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(CONNECT_TIMEOUT)
                 .build();
@@ -203,6 +212,10 @@ public class McpRemoteClient implements AutoCloseable {
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
+        // Add custom headers (API keys, auth tokens, etc.)
+        for (var entry : extraHeaders.entrySet()) {
+            builder.header(entry.getKey(), entry.getValue());
+        }
         if (remoteSessionId != null) {
             builder.header("Mcp-Session-Id", remoteSessionId);
         }

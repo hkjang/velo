@@ -404,6 +404,17 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         input(b, "mcpSrvEndpoint", "https://", "\uc5d4\ub4dc\ud3ec\uc778\ud2b8 URL *");
         input(b, "mcpSrvVersion", "1.0", "\ubc84\uc804");
         b.append("</div>");
+        b.append("<div class=\"card-header\" style=\"margin-top:12px;font-size:13px;\">\uc778\uc99d \uc124\uc815 (\uc120\ud0dd)</div>");
+        b.append("<div class=\"form-grid cols-2\" style=\"margin-top:6px;\">");
+        input(b, "mcpSrvHeaderKey1", "", "\ud5e4\ub354 \ud0a4 1 (ex: X-Api-Key)");
+        input(b, "mcpSrvHeaderVal1", "", "\ud5e4\ub354 \uac12 1");
+        input(b, "mcpSrvHeaderKey2", "", "\ud5e4\ub354 \ud0a4 2 (ex: Authorization)");
+        input(b, "mcpSrvHeaderVal2", "", "\ud5e4\ub354 \uac12 2");
+        b.append("</div>");
+        b.append("<div class=\"form-grid cols-2\" style=\"margin-top:6px;\">");
+        input(b, "mcpSrvBasicUser", "", "Basic Auth \uc0ac\uc6a9\uc790");
+        input(b, "mcpSrvBasicPass", "", "Basic Auth \ube44\ubc00\ubc88\ud638");
+        b.append("</div>");
         b.append("<div class=\"btns\"><button class=\"btn btn-primary\" onclick=\"registerMcpServer()\">\uc11c\ubc84 \ub4f1\ub85d</button></div>");
         b.append("<pre class=\"json-box\" id=\"mcpServerResult\"></pre>");
         b.append("</div>\n");
@@ -651,9 +662,22 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("}\n");
 
         b.append("async function registerMcpServer(){\n");
-        b.append("  const p={name:document.getElementById('mcpSrvName').value,endpoint:document.getElementById('mcpSrvEndpoint').value,environment:'remote',version:document.getElementById('mcpSrvVersion').value};\n");
+        b.append("  const hdrs={};\n");
+        b.append("  const k1=document.getElementById('mcpSrvHeaderKey1').value.trim();\n");
+        b.append("  const v1=document.getElementById('mcpSrvHeaderVal1').value;\n");
+        b.append("  if(k1)hdrs[k1]=v1;\n");
+        b.append("  const k2=document.getElementById('mcpSrvHeaderKey2').value.trim();\n");
+        b.append("  const v2=document.getElementById('mcpSrvHeaderVal2').value;\n");
+        b.append("  if(k2)hdrs[k2]=v2;\n");
+        b.append("  const p={name:document.getElementById('mcpSrvName').value,\n");
+        b.append("    endpoint:document.getElementById('mcpSrvEndpoint').value,\n");
+        b.append("    environment:'remote',version:document.getElementById('mcpSrvVersion').value,\n");
+        b.append("    headers:hdrs};\n");
+        b.append("  const bu=document.getElementById('mcpSrvBasicUser').value.trim();\n");
+        b.append("  const bp=document.getElementById('mcpSrvBasicPass').value;\n");
+        b.append("  if(bu){p.basicAuthUser=bu;p.basicAuthPassword=bp;}\n");
         b.append("  showJson('mcpServerResult',await mcpApi('/admin/servers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}));\n");
-        b.append("  refreshMcpServers();\n");
+        b.append("  refreshMcpServers();refreshGatewayStatus();\n");
         b.append("}\n");
 
         // MCP Tools

@@ -133,8 +133,23 @@ public class McpAdminHandler implements HttpHandler {
             String endpoint = stringVal(body, "endpoint", "");
             String environment = stringVal(body, "environment", "remote");
             String version = stringVal(body, "version", "unknown");
-            McpServerDescriptor desc = serverRegistry.register(name, endpoint, environment, version);
-            log.info("Admin: registered MCP server id={} name={} endpoint={}", desc.id(), name, endpoint);
+
+            // Parse custom headers (object: {"X-Api-Key":"...", "X-Token":"..."})
+            java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
+            if (body.get("headers") instanceof java.util.Map<?, ?> hm) {
+                hm.forEach((k, v) -> {
+                    if (k != null && v != null) headers.put(k.toString(), v.toString());
+                });
+            }
+
+            // Parse Basic Auth
+            String basicAuthUser = stringVal(body, "basicAuthUser", null);
+            String basicAuthPassword = stringVal(body, "basicAuthPassword", null);
+
+            McpServerDescriptor desc = serverRegistry.register(name, endpoint, environment, version,
+                    headers, basicAuthUser, basicAuthPassword);
+            log.info("Admin: registered MCP server id={} name={} endpoint={} headers={} basicAuth={}",
+                    desc.id(), name, endpoint, headers.size(), desc.hasBasicAuth());
             return HttpResponses.jsonOk(desc.toJson());
         }
         return HttpResponses.methodNotAllowed("GET or POST only");

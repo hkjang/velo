@@ -57,16 +57,19 @@ public final class AiPlatformLayout {
         html.append("    <a href=\"").append(escapeHtml(contextPath)).append("/logout\" class=\"nav-item logout\">\ub85c\uadf8\uc544\uc6c3</a>\n");
         html.append("  </div>\n");
         html.append("</aside>\n");
+        // showTab must be declared before body content (which may reference it)
+        html.append("<script>\n");
+        html.append("function showTab(e,id){e&&e.preventDefault();document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(a=>a.classList.remove('active'));const el=document.getElementById('tab-'+id);if(el)el.classList.add('active');if(e&&e.currentTarget)e.currentTarget.classList.add('active');document.getElementById('sidebar').classList.remove('open');}\n");
+        html.append("</script>\n");
         // main
         html.append("<main class=\"main\">\n");
         html.append("  <button class=\"mobile-menu\" onclick=\"document.getElementById('sidebar').classList.toggle('open')\">\u2630 \uba54\ub274</button>\n");
         html.append(body);
         html.append("</main>\n");
-        // tab script
+        // tab script (showTab already declared above sidebar)
         html.append("<script>\n");
-        html.append("function showTab(e,id){e&&e.preventDefault();document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(a=>a.classList.remove('active'));const el=document.getElementById('tab-'+id);if(el)el.classList.add('active');if(e&&e.currentTarget)e.currentTarget.classList.add('active');document.getElementById('sidebar').classList.remove('open');}\n");
-        html.append("document.addEventListener('DOMContentLoaded',()=>{const h=location.hash.replace('#','');if(h){const a=document.querySelector('.nav-item[onclick*=\"'+h+'\"]');if(a){showTab(null,h);document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}}loadProviderList();});\n");
-        html.append("const CP='").append(escapeHtml(contextPath)).append("';\n");
+        html.append("document.addEventListener('DOMContentLoaded',()=>{const h=location.hash.replace('#','');if(h){const a=document.querySelector('.nav-item[onclick*=\"'+h+'\"]');if(a){showTab(null,h);document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}}if(typeof loadProviderList==='function')loadProviderList();});\n");
+        // CP is declared in DashboardServlet's inline script block
         html.append("""
 function registerProvider(){
   const pid=document.getElementById('provProviderId').value.trim();

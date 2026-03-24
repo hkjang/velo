@@ -188,8 +188,18 @@ public final class AiPlatformExtendedJson {
                     .append(q("displayName")).append(':').append(q(provider.displayName())).append(',')
                     .append(q("protocol")).append(':').append(q(provider.protocol())).append(',')
                     .append(q("supportsStreaming")).append(':').append(provider.supportsStreaming()).append(',')
-                    .append(q("healthy")).append(':').append(provider.healthy())
-                    .append('}');
+                    .append(q("healthy")).append(':').append(provider.healthy()).append(',')
+                    .append(q("baseUrl")).append(':').append(q(provider.baseUrl())).append(',')
+                    .append(q("type")).append(':').append(q(provider.type())).append(',')
+                    .append(q("dynamic")).append(':').append(provider.dynamic()).append(',')
+                    .append(q("models")).append(':').append('[');
+            boolean mFirst = true;
+            for (String m : provider.models()) {
+                if (!mFirst) json.append(',');
+                mFirst = false;
+                json.append(q(m));
+            }
+            json.append(']').append('}');
         }
         return json.append("]}").toString();
     }

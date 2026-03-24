@@ -62,6 +62,7 @@ public final class AiPlatformApplication {
             pluginRegistry.register(new AiContentFilterPlugin());
         }
         AiProviderRegistry providerRegistry = new AiProviderRegistry();
+        providerRegistry.setDataStore(dataStore);  // 영속화된 프로바이더 로드
         AiGatewayService gatewayService = new AiGatewayService(configuration, registryService, providerRegistry);
 
         // 의도 기반 라우팅 엔진 설정 (영속화 연결)

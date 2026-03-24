@@ -65,7 +65,35 @@ public final class AiPlatformLayout {
         // tab script
         html.append("<script>\n");
         html.append("function showTab(e,id){e&&e.preventDefault();document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(a=>a.classList.remove('active'));const el=document.getElementById('tab-'+id);if(el)el.classList.add('active');if(e&&e.currentTarget)e.currentTarget.classList.add('active');document.getElementById('sidebar').classList.remove('open');}\n");
-        html.append("document.addEventListener('DOMContentLoaded',()=>{const h=location.hash.replace('#','');if(h){const a=document.querySelector('.nav-item[onclick*=\"'+h+'\"]');if(a){showTab(null,h);document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}}});\n");
+        html.append("document.addEventListener('DOMContentLoaded',()=>{const h=location.hash.replace('#','');if(h){const a=document.querySelector('.nav-item[onclick*=\"'+h+'\"]');if(a){showTab(null,h);document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));a.classList.add('active');}}loadProviderList();});\n");
+        html.append("const CP='").append(escapeHtml(contextPath)).append("';\n");
+        html.append("""
+function registerProvider(){
+  const pid=document.getElementById('provProviderId').value.trim();
+  const baseUrl=document.getElementById('provBaseUrl').value.trim();
+  if(!pid||!baseUrl){alert('Provider ID와 Base URL은 필수입니다.');return;}
+  let headersStr='';
+  const h1k=document.getElementById('provHeader1Key'),h1v=document.getElementById('provHeader1Val');
+  const h2k=document.getElementById('provHeader2Key'),h2v=document.getElementById('provHeader2Val');
+  if(h1k&&h1k.value.trim())headersStr+=h1k.value.trim()+':'+h1v.value.trim();
+  if(h2k&&h2k.value.trim())headersStr+=(headersStr?';':'')+h2k.value.trim()+':'+h2v.value.trim();
+  fetch(CP+'/api/providers',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({providerId:pid,displayName:document.getElementById('provDisplayName').value.trim()||pid,
+      type:document.getElementById('provType').value,baseUrl:baseUrl,
+      apiKey:document.getElementById('provApiKey').value.trim(),
+      models:document.getElementById('provModels').value.trim(),customHeaders:headersStr})})
+    .then(r=>r.json()).then(d=>{if(d.error){alert(d.error);return;}alert('등록 완료: '+d.providerId);loadProviderList();}).catch(e=>alert('오류: '+e));
+}
+function loadProviderList(){
+  fetch(CP+'/api/providers').then(r=>r.json()).then(d=>{
+    const tb=document.getElementById('providerTableBody');if(!tb)return;
+    if(!d.providers||d.providers.length===0){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#666;">등록된 프로바이더 없음</td></tr>';return;}
+    tb.innerHTML=d.providers.map(p=>'<tr><td><strong>'+_e(p.providerId)+'</strong></td><td>'+_e(p.displayName)+'</td><td><span class="chip">'+_e(p.type)+'</span></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">'+_e(p.baseUrl)+'</td><td>'+((p.models||[]).map(m=>'<span class="chip chip-sm">'+_e(m)+'</span>').join(' ')||'-')+'</td><td>'+(p.dynamic?'동적':'설정')+'</td><td>'+(p.dynamic?'<button class="btn btn-xs btn-danger" onclick="deleteProvider(\\''+_e(p.providerId)+'\\')">삭제</button>':'-')+'</td></tr>').join('');
+  }).catch(()=>{});
+}
+function deleteProvider(pid){if(!confirm(pid+' 삭제?'))return;fetch(CP+'/api/providers/'+pid,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.deleted)loadProviderList();else alert(d.error||'실패');}).catch(e=>alert(e));}
+function _e(s){return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+""");
         html.append("</script>\n");
         html.append("</body>\n</html>");
         return html.toString();

@@ -197,6 +197,19 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(AiPlatformExtendedJson.providers(providerRegistry.listProviders()));
             return;
         }
+        if (path.startsWith("/providers/") && path.length() > "/providers/".length()) {
+            String pid = path.substring("/providers/".length());
+            io.velo.was.aiplatform.persistence.ProviderData pd = providerRegistry.getProviderData(pid);
+            if (pd == null) { notFound(resp, "Provider not found: " + pid); return; }
+            resp.getWriter().write("{\"providerId\":\"" + esc(pd.getProviderId()) + "\""
+                    + ",\"displayName\":\"" + esc(pd.getDisplayName()) + "\""
+                    + ",\"type\":\"" + esc(pd.getType()) + "\""
+                    + ",\"baseUrl\":\"" + esc(pd.getBaseUrl()) + "\""
+                    + ",\"models\":[" + pd.getModels().stream().map(m -> "\"" + esc(m) + "\"").collect(java.util.stream.Collectors.joining(",")) + "]"
+                    + ",\"enabled\":" + pd.isEnabled()
+                    + ",\"createdAt\":\"" + esc(pd.getCreatedAt()) + "\"}");
+            return;
+        }
         if ("/edge/devices".equals(path)) {
             if (!configuration.getServer().getAiPlatform().getServing().isEdgeAiEnabled()) {
                 unavailable(resp, "Edge AI is disabled in configuration");
@@ -290,6 +303,14 @@ public class AiPlatformApiServlet extends HttpServlet {
                 }
                 tenantService.removeTenant(tenantId);
                 resp.getWriter().write("{\"deleted\":true,\"tenantId\":\"" + AiGatewayServlet.escapeJson(tenantId) + "\"}");
+                return;
+            }
+            // Provider 삭제
+            if (path.startsWith("/providers/") && path.length() > "/providers/".length()) {
+                String pid = path.substring("/providers/".length());
+                boolean removed = providerRegistry.removeDynamic(pid);
+                if (!removed) { notFound(resp, "Provider not found: " + pid); return; }
+                resp.getWriter().write("{\"deleted\":true,\"providerId\":\"" + esc(pid) + "\"}");
                 return;
             }
             // 의도 키워드 삭제
@@ -480,6 +501,34 @@ public class AiPlatformApiServlet extends HttpServlet {
                 RoutingPolicy pol = intentPolicyService.addPolicy(IntentType.fromString(intentStr), priority, routeTarget, modelName, fallback, streaming, tenantOverride, maxTokens);
                 resp.setStatus(HttpServletResponse.SC_CREATED);
                 resp.getWriter().write(buildPolicyJson(pol));
+                return;
+            }
+            // ── Provider 동적 등록 ──
+            if ("/providers".equals(path)) {
+                usageService.recordControlPlaneAccess("/api/providers");
+                String providerId = firstNonBlank(req.getParameter("providerId"), extractJsonString(body, "providerId"));
+                String displayName = firstNonBlank(req.getParameter("displayName"), extractJsonString(body, "displayName"));
+                String type = firstNonBlank(req.getParameter("type"), extractJsonString(body, "type"));
+                String baseUrl = firstNonBlank(req.getParameter("baseUrl"), extractJsonString(body, "baseUrl"));
+                String apiKey = firstNonBlank(req.getParameter("apiKey"), extractJsonString(body, "apiKey"));
+                String modelsStr = firstNonBlank(req.getParameter("models"), extractJsonString(body, "models"));
+                java.util.List<String> models = modelsStr.isBlank() ? java.util.List.of()
+                        : java.util.Arrays.stream(modelsStr.split("[,;|]")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+                String headersStr = firstNonBlank(req.getParameter("customHeaders"), extractJsonString(body, "customHeaders"));
+                java.util.Map<String, String> customHeaders = new java.util.LinkedHashMap<>();
+                if (!headersStr.isBlank()) {
+                    for (String pair : headersStr.split("[;|]")) {
+                        String[] kv = pair.split(":", 2);
+                        if (kv.length == 2 && !kv[0].isBlank()) customHeaders.put(kv[0].trim(), kv[1].trim());
+                    }
+                }
+                if (providerId.isBlank()) { badRequest(resp, "providerId is required"); return; }
+                if (baseUrl.isBlank()) { badRequest(resp, "baseUrl is required"); return; }
+                io.velo.was.aiplatform.persistence.ProviderData pd = providerRegistry.registerDynamic(
+                        providerId, displayName, type, baseUrl, apiKey, models, customHeaders);
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+                resp.getWriter().write("{\"registered\":true,\"providerId\":\"" + esc(pd.getProviderId()) + "\""
+                        + ",\"baseUrl\":\"" + esc(pd.getBaseUrl()) + "\"}");
                 return;
             }
             // 벌크 임포트

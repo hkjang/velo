@@ -164,29 +164,30 @@ public class AiPlatformDashboardServlet extends HttpServlet {
 
         // ===== TAB: providers — 프로바이더 연동 =====
         b.append("<div class=\"tab-panel\" id=\"tab-providers\">\n");
-        b.append("<div class=\"card guide-card\">");
-        b.append("<div class=\"card-header\">\ud83d\udca1 AI \ud504\ub85c\ubc14\uc774\ub354 \uc5f0\ub3d9 \ubc29\ubc95</div>");
-        b.append("<div class=\"card-desc\" style=\"line-height:1.8;\">");
-        b.append("<strong>\u2460 \uc124\uc815 \uc704\uce58:</strong> <code>velo.yaml</code>\uc758 <code>server.aiPlatform.serving.models[]</code> \ubc30\uc5f4\uc5d0 \ubaa8\ub378 \ud504\ub85c\ud30c\uc77c \ucd94\uac00<br>");
-        b.append("<strong>\u2461 \ud504\ub85c\ubc14\uc774\ub354 \uc9c0\uc815:</strong> <code>provider</code> \ud544\ub4dc\ub97c <code>openai</code>, <code>anthropic</code>, <code>ollama</code>, <code>vllm</code>, <code>sglang</code> \uc911 \ud558\ub098\ub85c \uc9c0\uc815<br>");
-        b.append("<strong>\u2462 API \ud0a4 \uc124\uc815:</strong> \ud658\uacbd \ubcc0\uc218\ub85c \uc124\uc815 (<code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code> \ub4f1)<br>");
-        b.append("<strong>\u2463 \ub7f0\ud0c0\uc784 \ucd94\uac00:</strong> \uc704\uc758 <strong>\ubaa8\ub378 \ub808\uc9c0\uc2a4\ud2b8\ub9ac</strong> \ud0ed\uc5d0\uc11c \uc11c\ubc84 \uc7ac\uc2dc\uc791 \uc5c6\uc774 \ubaa8\ub378\uc744 \ucd94\uac00\ud560 \uc218\ub3c4 \uc788\uc2b5\ub2c8\ub2e4.<br>");
-        b.append("<strong>OpenAI \ud638\ud658 \ud504\ub85d\uc2dc:</strong> \ubaa8\ub4e0 \ud504\ub85c\ubc14\uc774\ub354\ub97c <code>/v1/chat/completions</code> \uc5d4\ub4dc\ud3ec\uc778\ud2b8 \ud558\ub098\ub85c \ud1b5\ud569 \uc811\uc18d \uac00\ub2a5");
-        b.append("</div></div>\n");
-        b.append("<div class=\"card\"><div class=\"card-header\">\uba40\ud2f0 LLM \ud504\ub85c\ubc14\uc774\ub354 \ud604\ud669</div><div class=\"card-desc\">\uc9c0\uc6d0 \ud504\ub85c\ubc14\uc774\ub354 \ubc0f \uc5f0\ub3d9 \uc0c1\ud0dc</div>");
-        b.append("<div class=\"tbl-wrap\"><table><thead><tr><th>\ud504\ub85c\ubc14\uc774\ub354</th><th>\ud504\ub85c\ud1a0\ucf5c</th><th>\ub300\ud45c \ubaa8\ub378</th><th>Failover</th><th>\ub85c\ub4dc\ubc38\ub7f0\uc2f1</th><th>\uc0c1\ud0dc</th></tr></thead><tbody>");
-        provRow(b, "OpenAI", "REST / SSE", "GPT-4o, GPT-4o-mini", true, true, true);
-        provRow(b, "Anthropic", "REST / SSE", "Claude Opus, Sonnet", true, true, true);
-        provRow(b, "vLLM", "OpenAI \ud638\ud658", "\ucee4\uc2a4\ud140 \ud30c\uc778\ud29c\ub2dd \ubaa8\ub378", true, false, ai.getServing().isModelRouterEnabled());
-        provRow(b, "SGLang", "OpenAI \ud638\ud658", "\ucee4\uc2a4\ud140 \ud30c\uc778\ud29c\ub2dd \ubaa8\ub378", true, false, ai.getServing().isModelRouterEnabled());
-        provRow(b, "Ollama", "REST", "Llama, Mistral, Phi", true, false, ai.getServing().isEdgeAiEnabled());
-        b.append("</tbody></table></div>");
-        b.append("</div>\n");
-        // Quick start code
-        b.append("<div class=\"card\"><div class=\"card-header\">\uc5f0\ub3d9 \ube60\ub978 \uc2dc\uc791</div><div class=\"card-desc\">OpenAI SDK\ub85c Velo AI \uac8c\uc774\ud2b8\uc6e8\uc774 \uc811\uc18d</div>");
-        b.append("<pre class=\"code-box\">");
-        b.append(h("# Python (OpenAI SDK)\nfrom openai import OpenAI\n\nclient = OpenAI(\n    base_url=\"http://localhost:8080" + ai.getConsole().getContextPath() + "/v1\",\n    api_key=\"velo-demo-key\"  # 테넌트 탭에서 API 키 발급\n)\n\nresponse = client.chat.completions.create(\n    model=\"llm-general\",\n    messages=[{\"role\": \"user\", \"content\": \"안녕하세요\"}]\n)\n\n# curl\ncurl -X POST " + ai.getConsole().getContextPath() + "/v1/chat/completions \\\n  -H \"Authorization: Bearer velo-demo-key\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"messages\":[{\"role\":\"user\",\"content\":\"안녕하세요\"}]}'"));
-        b.append("</pre></div>\n");
+        // Provider 동적 등록 폼
+        b.append("<div class=\"card\"><div class=\"card-header\">AI Provider 등록</div>");
+        b.append("<div class=\"card-desc\">vLLM, SGLang, OpenAI, Anthropic, Ollama 등 프로바이더를 동적으로 등록합니다. 재시작해도 유지됩니다.</div>");
+        b.append("<div class=\"form-grid cols-3\">");
+        input(b, "provProviderId", "", "Provider ID *");
+        input(b, "provDisplayName", "", "표시 이름");
+        b.append("<div class=\"form-field\"><label class=\"form-label\" for=\"provType\">타입</label>");
+        b.append("<select id=\"provType\" class=\"form-input\"><option value=\"openai\">OpenAI 호환 (vLLM/SGLang)</option><option value=\"anthropic\">Anthropic</option><option value=\"ollama\">Ollama</option></select></div>");
+        input(b, "provBaseUrl", "", "Base URL * (예: http://gpu-server:8000)");
+        input(b, "provApiKey", "", "API Key");
+        input(b, "provModels", "", "모델 목록 (콤마 구분)");
+        b.append("</div>");
+        b.append("<details style=\"margin:8px 0;\"><summary style=\"cursor:pointer;color:#0f766e;\">커스텀 헤더 (선택)</summary>");
+        b.append("<div class=\"form-grid cols-2\" style=\"margin-top:8px;\">");
+        input(b, "provHeader1Key", "", "헤더 키 1");
+        input(b, "provHeader1Val", "", "헤더 값 1");
+        input(b, "provHeader2Key", "", "헤더 키 2");
+        input(b, "provHeader2Val", "", "헤더 값 2");
+        b.append("</div></details>");
+        b.append("<div class=\"btns\"><button class=\"btn btn-primary\" onclick=\"registerProvider()\">프로바이더 등록</button></div></div>\n");
+        // 등록된 Provider 테이블
+        b.append("<div class=\"card\"><div class=\"card-header\">등록된 프로바이더</div>");
+        b.append("<div class=\"tbl-wrap\"><table><thead><tr><th>ID</th><th>이름</th><th>타입</th><th>Base URL</th><th>모델</th><th>동적</th><th>관리</th></tr></thead>");
+        b.append("<tbody id=\"providerTableBody\"><tr><td colspan=\"7\" style=\"text-align:center;color:#666;\">로딩 중...</td></tr></tbody></table></div></div>\n");
         b.append("</div>\n");
 
         // ===== TAB: intent — 의도 기반 라우팅 =====

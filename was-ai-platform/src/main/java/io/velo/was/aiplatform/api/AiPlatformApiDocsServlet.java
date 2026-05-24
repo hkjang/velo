@@ -1,19 +1,42 @@
 package io.velo.was.aiplatform.api;
 
 import io.velo.was.aiplatform.gateway.AiGatewayServlet;
+import io.velo.was.aiplatform.provider.AiProviderRegistry;
+import io.velo.was.aiplatform.publishing.AiPublishedApiService;
+import io.velo.was.aiplatform.publishing.AiPublishedEndpoint;
+import io.velo.was.aiplatform.registry.AiModelRegistryService;
+import io.velo.was.aiplatform.tenant.AiTenantService;
 import io.velo.was.config.ServerConfiguration;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.util.Comparator;
+import java.util.List;
 
 public class AiPlatformApiDocsServlet extends HttpServlet {
 
     private final ServerConfiguration configuration;
+    private final AiModelRegistryService registryService;
+    private final AiPublishedApiService publishedApiService;
+    private final AiTenantService tenantService;
+    private final AiProviderRegistry providerRegistry;
 
     public AiPlatformApiDocsServlet(ServerConfiguration configuration) {
+        this(configuration, null, null, null, null);
+    }
+
+    public AiPlatformApiDocsServlet(ServerConfiguration configuration,
+                                    AiModelRegistryService registryService,
+                                    AiPublishedApiService publishedApiService,
+                                    AiTenantService tenantService,
+                                    AiProviderRegistry providerRegistry) {
         this.configuration = configuration;
+        this.registryService = registryService;
+        this.publishedApiService = publishedApiService;
+        this.tenantService = tenantService;
+        this.providerRegistry = providerRegistry;
     }
 
     @Override
@@ -36,7 +59,10 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         resp.setContentType("application/json; charset=UTF-8");
         resp.setCharacterEncoding("UTF-8");
         resp.setHeader("Cache-Control", "no-cache");
+        resp.getWriter().write(buildOpenApiSpec(req.getContextPath()));
+    }
 
+    String buildOpenApiSpec(String requestContextPath) {
         ServerConfiguration.Server server = configuration.getServer();
         ServerConfiguration.AiPlatform ai = server.getAiPlatform();
         String host = "0.0.0.0".equals(server.getListener().getHost()) ? "localhost" : server.getListener().getHost();
@@ -57,6 +83,8 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append("      \"description\": \"Current AI Platform base URL\"\n");
         s.append("    }\n");
         s.append("  ],\n");
+        appendVeloExtension(s, requestContextPath);
+        s.append(",\n");
         s.append("  \"tags\": [\n");
         s.append("    {\"name\": \"Gateway\", \"description\": \"Routing, inference, and streaming endpoints\"},\n");
         s.append("    {\"name\": \"Control Plane\", \"description\": \"Status, registry, and usage endpoints for the standalone AI module\"}\n");
@@ -73,7 +101,7 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append(",\n");
         apiPath(s, "/gateway/ensemble", "post", "Gateway", "Multi-model ensemble inference", "Sends request to multiple models and combines results.", true);
         s.append(",\n");
-        apiPath(s, "/invoke/{model}", "post", "Gateway", "Invoke a published generated API", "Public endpoint generated from the active model registry.", false);
+        publishedInvokePath(s, requestContextPath);
         s.append(",\n");
         apiPath(s, "/v1/chat/completions", "post", "Gateway", "OpenAI-compatible chat completions proxy", "Accepts OpenAI-format requests and routes them through the AI gateway with failover support.", true);
         s.append(",\n");
@@ -84,17 +112,12 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         // Control Plane paths
         apiPath(s, "/api/status", "get", "Control Plane", "Get AI Platform status", null, false);
         s.append(",\n");
+        apiPath(s, "/api/readiness", "get", "Control Plane", "Get AI Platform readiness checks", "Reports routable models, tenant readiness, and provider health.", false);
+        s.append(",\n");
         apiPath(s, "/api/overview", "get", "Control Plane", "Get AI Platform overview", null, false);
         s.append(",\n");
-        apiPath(s, "/api/models", "get", "Control Plane", "List registered models", "Requires an authenticated console session.", false);
+        modelRegistryPath(s);
         s.append(",\n");
-        s.append("    \"/api/models\": {\n");
-        s.append("      \"post\": {\n");
-        s.append("        \"tags\": [\"Control Plane\"],\n");
-        s.append("        \"summary\": \"Register or update a model version\",\n");
-        s.append("        \"responses\": { \"201\": { \"description\": \"Registered model\" } }\n");
-        s.append("      }\n");
-        s.append("    },\n");
         apiPath(s, "/api/models/{name}/versions/{version}/status", "post", "Control Plane", "Change model version status", "Promote ACTIVE, keep CANARY, or retire a version.", false);
         s.append(",\n");
         apiPath(s, "/api/usage", "get", "Control Plane", "Get usage and metering counters", null, false);
@@ -104,6 +127,8 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         apiPath(s, "/api/tenants", "get", "Control Plane", "List tenants", null, false);
         s.append(",\n");
         apiPath(s, "/api/tenants/{id}/keys", "post", "Control Plane", "Issue an API key for a tenant", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/tenants/{id}/keys/{keyId}", "delete", "Control Plane", "Revoke a tenant API key", "Marks the key inactive and removes it from the authorization index.", false);
         s.append(",\n");
         apiPath(s, "/api/tenants/{id}/usage", "get", "Control Plane", "Get tenant usage metrics", null, false);
         s.append(",\n");
@@ -133,6 +158,12 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append("  },\n");
         // Components
         s.append("  \"components\": {\n");
+        s.append("    \"securitySchemes\": {\n");
+        s.append("      \"TenantApiKey\": {\"type\": \"apiKey\", \"in\": \"header\", \"name\": \"")
+                .append(escapeJson(apiKeyHeader())).append("\"},\n");
+        s.append("      \"BearerAuth\": {\"type\": \"http\", \"scheme\": \"bearer\"},\n");
+        s.append("      \"ConsoleSession\": {\"type\": \"apiKey\", \"in\": \"cookie\", \"name\": \"VELO_AI_PLATFORM_SESSION\"}\n");
+        s.append("    },\n");
         s.append("    \"schemas\": {\n");
         s.append("      \"GatewayRequest\": {\n");
         s.append("        \"type\": \"object\",\n");
@@ -141,6 +172,23 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append("          \"prompt\": {\"type\": \"string\", \"example\": \"Recommend three products\"},\n");
         s.append("          \"sessionId\": {\"type\": \"string\", \"example\": \"demo-session\"},\n");
         s.append("          \"stream\": {\"type\": \"boolean\", \"example\": false}\n");
+        s.append("        }\n");
+        s.append("      },\n");
+        s.append("      \"ModelRegistrationRequest\": {\n");
+        s.append("        \"type\": \"object\",\n");
+        s.append("        \"required\": [\"name\", \"version\"],\n");
+        s.append("        \"properties\": {\n");
+        s.append("          \"name\": {\"type\": \"string\", \"example\": \"llm-custom\"},\n");
+        s.append("          \"category\": {\"type\": \"string\", \"example\": \"LLM\"},\n");
+        s.append("          \"provider\": {\"type\": \"string\", \"example\": \"openai\"},\n");
+        s.append("          \"version\": {\"type\": \"string\", \"example\": \"v1\"},\n");
+        s.append("          \"latencyTier\": {\"type\": \"string\", \"example\": \"balanced\"},\n");
+        s.append("          \"latencyMs\": {\"type\": \"integer\", \"example\": 250},\n");
+        s.append("          \"accuracyScore\": {\"type\": \"integer\", \"example\": 88},\n");
+        s.append("          \"defaultSelected\": {\"type\": \"boolean\", \"example\": false},\n");
+        s.append("          \"enabled\": {\"type\": \"boolean\", \"example\": true},\n");
+        s.append("          \"status\": {\"type\": \"string\", \"example\": \"ACTIVE\"},\n");
+        s.append("          \"source\": {\"type\": \"string\", \"example\": \"runtime\"}\n");
         s.append("        }\n");
         s.append("      },\n");
         s.append("      \"ChatCompletionRequest\": {\n");
@@ -157,7 +205,7 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append("    }\n");
         s.append("  }\n");
         s.append("}");
-        resp.getWriter().write(s.toString());
+        return s.toString();
     }
 
     private static void apiPath(StringBuilder s, String path, String method, String tag, String summary, String desc, boolean hasBody) {
@@ -174,6 +222,180 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append(",\n        \"responses\": { \"200\": { \"description\": \"Success\" } }\n");
         s.append("      }\n");
         s.append("    }");
+    }
+
+    private void modelRegistryPath(StringBuilder s) {
+        s.append("    \"/api/models\": {\n");
+        s.append("      \"get\": {\n");
+        s.append("        \"tags\": [\"Control Plane\"],\n");
+        s.append("        \"summary\": \"List registered models\",\n");
+        s.append("        \"description\": \"Requires an authenticated console session.\",\n");
+        s.append("        \"security\": [{\"ConsoleSession\": []}],\n");
+        s.append("        \"responses\": { \"200\": { \"description\": \"Registered models\" } }\n");
+        s.append("      },\n");
+        s.append("      \"post\": {\n");
+        s.append("        \"tags\": [\"Control Plane\"],\n");
+        s.append("        \"summary\": \"Register or update a model version\",\n");
+        s.append("        \"security\": [{\"ConsoleSession\": []}],\n");
+        s.append("        \"requestBody\": { \"required\": true, \"content\": { \"application/json\": { \"schema\": { \"$ref\": \"#/components/schemas/ModelRegistrationRequest\" } } } },\n");
+        s.append("        \"responses\": { \"201\": { \"description\": \"Registered model\" } }\n");
+        s.append("      }\n");
+        s.append("    }");
+    }
+
+    private void publishedInvokePath(StringBuilder s, String requestContextPath) {
+        List<ServerConfiguration.ModelProfile> models = currentModels();
+        List<AiPublishedEndpoint> endpoints = currentPublishedEndpoints(requestContextPath);
+        s.append("    \"/invoke/{model}\": {\n");
+        s.append("      \"post\": {\n");
+        s.append("        \"tags\": [\"Gateway\"],\n");
+        s.append("        \"summary\": \"Invoke a published generated API\",\n");
+        s.append("        \"description\": \"Public endpoint generated from the active model registry.\",\n");
+        s.append("        \"security\": [{\"TenantApiKey\": []}, {\"BearerAuth\": []}],\n");
+        s.append("        \"parameters\": [{\"name\":\"model\",\"in\":\"path\",\"required\":true,\"schema\":{\"type\":\"string\",\"enum\":");
+        appendModelEnum(s, models);
+        s.append("}}],\n");
+        s.append("        \"requestBody\": { \"required\": false, \"content\": { \"application/json\": { \"schema\": { \"type\": \"string\" } }, \"text/plain\": { \"schema\": { \"type\": \"string\" } } } },\n");
+        s.append("        \"x-velo-publishedEndpoints\": ");
+        appendPublishedEndpoints(s, endpoints);
+        s.append(",\n");
+        s.append("        \"responses\": { \"200\": { \"description\": \"Published model response\" }, \"401\": { \"description\": \"Missing or invalid tenant API key\" }, \"404\": { \"description\": \"Published model endpoint not found\" } }\n");
+        s.append("      }\n");
+        s.append("    }");
+    }
+
+    private void appendVeloExtension(StringBuilder s, String requestContextPath) {
+        List<ServerConfiguration.ModelProfile> models = currentModels();
+        List<AiPublishedEndpoint> endpoints = currentPublishedEndpoints(requestContextPath);
+        List<AiProviderRegistry.AiProviderInfo> providers = currentProviders();
+        long healthyProviders = providers.stream().filter(AiProviderRegistry.AiProviderInfo::healthy).count();
+        s.append("  \"x-velo\": {\n");
+        s.append("    \"contextPath\": ").append(q(normalizeContextPath(requestContextPath))).append(",\n");
+        s.append("    \"apiKeyHeader\": ").append(q(apiKeyHeader())).append(",\n");
+        s.append("    \"routableModels\": ").append(models.size()).append(",\n");
+        s.append("    \"models\": ");
+        appendModels(s, models);
+        s.append(",\n");
+        s.append("    \"publishedEndpoints\": ");
+        appendPublishedEndpoints(s, endpoints);
+        s.append(",\n");
+        s.append("    \"providers\": {\"count\": ").append(providers.size())
+                .append(", \"healthy\": ").append(healthyProviders).append("}\n");
+        s.append("  }");
+    }
+
+    private List<ServerConfiguration.ModelProfile> currentModels() {
+        if (registryService != null) {
+            return registryService.routingModels();
+        }
+        return configuration.getServer().getAiPlatform().getServing().getModels().stream()
+                .filter(ServerConfiguration.ModelProfile::isEnabled)
+                .sorted(Comparator.comparing(ServerConfiguration.ModelProfile::getName))
+                .toList();
+    }
+
+    private List<AiPublishedEndpoint> currentPublishedEndpoints(String requestContextPath) {
+        String contextPath = normalizeContextPath(requestContextPath);
+        if (publishedApiService != null) {
+            return publishedApiService.listEndpoints(contextPath);
+        }
+        if (!configuration.getServer().getAiPlatform().getPlatform().isAutoApiGenerationEnabled()) {
+            return List.of();
+        }
+        return currentModels().stream()
+                .map(model -> new AiPublishedEndpoint(
+                        model.getName() + "-invoke",
+                        model.getName(),
+                        model.getVersion(),
+                        model.getCategory(),
+                        "POST",
+                        contextPath + "/invoke/" + model.getName(),
+                        true,
+                        "Dedicated generated endpoint for the active " + model.getName() + " model profile"
+                ))
+                .toList();
+    }
+
+    private List<AiProviderRegistry.AiProviderInfo> currentProviders() {
+        return providerRegistry == null ? List.of() : providerRegistry.listProviders();
+    }
+
+    private String apiKeyHeader() {
+        if (tenantService != null) {
+            return tenantService.apiKeyHeader();
+        }
+        return configuration.getServer().getAiPlatform().getPlatform().getApiKeyHeader();
+    }
+
+    private String normalizeContextPath(String requestContextPath) {
+        if (requestContextPath != null && !requestContextPath.isBlank()) {
+            return requestContextPath;
+        }
+        return configuration.getServer().getAiPlatform().getConsole().getContextPath();
+    }
+
+    private static void appendModels(StringBuilder s, List<ServerConfiguration.ModelProfile> models) {
+        s.append('[');
+        boolean first = true;
+        for (ServerConfiguration.ModelProfile model : models) {
+            if (!first) {
+                s.append(',');
+            }
+            first = false;
+            s.append("{\"name\":").append(q(model.getName()))
+                    .append(",\"category\":").append(q(model.getCategory()))
+                    .append(",\"provider\":").append(q(model.getProvider()))
+                    .append(",\"version\":").append(q(model.getVersion()))
+                    .append(",\"latencyMs\":").append(model.getLatencyMs())
+                    .append('}');
+        }
+        s.append(']');
+    }
+
+    private static void appendModelEnum(StringBuilder s, List<ServerConfiguration.ModelProfile> models) {
+        s.append('[');
+        boolean first = true;
+        for (ServerConfiguration.ModelProfile model : models) {
+            if (!first) {
+                s.append(',');
+            }
+            first = false;
+            s.append(q(model.getName()));
+        }
+        s.append(']');
+    }
+
+    private static void appendPublishedEndpoints(StringBuilder s, List<AiPublishedEndpoint> endpoints) {
+        s.append('[');
+        boolean first = true;
+        for (AiPublishedEndpoint endpoint : endpoints) {
+            if (!first) {
+                s.append(',');
+            }
+            first = false;
+            s.append("{\"endpointName\":").append(q(endpoint.endpointName()))
+                    .append(",\"modelName\":").append(q(endpoint.modelName()))
+                    .append(",\"method\":").append(q(endpoint.method()))
+                    .append(",\"path\":").append(q(endpoint.path()))
+                    .append(",\"summary\":").append(q(endpoint.summary()))
+                    .append('}');
+        }
+        s.append(']');
+    }
+
+    private static String q(String value) {
+        return "\"" + escapeJson(value) + "\"";
+    }
+
+    private static String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     private void serveDeveloperPortal(HttpServletRequest req, HttpServletResponse resp) throws IOException {

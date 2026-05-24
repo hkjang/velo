@@ -121,7 +121,7 @@ public class AiPlatformApiServlet extends HttpServlet {
         this.intentEngine = intentEngine;
     }
 
-    /** 게이트웨이 감사 로그를 설정한다. */
+    /** Configures gateway audit log access. */
     public void setGatewayAuditLog(AiGatewayAuditLog gatewayAuditLog) {
         this.gatewayAuditLog = gatewayAuditLog;
     }
@@ -146,6 +146,16 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(AiPlatformApiJson.status(configuration, summary));
             return;
         }
+        if ("/readiness".equals(path) || "/health".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/readiness");
+            resp.getWriter().write(AiPlatformApiJson.readiness(
+                    configuration,
+                    summary,
+                    tenantService.snapshot(),
+                    providerRegistry.listProviders()
+            ));
+            return;
+        }
         if ("/models".equals(path)) {
             usageService.recordControlPlaneAccess("/api/models");
             resp.getWriter().write(AiPlatformApiJson.models(registryService.listModels(), summary));
@@ -153,9 +163,14 @@ public class AiPlatformApiServlet extends HttpServlet {
         }
         if (path.startsWith("/models/")) {
             usageService.recordControlPlaneAccess("/api/models/{name}");
-            AiRegisteredModel model = registryService.findModel(path.substring("/models/".length()));
+            String modelName = path.substring("/models/".length());
+            if (modelName.isBlank()) {
+                badRequest(resp, "Model name is required");
+                return;
+            }
+            AiRegisteredModel model = registryService.findModel(modelName);
             if (model == null) {
-                notFound(resp, "Model not found");
+                notFound(resp, "Model not found: " + modelName);
                 return;
             }
             resp.getWriter().write(AiPlatformApiJson.model(model));
@@ -228,7 +243,7 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(buildConfigJson());
             return;
         }
-        // 의도 기반 라우팅 API
+        // Intent routing API
         if ("/intent/keywords".equals(path) && intentPolicyService != null) {
             usageService.recordControlPlaneAccess("/api/intent/keywords");
             resp.getWriter().write(buildIntentKeywordsJson());
@@ -255,7 +270,7 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(buildExportJson());
             return;
         }
-        // ── 게이트웨이 감사 API ──
+        // Gateway audit API
         if ("/gateway-audit".equals(path) && gatewayAuditLog != null) {
             usageService.recordControlPlaneAccess("/api/gateway-audit");
             int limit = parseInteger(req.getParameter("limit"), 50);
@@ -287,7 +302,7 @@ public class AiPlatformApiServlet extends HttpServlet {
                 }
                 AiRegisteredModel model = registryService.findModel(modelName);
                 if (model == null) {
-                    notFound(resp, "모델을 찾을 수 없습니다: " + modelName);
+                    notFound(resp, "Model not found: " + modelName);
                     return;
                 }
                 registryService.removeModel(modelName);
@@ -296,7 +311,20 @@ public class AiPlatformApiServlet extends HttpServlet {
                 return;
             }
             if (path.startsWith("/tenants/")) {
-                String tenantId = path.substring("/tenants/".length());
+                String[] segments = Arrays.stream(path.split("/"))
+                        .filter(segment -> !segment.isBlank())
+                        .toArray(String[]::new);
+                if (segments.length == 4 && "tenants".equals(segments[0]) && "keys".equals(segments[2])) {
+                    tenantService.revokeApiKey(segments[1], segments[3]);
+                    resp.getWriter().write("{\"revoked\":true,\"tenantId\":\"" + esc(segments[1])
+                            + "\",\"keyId\":\"" + esc(segments[3]) + "\"}");
+                    return;
+                }
+                if (segments.length != 2 || !"tenants".equals(segments[0])) {
+                    notFound(resp, "Not Found");
+                    return;
+                }
+                String tenantId = segments[1];
                 if (tenantId.isBlank()) {
                     badRequest(resp, "Tenant ID is required");
                     return;
@@ -305,7 +333,7 @@ public class AiPlatformApiServlet extends HttpServlet {
                 resp.getWriter().write("{\"deleted\":true,\"tenantId\":\"" + AiGatewayServlet.escapeJson(tenantId) + "\"}");
                 return;
             }
-            // Provider 삭제
+            // Provider deletion
             if (path.startsWith("/providers/") && path.length() > "/providers/".length()) {
                 String pid = path.substring("/providers/".length());
                 boolean removed = providerRegistry.removeDynamic(pid);
@@ -313,14 +341,14 @@ public class AiPlatformApiServlet extends HttpServlet {
                 resp.getWriter().write("{\"deleted\":true,\"providerId\":\"" + esc(pid) + "\"}");
                 return;
             }
-            // 의도 키워드 삭제
+            // Intent keyword change
             if (path.startsWith("/intent/keywords/") && intentPolicyService != null) {
                 String keywordId = path.substring("/intent/keywords/".length());
                 intentPolicyService.removeKeyword(keywordId);
                 resp.getWriter().write("{\"deleted\":true,\"keywordId\":\"" + esc(keywordId) + "\"}");
                 return;
             }
-            // 의도 정책 삭제
+            // Intent policy change
             if (path.startsWith("/intent/policies/") && intentPolicyService != null) {
                 String policyId = path.substring("/intent/policies/".length());
                 intentPolicyService.removePolicy(policyId);
@@ -339,7 +367,7 @@ public class AiPlatformApiServlet extends HttpServlet {
         String path = normalizePath(req.getPathInfo());
         String body = req.getReader().lines().collect(Collectors.joining("\n"));
         try {
-            // 의도 키워드 수정
+            // Intent keyword change
             if (path.startsWith("/intent/keywords/") && intentPolicyService != null) {
                 String keywordId = path.substring("/intent/keywords/".length());
                 String primaryKeyword = firstNonBlank(req.getParameter("primaryKeyword"), extractJsonString(body, "primaryKeyword"));
@@ -353,7 +381,7 @@ public class AiPlatformApiServlet extends HttpServlet {
                 resp.getWriter().write(buildKeywordJson(updated));
                 return;
             }
-            // 의도 정책 수정
+            // Intent policy change
             if (path.startsWith("/intent/policies/") && intentPolicyService != null) {
                 String policyId = path.substring("/intent/policies/".length());
                 String intentStr = firstNonBlank(req.getParameter("intent"), extractJsonString(body, "intent"));
@@ -439,7 +467,7 @@ public class AiPlatformApiServlet extends HttpServlet {
                 unavailable(resp, "\ud30c\uc778\ud29c\ub2dd \uae30\ub2a5\uc774 \uc81c\uac70\ub418\uc5c8\uc2b5\ub2c8\ub2e4.");
                 return;
             }
-            // 의도 기반 라우팅 API
+            // Intent routing API
             if ("/intent/test".equals(path) && intentEngine != null) {
                 usageService.recordControlPlaneAccess("/api/intent/test");
                 String prompt = firstNonBlank(req.getParameter("prompt"), extractJsonString(body, "prompt"));
@@ -476,7 +504,7 @@ public class AiPlatformApiServlet extends HttpServlet {
                 java.util.List<String> synonyms = synonymsStr.isBlank() ? java.util.List.of()
                         : java.util.Arrays.stream(synonymsStr.split("[,;|]")).map(String::trim).filter(s -> !s.isEmpty()).toList();
                 if (primaryKeyword.isBlank()) {
-                    badRequest(resp, "primaryKeyword는 필수입니다.");
+                    badRequest(resp, "primaryKeyword is required");
                     return;
                 }
                 IntentKeyword kw = intentPolicyService.addKeyword(primaryKeyword, synonyms, IntentType.fromString(intentStr), priority);
@@ -495,7 +523,7 @@ public class AiPlatformApiServlet extends HttpServlet {
                 String tenantOverride = firstNonBlank(req.getParameter("tenantOverride"), extractJsonString(body, "tenantOverride"));
                 int maxTokens = parseInteger(firstNonBlank(req.getParameter("maxInputTokens"), extractJsonNumber(body, "maxInputTokens")), 0);
                 if (modelName.isBlank()) {
-                    badRequest(resp, "modelName은 필수입니다.");
+                    badRequest(resp, "modelName is required");
                     return;
                 }
                 RoutingPolicy pol = intentPolicyService.addPolicy(IntentType.fromString(intentStr), priority, routeTarget, modelName, fallback, streaming, tenantOverride, maxTokens);
@@ -503,7 +531,7 @@ public class AiPlatformApiServlet extends HttpServlet {
                 resp.getWriter().write(buildPolicyJson(pol));
                 return;
             }
-            // ── Provider 동적 등록 ──
+            // Dynamic provider registration
             if ("/providers".equals(path)) {
                 usageService.recordControlPlaneAccess("/api/providers");
                 String providerId = firstNonBlank(req.getParameter("providerId"), extractJsonString(body, "providerId"));
@@ -531,7 +559,7 @@ public class AiPlatformApiServlet extends HttpServlet {
                         + ",\"baseUrl\":\"" + esc(pd.getBaseUrl()) + "\"}");
                 return;
             }
-            // 벌크 임포트
+            // Bulk import
             if ("/intent/import".equals(path) && intentPolicyService != null) {
                 usageService.recordControlPlaneAccess("/api/intent/import");
                 int imported = handleBulkImport(body);
@@ -544,9 +572,9 @@ public class AiPlatformApiServlet extends HttpServlet {
         } catch (NoSuchElementException e) {
             String hint = e.getMessage();
             if (hint != null && hint.contains("Model")) {
-                hint += " — 먼저 [버전 등록]으로 모델을 등록하세요.";
+                hint += " Register the model version first.";
             } else if (hint != null && hint.contains("Tenant")) {
-                hint += " — 먼저 [테넌트 등록]으로 테넌트를 생성하세요.";
+                hint += " Create the tenant first.";
             }
             notFound(resp, hint != null ? hint : "Not Found");
         }
@@ -758,8 +786,7 @@ public class AiPlatformApiServlet extends HttpServlet {
         return sb.toString();
     }
 
-    // ── Intent routing JSON builders ──
-
+    // Intent routing JSON builders
     private String buildIntentKeywordsJson() {
         var keywords = intentPolicyService.listKeywords();
         StringBuilder sb = new StringBuilder(2048);
@@ -936,7 +963,7 @@ public class AiPlatformApiServlet extends HttpServlet {
 
     private int handleBulkImport(String body) {
         int imported = 0;
-        // 키워드 배열 파싱 (간이 JSON 파싱)
+        // Parse keyword arrays from JSON payloads.
         java.util.regex.Pattern kwPattern = java.util.regex.Pattern.compile(
                 "\"primaryKeyword\"\\s*:\\s*\"([^\"]+)\"");
         java.util.regex.Pattern synPattern = java.util.regex.Pattern.compile(
@@ -946,7 +973,7 @@ public class AiPlatformApiServlet extends HttpServlet {
         java.util.regex.Pattern prioPattern = java.util.regex.Pattern.compile(
                 "\"priority\"\\s*:\\s*(\\d+)");
 
-        // Jackson으로 파싱 시도
+        // Prefer Jackson parsing when the payload is valid JSON.
         try {
             com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
             if (root.has("keywords") && root.get("keywords").isArray()) {
@@ -958,7 +985,7 @@ public class AiPlatformApiServlet extends HttpServlet {
                     int priority = kw.has("priority") ? kw.get("priority").asInt(50) : 50;
                     java.util.List<String> synonyms = syn.isBlank() ? java.util.List.of()
                             : java.util.Arrays.stream(syn.split("[,;|]")).map(String::trim).filter(s -> !s.isEmpty()).toList();
-                    // synonyms가 배열인 경우
+                    // Preserve array-based synonyms.
                     if (kw.has("synonyms") && kw.get("synonyms").isArray()) {
                         java.util.List<String> arr = new java.util.ArrayList<>();
                         for (com.fasterxml.jackson.databind.JsonNode s : kw.get("synonyms")) arr.add(s.asText());
@@ -983,13 +1010,12 @@ public class AiPlatformApiServlet extends HttpServlet {
                 }
             }
         } catch (Exception e) {
-            throw new IllegalArgumentException("JSON 파싱 오류: " + e.getMessage());
+            throw new IllegalArgumentException("JSON parsing error: " + e.getMessage());
         }
         return imported;
     }
 
-    // ── 게이트웨이 감사 JSON builders ──
-
+    // Gateway audit JSON builders
     private String buildGatewayAuditJson(int limit, String endpoint, String tenantId, String modelName, String modality) {
         java.util.List<AiGatewayAuditEntry> entries = gatewayAuditLog.query(limit, endpoint, tenantId, modelName, modality);
         StringBuilder sb = new StringBuilder(8192);

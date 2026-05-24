@@ -1,6 +1,7 @@
 package io.velo.was.aiplatform.api;
 
 import io.velo.was.aiplatform.observability.AiPlatformUsageSnapshot;
+import io.velo.was.aiplatform.provider.AiProviderRegistry;
 import io.velo.was.aiplatform.registry.AiModelRegistrySummary;
 import io.velo.was.aiplatform.registry.AiModelVersionInfo;
 import io.velo.was.aiplatform.registry.AiRegisteredModel;
@@ -29,6 +30,39 @@ public final class AiPlatformApiJson {
                 q("registeredModels") + ":" + summary.totalModels() + "," +
                 q("routableModels") + ":" + summary.routableModels() +
                 "}";
+    }
+
+    public static String readiness(ServerConfiguration configuration,
+                                   AiModelRegistrySummary summary,
+                                   AiTenantSnapshot tenantSnapshot,
+                                   List<AiProviderRegistry.AiProviderInfo> providers) {
+        ServerConfiguration.AiPlatform ai = configuration.getServer().getAiPlatform();
+        long healthyProviders = providers.stream().filter(AiProviderRegistry.AiProviderInfo::healthy).count();
+        boolean ready = ai.isEnabled() && summary.routableModels() > 0;
+
+        StringBuilder json = new StringBuilder(512).append('{')
+                .append(q("status")).append(':').append(q(ready ? "UP" : "DEGRADED")).append(',')
+                .append(q("ready")).append(':').append(ready).append(',')
+                .append(q("checks")).append(":{")
+                .append(q("aiPlatformEnabled")).append(':').append(ai.isEnabled()).append(',')
+                .append(q("routableModels")).append(':').append(summary.routableModels()).append(',')
+                .append(q("registeredModels")).append(':').append(summary.totalModels()).append(',')
+                .append(q("activeTenants")).append(':').append(tenantSnapshot.activeTenants()).append(',')
+                .append(q("providersRegistered")).append(':').append(providers.size()).append(',')
+                .append(q("healthyProviders")).append(':').append(healthyProviders)
+                .append("},")
+                .append(q("warnings")).append(':').append('[');
+        boolean first = true;
+        if (!ai.isEnabled()) {
+            first = appendWarning(json, first, "AI platform is disabled");
+        }
+        if (summary.routableModels() == 0) {
+            first = appendWarning(json, first, "No routable models are registered");
+        }
+        if (!providers.isEmpty() && healthyProviders == 0) {
+            appendWarning(json, first, "No providers passed health checks");
+        }
+        return json.append("]}").toString();
     }
 
     public static String overview(ServerConfiguration configuration,
@@ -177,6 +211,14 @@ public final class AiPlatformApiJson {
             json.append(q(entry.getKey())).append(':').append(entry.getValue());
         }
         return json.append('}').toString();
+    }
+
+    private static boolean appendWarning(StringBuilder json, boolean first, String warning) {
+        if (!first) {
+            json.append(',');
+        }
+        json.append(q(warning));
+        return false;
     }
 
     private static String q(String value) {

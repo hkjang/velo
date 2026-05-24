@@ -57,6 +57,10 @@ public class AiGatewayService {
         return providerRegistry;
     }
 
+    public List<ServerConfiguration.ModelProfile> getAvailableModels() {
+        return registryService.routingModels();
+    }
+
     public AiGatewayRouteDecision route(AiGatewayRequest request) {
         ServerConfiguration.AiPlatform ai = configuration.getServer().getAiPlatform();
         ServerConfiguration.Serving serving = ai.getServing();

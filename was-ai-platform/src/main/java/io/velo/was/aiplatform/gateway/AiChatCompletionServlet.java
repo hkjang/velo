@@ -140,10 +140,25 @@ public class AiChatCompletionServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         returnJson(resp);
-        resp.getWriter().write("{\"object\":\"list\",\"data\":[" +
-                "{\"id\":\"velo-ai-gateway\",\"object\":\"model\",\"owned_by\":\"velo\"}" +
-                "]}");
+        resp.getWriter().write(toOpenAiModelsResponse());
         resp.getWriter().flush();
+    }
+
+    private String toOpenAiModelsResponse() {
+        StringBuilder response = new StringBuilder(256).append("{\"object\":\"list\",\"data\":[");
+        boolean first = true;
+        for (ServerConfiguration.ModelProfile model : gatewayService.getAvailableModels()) {
+            if (!first) {
+                response.append(',');
+            }
+            first = false;
+            response.append("{\"id\":\"").append(AiGatewayServlet.escapeJson(model.getName())).append("\",")
+                    .append("\"object\":\"model\",")
+                    .append("\"owned_by\":\"").append(AiGatewayServlet.escapeJson(model.getProvider())).append("\",")
+                    .append("\"velo\":{\"category\":\"").append(AiGatewayServlet.escapeJson(model.getCategory())).append("\",")
+                    .append("\"version\":\"").append(AiGatewayServlet.escapeJson(model.getVersion())).append("\"}}");
+        }
+        return response.append("]}").toString();
     }
 
     private void streamResponse(HttpServletResponse resp, AiGatewayInferenceResult result,

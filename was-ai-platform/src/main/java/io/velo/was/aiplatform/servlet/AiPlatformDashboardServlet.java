@@ -273,7 +273,7 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("<strong>\u2460 \ud14c\ub10c\ud2b8 \ub4f1\ub85d:</strong> ID/\uc774\ub984/\uc694\uae08\uc81c \uc785\ub825 \ud6c4 <strong>[\ud14c\ub10c\ud2b8 \ub4f1\ub85d]</strong> \ud074\ub9ad<br>");
         b.append("<strong>\u2461 API \ud0a4 \ubc1c\uae09:</strong> \ub4f1\ub85d\ub41c \ud14c\ub10c\ud2b8 ID \uc785\ub825 \ud6c4 <strong>[API \ud0a4 \ubc1c\uae09]</strong> \ud074\ub9ad<br>");
         b.append("<strong>\u2462 \ud14c\ub10c\ud2b8 \uc0ad\uc81c:</strong> \ud14c\ub10c\ud2b8 ID \uc785\ub825 \ud6c4 <strong>[\ud14c\ub10c\ud2b8 \uc0ad\uc81c]</strong> \ud074\ub9ad<br>");
-        b.append("<strong>\ucc38\uace0:</strong> \uc11c\ubc84 \uc2dc\uc791 \uc2dc <code>tenant-demo</code> + <code>velo-demo-key</code>\uac00 \uc790\ub3d9 \uc0dd\uc131\ub429\ub2c8\ub2e4.");
+        b.append("<strong>\ucc38\uace0:</strong> \uc11c\ubc84 \uc2dc\uc791 \uc2dc <code>tenant-demo</code>\uac00 \uc0dd\uc131\ub418\uba70, API \ud0a4\ub294 \ucf58\uc194\uc5d0\uc11c \ubc1c\uae09\ud574\uc57c \ud569\ub2c8\ub2e4.");
         b.append("</div></div>\n");
         b.append("<div class=\"card\"><div class=\"card-header\">\ud14c\ub10c\ud2b8 CRUD</div>");
         b.append("<div class=\"form-grid cols-3\">");

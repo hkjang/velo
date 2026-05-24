@@ -13,14 +13,35 @@ public record TenantData(
         int rateLimitPerMinute,
         long tokenQuota,
         long createdAt,
+        long totalRequests,
+        long totalTokens,
+        long currentWindowEpochMinute,
+        int currentWindowRequests,
+        long lastActivityAt,
         List<ApiKeyData> apiKeys
 ) {
+    public TenantData(String tenantId,
+                      String displayName,
+                      String plan,
+                      boolean active,
+                      int rateLimitPerMinute,
+                      long tokenQuota,
+                      long createdAt,
+                      List<ApiKeyData> apiKeys) {
+        this(tenantId, displayName, plan, active, rateLimitPerMinute, tokenQuota, createdAt,
+                0L, 0L, 0L, 0, 0L, apiKeys);
+    }
+
     public record ApiKeyData(
             String keyId,
             String label,
             String secret,
             boolean active,
-            long createdAt
+            long createdAt,
+            long lastUsedAt
     ) {
+        public ApiKeyData(String keyId, String label, String secret, boolean active, long createdAt) {
+            this(keyId, label, secret, active, createdAt, 0L);
+        }
     }
 }

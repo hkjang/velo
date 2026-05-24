@@ -99,7 +99,7 @@ public class AiProviderRegistry {
                             adapter.displayName(),
                             adapter.protocol(),
                             adapter.supportsStreaming(),
-                            false,
+                            safeHealthCheck(adapter),
                             pd != null ? pd.getBaseUrl() : "",
                             pd != null ? pd.getModels() : List.of(),
                             pd != null ? pd.getType() : "unknown",
@@ -111,6 +111,14 @@ public class AiProviderRegistry {
 
     public int size() {
         return adapters.size();
+    }
+
+    private static boolean safeHealthCheck(AiProviderAdapter adapter) {
+        try {
+            return adapter.healthCheck();
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /**

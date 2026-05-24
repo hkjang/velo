@@ -81,7 +81,6 @@ public final class AiPlatformExtendedJson {
                 .append(q("apiKeyHeader")).append(':').append(q(snapshot.apiKeyHeader())).append(',')
                 .append(q("totalTenants")).append(':').append(snapshot.totalTenants()).append(',')
                 .append(q("activeTenants")).append(':').append(snapshot.activeTenants()).append(',')
-                .append(q("bootstrapApiKey")).append(':').append(q(snapshot.bootstrapApiKey())).append(',')
                 .append(q("tenants")).append(':').append('[');
         boolean first = true;
         for (AiTenantProfile tenant : snapshot.tenants()) {

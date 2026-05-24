@@ -112,7 +112,13 @@ public final class AiPlatformApplication {
                 .servlet("/agp/admin/*", new AgpAdminServlet(agpGateway));
 
         if (configuration.getServer().getAiPlatform().getPlatform().isDeveloperPortalEnabled()) {
-            builder.servlet("/api-docs/*", new AiPlatformApiDocsServlet(configuration));
+            builder.servlet("/api-docs/*", new AiPlatformApiDocsServlet(
+                    configuration,
+                    registryService,
+                    publishedApiService,
+                    tenantService,
+                    providerRegistry
+            ));
         }
 
         return builder.build();

@@ -53,4 +53,15 @@ class AiGatewayServiceTest {
         assertTrue(second.decision().cacheHit());
         assertEquals(first.decision().modelName(), second.decision().modelName());
     }
+
+    @Test
+    void availableModelsReflectRegistryRoutableModels() {
+        ServerConfiguration configuration = new ServerConfiguration();
+        configuration.validate();
+
+        AiGatewayService service = new AiGatewayService(configuration);
+
+        assertTrue(service.getAvailableModels().stream()
+                .anyMatch(model -> "llm-general".equals(model.getName())));
+    }
 }

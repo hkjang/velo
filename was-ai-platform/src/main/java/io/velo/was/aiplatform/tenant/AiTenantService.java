@@ -123,17 +123,42 @@ public class AiTenantService {
         if (tenant == null) {
             throw new NoSuchElementException("Tenant not found: " + tenantId);
         }
-        String normalizedLabel = label == null || label.isBlank() ? "default" : label.trim();
         long now = System.currentTimeMillis();
-        String keyId = "key-" + Long.toString(issuedKeySequence.incrementAndGet(), 36);
-        byte[] randomBytes = new byte[6];
-        secureRandom.nextBytes(randomBytes);
-        String secret = "vtk_" + normalizeKey(tenant.tenantId) + "_" + HexFormat.of().formatHex(randomBytes);
-        MutableApiKey apiKey = new MutableApiKey(keyId, normalizedLabel, secret, now);
-        tenant.apiKeys.put(normalizeKey(keyId), apiKey);
-        apiKeyIndex.put(secret, new ApiKeyRef(normalizeKey(tenant.tenantId), normalizeKey(keyId)));
+        AiTenantIssuedKey issuedKey = createApiKey(tenant, label, now);
         persistTenants();
-        return new AiTenantIssuedKey(tenant.tenantId, tenant.displayName, tenant.plan, keyId, normalizedLabel, secret, now);
+        return issuedKey;
+    }
+
+    public synchronized AiTenantKeyRotationResult rotateApiKey(String tenantId, String keyId, String label, long graceSeconds) {
+        MutableTenant tenant = tenants.get(normalizeKey(tenantId));
+        if (tenant == null) {
+            throw new NoSuchElementException("Tenant not found: " + tenantId);
+        }
+        MutableApiKey oldKey = tenant.apiKeys.get(normalizeKey(keyId));
+        if (oldKey == null) {
+            throw new NoSuchElementException("API key not found: " + keyId);
+        }
+        long now = System.currentTimeMillis();
+        if (!oldKey.active || (oldKey.expiresAtEpochMillis > 0 && oldKey.expiresAtEpochMillis <= now)) {
+            oldKey.active = false;
+            apiKeyIndex.remove(oldKey.secret);
+            persistTenants();
+            throw new IllegalStateException("API key is inactive");
+        }
+        long graceExpiresAt = 0L;
+        boolean oldKeyStillActive = graceSeconds > 0;
+        if (oldKeyStillActive) {
+            graceExpiresAt = now + (graceSeconds * 1000L);
+            oldKey.expiresAtEpochMillis = graceExpiresAt;
+        } else {
+            oldKey.active = false;
+            oldKey.expiresAtEpochMillis = now;
+            apiKeyIndex.remove(oldKey.secret);
+        }
+        String nextLabel = label == null || label.isBlank() ? oldKey.label + "-rotated" : label;
+        AiTenantIssuedKey newKey = createApiKey(tenant, nextLabel, now);
+        persistTenants();
+        return new AiTenantKeyRotationResult(newKey, oldKey.keyId, graceExpiresAt, oldKeyStillActive);
     }
 
     public synchronized void revokeApiKey(String tenantId, String keyId) {
@@ -171,6 +196,12 @@ public class AiTenantService {
             throw new SecurityException("API key is inactive");
         }
         long now = System.currentTimeMillis();
+        if (key.expiresAtEpochMillis > 0 && key.expiresAtEpochMillis <= now) {
+            key.active = false;
+            apiKeyIndex.remove(key.secret);
+            persistTenants();
+            throw new SecurityException("API key expired");
+        }
         refreshWindow(tenant, now);
         int nextWindowRequests = tenant.currentWindowRequests + 1;
         if (nextWindowRequests > tenant.rateLimitPerMinute) {
@@ -216,6 +247,18 @@ public class AiTenantService {
         persistTenants();
     }
 
+    private AiTenantIssuedKey createApiKey(MutableTenant tenant, String label, long now) {
+        String normalizedLabel = label == null || label.isBlank() ? "default" : label.trim();
+        String keyId = "key-" + Long.toString(issuedKeySequence.incrementAndGet(), 36);
+        byte[] randomBytes = new byte[6];
+        secureRandom.nextBytes(randomBytes);
+        String secret = "vtk_" + normalizeKey(tenant.tenantId) + "_" + HexFormat.of().formatHex(randomBytes);
+        MutableApiKey apiKey = new MutableApiKey(keyId, normalizedLabel, secret, now);
+        tenant.apiKeys.put(normalizeKey(keyId), apiKey);
+        apiKeyIndex.put(secret, new ApiKeyRef(normalizeKey(tenant.tenantId), normalizeKey(keyId)));
+        return new AiTenantIssuedKey(tenant.tenantId, tenant.displayName, tenant.plan, keyId, normalizedLabel, secret, now);
+    }
+
     private void bootstrapDemoTenant() {
         registerOrUpdate(new AiTenantRegistrationRequest(
                 DEMO_TENANT_ID,
@@ -237,7 +280,8 @@ public class AiTenantService {
                         maskSecret(key.secret),
                         key.active,
                         key.createdAtEpochMillis,
-                        key.lastUsedAtEpochMillis
+                        key.lastUsedAtEpochMillis,
+                        key.expiresAtEpochMillis
                 ))
                 .toList();
         AiTenantUsageInfo usage = new AiTenantUsageInfo(
@@ -324,6 +368,7 @@ public class AiTenantService {
         private boolean active = true;
         private final long createdAtEpochMillis;
         private long lastUsedAtEpochMillis;
+        private long expiresAtEpochMillis;
 
         private MutableApiKey(String keyId, String label, String secret, long createdAtEpochMillis) {
             this.keyId = keyId;
@@ -361,8 +406,12 @@ public class AiTenantService {
                         MutableApiKey apiKey = new MutableApiKey(akd.keyId(), akd.label(), akd.secret(), akd.createdAt());
                         apiKey.active = akd.active();
                         apiKey.lastUsedAtEpochMillis = akd.lastUsedAt();
+                        apiKey.expiresAtEpochMillis = akd.expiresAt();
                         tenant.apiKeys.put(normalizeKey(akd.keyId()), apiKey);
-                        apiKeyIndex.put(akd.secret(), new ApiKeyRef(normalizeKey(td.tenantId()), normalizeKey(akd.keyId())));
+                        issuedKeySequence.updateAndGet(current -> Math.max(current, sequenceFromKeyId(akd.keyId())));
+                        if (apiKey.active && (apiKey.expiresAtEpochMillis <= 0 || apiKey.expiresAtEpochMillis > System.currentTimeMillis())) {
+                            apiKeyIndex.put(akd.secret(), new ApiKeyRef(normalizeKey(td.tenantId()), normalizeKey(akd.keyId())));
+                        }
                     }
                 }
             }
@@ -384,7 +433,7 @@ public class AiTenantService {
             for (MutableTenant t : tenants.values()) {
                 List<TenantData.ApiKeyData> keys = t.apiKeys.values().stream()
                         .map(k -> new TenantData.ApiKeyData(k.keyId, k.label, k.secret, k.active,
-                                k.createdAtEpochMillis, k.lastUsedAtEpochMillis))
+                                k.createdAtEpochMillis, k.lastUsedAtEpochMillis, k.expiresAtEpochMillis))
                         .toList();
                 data.add(new TenantData(t.tenantId, t.displayName, t.plan, t.active,
                         t.rateLimitPerMinute, t.tokenQuota, t.createdAtEpochMillis,
@@ -393,6 +442,17 @@ public class AiTenantService {
             }
             dataStore.save(TENANTS_FILE, data);
         } catch (Exception ignored) {
+        }
+    }
+
+    private static long sequenceFromKeyId(String keyId) {
+        if (keyId == null || !keyId.startsWith("key-")) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(keyId.substring(4), 36);
+        } catch (NumberFormatException ignored) {
+            return 0L;
         }
     }
 }

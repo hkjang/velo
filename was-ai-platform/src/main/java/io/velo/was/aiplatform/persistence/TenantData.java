@@ -38,10 +38,16 @@ public record TenantData(
             String secret,
             boolean active,
             long createdAt,
-            long lastUsedAt
+            long lastUsedAt,
+            long expiresAt
     ) {
+        public ApiKeyData(String keyId, String label, String secret, boolean active,
+                          long createdAt, long lastUsedAt) {
+            this(keyId, label, secret, active, createdAt, lastUsedAt, 0L);
+        }
+
         public ApiKeyData(String keyId, String label, String secret, boolean active, long createdAt) {
-            this(keyId, label, secret, active, createdAt, 0L);
+            this(keyId, label, secret, active, createdAt, 0L, 0L);
         }
     }
 }

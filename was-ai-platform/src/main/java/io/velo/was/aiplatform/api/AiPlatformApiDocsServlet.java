@@ -50,6 +50,10 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
             serveDeveloperPortal(req, resp);
             return;
         }
+        if ("/swagger".equals(pathInfo) || "/swagger-ui".equals(pathInfo)) {
+            serveSwaggerStyleUi(req, resp);
+            return;
+        }
 
         resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
         resp.getWriter().write("Not Found");
@@ -118,6 +122,8 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append(",\n");
         modelRegistryPath(s);
         s.append(",\n");
+        apiPath(s, "/api/models/deployment-plan", "post", "Control Plane", "Preview model deployment impact", "Dry-run a model registration request without mutating the registry.", true);
+        s.append(",\n");
         apiPath(s, "/api/models/{name}/versions/{version}/status", "post", "Control Plane", "Change model version status", "Promote ACTIVE, keep CANARY, or retire a version.", false);
         s.append(",\n");
         apiPath(s, "/api/usage", "get", "Control Plane", "Get usage and metering counters", null, false);
@@ -130,9 +136,13 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append(",\n");
         apiPath(s, "/api/tenants/{id}/keys/{keyId}", "delete", "Control Plane", "Revoke a tenant API key", "Marks the key inactive and removes it from the authorization index.", false);
         s.append(",\n");
+        apiPath(s, "/api/tenants/{id}/keys/{keyId}/rotate", "post", "Control Plane", "Rotate a tenant API key", "Issues a replacement key and optionally keeps the previous key active for graceSeconds.", true);
+        s.append(",\n");
         apiPath(s, "/api/tenants/{id}/usage", "get", "Control Plane", "Get tenant usage metrics", null, false);
         s.append(",\n");
         apiPath(s, "/api/providers", "get", "Control Plane", "List AI providers", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/providers/circuit-breakers", "get", "Control Plane", "List provider circuit breaker states", null, false);
         s.append(",\n");
         apiPath(s, "/api/plugins", "get", "Control Plane", "List plugins", null, false);
         s.append(",\n");
@@ -154,6 +164,8 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         apiPath(s, "/api/intent/stats", "get", "Control Plane", "Get intent routing statistics", null, false);
         s.append(",\n");
         apiPath(s, "/api/intent/audit", "get", "Control Plane", "Get intent routing audit log", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/gateway-audit/export", "get", "Control Plane", "Export gateway audit log as NDJSON", "Supports endpoint, tenantId, modelName, modality, limit, and download query parameters.", false);
         s.append("\n");
         s.append("  },\n");
         // Components
@@ -398,6 +410,36 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
                 .replace("\t", "\\t");
     }
 
+    private void serveSwaggerStyleUi(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("text/html; charset=UTF-8");
+        resp.setCharacterEncoding("UTF-8");
+        String cp = req.getContextPath();
+        StringBuilder b = new StringBuilder(4096);
+        b.append("<!DOCTYPE html><html lang=\"ko\"><head><meta charset=\"UTF-8\">");
+        b.append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
+        b.append("<title>Velo AI Platform Swagger</title>");
+        b.append("<style>");
+        b.append(":root{--bg:#101820;--panel:#f7efe2;--ink:#14201b;--muted:#617069;--line:rgba(20,32,27,.16);--green:#1f7a5b;--gold:#d9a441;}");
+        b.append("*{box-sizing:border-box}body{margin:0;font-family:'IBM Plex Sans','Noto Sans KR',system-ui,sans-serif;background:radial-gradient(circle at 20% 0,#28463b 0,#101820 42%,#0b1117 100%);color:var(--panel)}");
+        b.append(".shell{max-width:1180px;margin:0 auto;padding:28px 16px 52px}.hero{padding:28px 0 18px}.hero h1{font-size:clamp(28px,5vw,52px);letter-spacing:-.05em;margin:0 0 8px}.hero p{color:rgba(247,239,226,.78);max-width:760px;line-height:1.7}");
+        b.append(".bar{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.bar a,.bar button{border:1px solid rgba(247,239,226,.22);background:rgba(247,239,226,.08);color:var(--panel);border-radius:999px;padding:10px 14px;text-decoration:none;font-weight:700;cursor:pointer}");
+        b.append(".grid{display:grid;grid-template-columns:300px 1fr;gap:16px}.card{background:var(--panel);color:var(--ink);border-radius:18px;border:1px solid var(--line);box-shadow:0 20px 70px rgba(0,0,0,.24);overflow:hidden}");
+        b.append(".side{padding:16px}.side input{width:100%;padding:11px;border-radius:12px;border:1px solid var(--line);margin-bottom:12px}.tag{font-size:12px;font-weight:800;color:var(--muted);margin:16px 0 8px;text-transform:uppercase}.op{display:block;width:100%;text-align:left;border:0;background:#fff8ec;border-radius:12px;margin:8px 0;padding:11px;cursor:pointer}.op b{font-size:12px;color:var(--green);margin-right:8px}.op span{font-size:12px;color:var(--muted);display:block;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}");
+        b.append(".main{padding:22px}.method{display:inline-block;background:var(--green);color:white;border-radius:8px;padding:5px 9px;font-weight:800;font-size:12px}.path{font-family:'JetBrains Mono',Consolas,monospace;font-size:20px;margin:12px 0}.summary{color:var(--muted);line-height:1.7}.raw{margin-top:18px;background:#101820;color:#e8f0e8;border-radius:14px;padding:16px;overflow:auto;max-height:520px;font-size:12px;line-height:1.6}.empty{color:var(--muted);padding:30px;text-align:center}@media(max-width:860px){.grid{grid-template-columns:1fr}}");
+        b.append("</style></head><body><div class=\"shell\"><section class=\"hero\">");
+        b.append("<h1>Swagger-style API Explorer</h1>");
+        b.append("<p>Standalone Velo AI Platform OpenAPI spec, rendered without external CDN dependencies. Use this page for quick endpoint discovery and keep the raw JSON contract available for tooling.</p>");
+        b.append("<div class=\"bar\"><a href=\"").append(cp).append("/api-docs/openapi.json\">OpenAPI JSON</a><a href=\"").append(cp).append("/api-docs/ui\">Developer Portal</a><button onclick=\"loadSpec()\">Reload Spec</button></div>");
+        b.append("</section><div class=\"grid\"><aside class=\"card side\"><input id=\"filter\" placeholder=\"Filter paths or summaries\" oninput=\"renderList()\"><div id=\"ops\"></div></aside><main class=\"card main\" id=\"detail\"><div class=\"empty\">Loading OpenAPI spec...</div></main></div></div>");
+        b.append("<script>");
+        b.append("let spec=null,ops=[],selected=0;async function loadSpec(){const r=await fetch('").append(cp).append("/api-docs/openapi.json',{cache:'no-store'});spec=await r.json();ops=[];Object.entries(spec.paths||{}).forEach(([p,ms])=>Object.entries(ms).forEach(([m,o])=>ops.push({path:p,method:m.toUpperCase(),summary:o.summary||'',description:o.description||'',operation:o})));renderList();show(0)}");
+        b.append("function renderList(){const q=(document.getElementById('filter').value||'').toLowerCase();const box=document.getElementById('ops');let html='',last='';ops.forEach((o,i)=>{if(q&&!(o.path+' '+o.summary).toLowerCase().includes(q))return;const tag=(o.operation.tags||['Other'])[0];if(tag!==last){html+='<div class=\"tag\">'+esc(tag)+'</div>';last=tag}html+='<button class=\"op\" onclick=\"show('+i+')\"><b>'+esc(o.method)+'</b>'+esc(o.summary)+'<span>'+esc(o.path)+'</span></button>'});box.innerHTML=html||'<div class=\"empty\">No matching paths</div>'}");
+        b.append("function show(i){selected=i;const o=ops[i];if(!o)return;document.getElementById('detail').innerHTML='<div class=\"method\">'+esc(o.method)+'</div><div class=\"path\">'+esc(o.path)+'</div><p class=\"summary\">'+esc(o.description||o.summary||'No description')+'</p><pre class=\"raw\">'+esc(JSON.stringify(o.operation,null,2))+'</pre>'}");
+        b.append("function esc(v){return String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}loadSpec();");
+        b.append("</script></body></html>");
+        resp.getWriter().write(b.toString());
+    }
+
     private void serveDeveloperPortal(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("text/html; charset=UTF-8");
         resp.setCharacterEncoding("UTF-8");
@@ -447,6 +489,7 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         b.append("<p>\uc790\ub3d9 \uc0dd\uc131\ub41c OpenAPI \uacc4\uc57d\uc11c\ub97c \ud655\uc778\ud558\uace0, AI \uac8c\uc774\ud2b8\uc6e8\uc774\ub97c \ud14c\uc2a4\ud2b8\ud558\uba70, \ub77c\uc6b0\ud305/\ucd94\ub860/\uc2a4\ud2b8\ub9ac\ubc0d \ub3d9\uc791\uc744 \uad00\ub9ac \ucf58\uc194 \uc5c6\uc774 \uac80\uc99d\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4.</p>\n");
         b.append("<div class=\"actions\">");
         b.append("<a class=\"btn-p\" href=\"").append(cp).append("/api-docs\">OpenAPI JSON</a>");
+        b.append("<a class=\"btn-s\" href=\"").append(cp).append("/api-docs/swagger\">Swagger-style UI</a>");
         b.append("<a class=\"btn-s\" href=\"").append(streamUrl).append("\">\uc2a4\ud2b8\ub9ac\ubc0d \ub370\ubaa8</a>");
         b.append("<a class=\"btn-s\" href=\"").append(cp).append("/\">\ucf58\uc194\uc73c\ub85c \ub3cc\uc544\uac00\uae30</a>");
         b.append("</div>\n</section>\n");

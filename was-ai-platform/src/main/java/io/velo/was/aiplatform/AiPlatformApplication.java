@@ -62,6 +62,12 @@ public final class AiPlatformApplication {
             pluginRegistry.register(new AiContentFilterPlugin());
         }
         AiProviderRegistry providerRegistry = new AiProviderRegistry();
+        ServerConfiguration.Advanced advanced = configuration.getServer().getAiPlatform().getAdvanced();
+        providerRegistry.configureCircuitBreaker(
+                advanced.getProviderHealthCacheTtlMillis(),
+                advanced.getProviderCircuitFailureThreshold(),
+                advanced.getProviderCircuitOpenMillis()
+        );
         providerRegistry.setDataStore(dataStore);  // 영속화된 프로바이더 로드
         AiGatewayService gatewayService = new AiGatewayService(configuration, registryService, providerRegistry);
 
@@ -73,7 +79,7 @@ public final class AiPlatformApplication {
                 .findFirst()
                 .map(ServerConfiguration.ModelProfile::getName)
                 .orElse("llm-general");
-        int analysisWindow = configuration.getServer().getAiPlatform().getAdvanced().getIntentAnalysisWindow();
+        int analysisWindow = advanced.getIntentAnalysisWindow();
         RouteDecisionEngine intentEngine = new RouteDecisionEngine(intentPolicyService, defaultModel, analysisWindow);
         gatewayService.setIntentEngine(intentEngine);
 

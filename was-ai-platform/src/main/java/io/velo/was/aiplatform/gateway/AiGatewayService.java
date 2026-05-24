@@ -100,7 +100,7 @@ public class AiGatewayService {
         }
 
         RoutePolicyMatch policyMatch = selectRoutePolicy(serving.getRoutePolicies(), resolution.resolvedType());
-        List<ServerConfiguration.ModelProfile> enabledModels = registryService.routingModels();
+        List<ServerConfiguration.ModelProfile> enabledModels = registryService.weightedRoutingModels();
         if (enabledModels.isEmpty()) {
             throw new IllegalStateException("No enabled AI models are registered");
         }
@@ -477,7 +477,7 @@ public class AiGatewayService {
                                                                 String strategy,
                                                                 boolean autoSelectionEnabled) {
         if (!autoSelectionEnabled && preferredModel != null) {
-            return preferredModel;
+            return selectWeightedVariant(preferredModel, candidates);
         }
         Comparator<ServerConfiguration.ModelProfile> comparator = switch (strategy) {
             case "LATENCY_FIRST", "COST_FIRST" -> Comparator
@@ -494,12 +494,40 @@ public class AiGatewayService {
                     .thenComparing(Comparator.comparing(ServerConfiguration.ModelProfile::isDefaultSelected).reversed())
                     .thenComparingInt(ServerConfiguration.ModelProfile::getLatencyMs);
         };
-        return candidates.stream()
+        ServerConfiguration.ModelProfile selected = candidates.stream()
                 .min(comparator)
                 .orElseGet(() -> enabledModels.stream()
                         .filter(ServerConfiguration.ModelProfile::isDefaultSelected)
                         .findFirst()
                         .orElse(enabledModels.get(0)));
+        return selectWeightedVariant(selected, candidates);
+    }
+
+    private static ServerConfiguration.ModelProfile selectWeightedVariant(ServerConfiguration.ModelProfile selected,
+                                                                          List<ServerConfiguration.ModelProfile> candidates) {
+        List<ServerConfiguration.ModelProfile> variants = candidates.stream()
+                .filter(candidate -> candidate.getName().equalsIgnoreCase(selected.getName()))
+                .toList();
+        if (variants.size() <= 1) {
+            return selected;
+        }
+        int totalWeight = variants.stream()
+                .mapToInt(ServerConfiguration.ModelProfile::getTrafficWeight)
+                .filter(weight -> weight > 0)
+                .sum();
+        if (totalWeight <= 0) {
+            return selected;
+        }
+        int ticket = ThreadLocalRandom.current().nextInt(totalWeight);
+        int cursor = 0;
+        for (ServerConfiguration.ModelProfile variant : variants) {
+            int weight = Math.max(0, variant.getTrafficWeight());
+            cursor += weight;
+            if (ticket < cursor) {
+                return variant;
+            }
+        }
+        return selected;
     }
 
     private static double balancedScore(ServerConfiguration.ModelProfile model) {

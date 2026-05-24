@@ -172,6 +172,15 @@ public class AiGatewayAuditLog {
     }
 
     /** 버퍼에 저장된 총 엔트리 수. */
+    public String exportJsonLines(int limit, String endpoint, String tenantId,
+                                  String modelName, String modality) {
+        StringBuilder lines = new StringBuilder(Math.max(256, limit * 128));
+        for (AiGatewayAuditEntry entry : query(limit, endpoint, tenantId, modelName, modality)) {
+            lines.append(entry.toJson()).append('\n');
+        }
+        return lines.toString();
+    }
+
     public int size() {
         lock.readLock().lock();
         try {

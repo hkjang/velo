@@ -10,6 +10,7 @@ import io.velo.was.aiplatform.publishing.AiPublishedEndpoint;
 import io.velo.was.aiplatform.publishing.AiPublishedInvocationResult;
 import io.velo.was.aiplatform.tenant.AiTenantApiKeyInfo;
 import io.velo.was.aiplatform.tenant.AiTenantIssuedKey;
+import io.velo.was.aiplatform.tenant.AiTenantKeyRotationResult;
 import io.velo.was.aiplatform.tenant.AiTenantProfile;
 import io.velo.was.aiplatform.tenant.AiTenantSnapshot;
 import io.velo.was.aiplatform.tenant.AiTenantUsageInfo;
@@ -115,7 +116,8 @@ public final class AiPlatformExtendedJson {
                     .append(q("secretPreview")).append(':').append(q(keyInfo.secretPreview())).append(',')
                     .append(q("active")).append(':').append(keyInfo.active()).append(',')
                     .append(q("createdAt")).append(':').append(q(Instant.ofEpochMilli(keyInfo.createdAtEpochMillis()).toString())).append(',')
-                    .append(q("lastUsedAt")).append(':').append(keyInfo.lastUsedAtEpochMillis() > 0 ? q(Instant.ofEpochMilli(keyInfo.lastUsedAtEpochMillis()).toString()) : "null")
+                    .append(q("lastUsedAt")).append(':').append(keyInfo.lastUsedAtEpochMillis() > 0 ? q(Instant.ofEpochMilli(keyInfo.lastUsedAtEpochMillis()).toString()) : "null").append(',')
+                    .append(q("expiresAt")).append(':').append(keyInfo.expiresAtEpochMillis() > 0 ? q(Instant.ofEpochMilli(keyInfo.expiresAtEpochMillis()).toString()) : "null")
                     .append('}');
         }
         return json.append(']').append(',')
@@ -136,6 +138,17 @@ public final class AiPlatformExtendedJson {
                 q("label") + ":" + q(issuedKey.label()) + "," +
                 q("apiKey") + ":" + q(issuedKey.apiKey()) + "," +
                 q("createdAt") + ":" + q(Instant.ofEpochMilli(issuedKey.createdAtEpochMillis()).toString()) +
+                "}";
+    }
+
+    public static String rotatedTenantKey(AiTenantKeyRotationResult rotation) {
+        return "{" +
+                q("rotated") + ":true," +
+                q("rotatedKeyId") + ":" + q(rotation.rotatedKeyId()) + "," +
+                q("oldKeyStillActive") + ":" + rotation.oldKeyStillActive() + "," +
+                q("graceExpiresAt") + ":" + (rotation.graceExpiresAtEpochMillis() > 0
+                        ? q(Instant.ofEpochMilli(rotation.graceExpiresAtEpochMillis()).toString()) : "null") + "," +
+                q("newKey") + ":" + issuedTenantKey(rotation.newKey()) +
                 "}";
     }
 
@@ -191,6 +204,10 @@ public final class AiPlatformExtendedJson {
                     .append(q("baseUrl")).append(':').append(q(provider.baseUrl())).append(',')
                     .append(q("type")).append(':').append(q(provider.type())).append(',')
                     .append(q("dynamic")).append(':').append(provider.dynamic()).append(',')
+                    .append(q("circuitState")).append(':').append(q(provider.circuitState())).append(',')
+                    .append(q("failureCount")).append(':').append(provider.failureCount()).append(',')
+                    .append(q("circuitOpenUntilEpochMillis")).append(':').append(provider.circuitOpenUntilEpochMillis()).append(',')
+                    .append(q("lastHealthCheckEpochMillis")).append(':').append(provider.lastHealthCheckEpochMillis()).append(',')
                     .append(q("models")).append(':').append('[');
             boolean mFirst = true;
             for (String m : provider.models()) {
@@ -199,6 +216,27 @@ public final class AiPlatformExtendedJson {
                 json.append(q(m));
             }
             json.append(']').append('}');
+        }
+        return json.append("]}").toString();
+    }
+
+    public static String providerCircuits(List<AiProviderRegistry.AiProviderCircuitInfo> circuits) {
+        StringBuilder json = new StringBuilder(512).append('{')
+                .append(q("count")).append(':').append(circuits.size()).append(',')
+                .append(q("circuits")).append(':').append('[');
+        boolean first = true;
+        for (AiProviderRegistry.AiProviderCircuitInfo circuit : circuits) {
+            if (!first) json.append(',');
+            first = false;
+            json.append('{')
+                    .append(q("providerId")).append(':').append(q(circuit.providerId())).append(',')
+                    .append(q("state")).append(':').append(q(circuit.state())).append(',')
+                    .append(q("failureCount")).append(':').append(circuit.failureCount()).append(',')
+                    .append(q("openUntilEpochMillis")).append(':').append(circuit.openUntilEpochMillis()).append(',')
+                    .append(q("lastHealthCheckEpochMillis")).append(':').append(circuit.lastHealthCheckEpochMillis()).append(',')
+                    .append(q("lastHealthy")).append(':').append(circuit.lastHealthy()).append(',')
+                    .append(q("lastError")).append(':').append(q(circuit.lastError()))
+                    .append('}');
         }
         return json.append("]}").toString();
     }

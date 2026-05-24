@@ -2,6 +2,7 @@ package io.velo.was.aiplatform.api;
 
 import io.velo.was.aiplatform.observability.AiPlatformUsageSnapshot;
 import io.velo.was.aiplatform.provider.AiProviderRegistry;
+import io.velo.was.aiplatform.registry.AiModelDeploymentPlanner;
 import io.velo.was.aiplatform.registry.AiModelRegistrySummary;
 import io.velo.was.aiplatform.registry.AiModelVersionInfo;
 import io.velo.was.aiplatform.registry.AiRegisteredModel;
@@ -161,6 +162,31 @@ public final class AiPlatformApiJson {
                     .append(q("enabled")).append(':').append(version.enabled()).append(',')
                     .append(q("registeredAt")).append(':').append(q(Instant.ofEpochMilli(version.registeredAtEpochMillis()).toString()))
                     .append('}');
+        }
+        return json.append("]}").toString();
+    }
+
+    public static String deploymentPlan(AiModelDeploymentPlanner.DeploymentPlan plan) {
+        StringBuilder json = new StringBuilder(512);
+        json.append('{')
+                .append(q("modelName")).append(':').append(q(plan.modelName())).append(',')
+                .append(q("version")).append(':').append(q(plan.version())).append(',')
+                .append(q("requestedStatus")).append(':').append(q(plan.requestedStatus())).append(',')
+                .append(q("newModel")).append(':').append(plan.newModel()).append(',')
+                .append(q("newVersion")).append(':').append(plan.newVersion()).append(',')
+                .append(q("promotesActive")).append(':').append(plan.promotesActive()).append(',')
+                .append(q("canaryDeployment")).append(':').append(plan.canaryDeployment()).append(',')
+                .append(q("replacesActive")).append(':').append(plan.replacesActive()).append(',')
+                .append(q("currentActiveVersion")).append(':').append(q(plan.currentActiveVersion())).append(',')
+                .append(q("affectedEndpoint")).append(':').append(q(plan.affectedEndpoint())).append(',')
+                .append(q("warnings")).append(':').append('[');
+        boolean first = true;
+        for (String warning : plan.warnings()) {
+            if (!first) {
+                json.append(',');
+            }
+            first = false;
+            json.append(q(warning));
         }
         return json.append("]}").toString();
     }

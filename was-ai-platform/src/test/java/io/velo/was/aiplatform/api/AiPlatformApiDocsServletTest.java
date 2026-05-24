@@ -38,7 +38,11 @@ class AiPlatformApiDocsServletTest {
         assertTrue(spec.at("/paths/~1api~1models").has("get"));
         assertTrue(spec.at("/paths/~1api~1models").has("post"));
         assertTrue(spec.at("/paths/~1api~1readiness").has("get"));
+        assertTrue(spec.at("/paths/~1api~1models~1deployment-plan").has("post"));
         assertTrue(spec.at("/paths/~1api~1tenants~1{id}~1keys~1{keyId}").has("delete"));
+        assertTrue(spec.at("/paths/~1api~1tenants~1{id}~1keys~1{keyId}~1rotate").has("post"));
+        assertTrue(spec.at("/paths/~1api~1providers~1circuit-breakers").has("get"));
+        assertTrue(spec.at("/paths/~1api~1gateway-audit~1export").has("get"));
         assertEquals("X-AI-API-Key", spec.at("/x-velo/apiKeyHeader").asText());
         assertTrue(containsModel(spec.at("/x-velo/models"), "llm-general"));
         assertTrue(containsText(spec.at("/paths/~1invoke~1{model}/post/parameters/0/schema/enum"), "llm-general"));

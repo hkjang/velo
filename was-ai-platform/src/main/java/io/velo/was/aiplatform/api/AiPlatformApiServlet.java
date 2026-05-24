@@ -14,11 +14,13 @@ import io.velo.was.aiplatform.gateway.AiGatewayServlet;
 import io.velo.was.aiplatform.observability.AiPlatformUsageService;
 import io.velo.was.aiplatform.observability.AiPlatformUsageSnapshot;
 import io.velo.was.aiplatform.publishing.AiPublishedApiService;
+import io.velo.was.aiplatform.registry.AiModelDeploymentPlanner;
 import io.velo.was.aiplatform.registry.AiModelRegistrationRequest;
 import io.velo.was.aiplatform.registry.AiModelRegistryService;
 import io.velo.was.aiplatform.registry.AiModelRegistrySummary;
 import io.velo.was.aiplatform.registry.AiRegisteredModel;
 import io.velo.was.aiplatform.tenant.AiTenantIssuedKey;
+import io.velo.was.aiplatform.tenant.AiTenantKeyRotationResult;
 import io.velo.was.aiplatform.tenant.AiTenantRegistrationRequest;
 import io.velo.was.aiplatform.tenant.AiTenantService;
 import io.velo.was.config.ServerConfiguration;
@@ -148,6 +150,10 @@ public class AiPlatformApiServlet extends HttpServlet {
         }
         if ("/readiness".equals(path) || "/health".equals(path)) {
             usageService.recordControlPlaneAccess("/api/readiness");
+            if (configuration.getServer().getAiPlatform().getAdvanced().isReadinessFailureStatusEnabled()
+                    && (!configuration.getServer().getAiPlatform().isEnabled() || summary.routableModels() == 0)) {
+                resp.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            }
             resp.getWriter().write(AiPlatformApiJson.readiness(
                     configuration,
                     summary,
@@ -212,6 +218,11 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(AiPlatformExtendedJson.providers(providerRegistry.listProviders()));
             return;
         }
+        if ("/providers/circuit-breakers".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/providers/circuit-breakers");
+            resp.getWriter().write(AiPlatformExtendedJson.providerCircuits(providerRegistry.listCircuitBreakers()));
+            return;
+        }
         if (path.startsWith("/providers/") && path.length() > "/providers/".length()) {
             String pid = path.substring("/providers/".length());
             io.velo.was.aiplatform.persistence.ProviderData pd = providerRegistry.getProviderData(pid);
@@ -271,6 +282,20 @@ public class AiPlatformApiServlet extends HttpServlet {
             return;
         }
         // Gateway audit API
+        if ("/gateway-audit/export".equals(path) && gatewayAuditLog != null) {
+            usageService.recordControlPlaneAccess("/api/gateway-audit/export");
+            int limit = parseInteger(req.getParameter("limit"), 1000);
+            String filterEndpoint = req.getParameter("endpoint");
+            String filterTenant = req.getParameter("tenantId");
+            String filterModel = req.getParameter("modelName");
+            String filterModality = req.getParameter("modality");
+            resp.setContentType("application/x-ndjson; charset=UTF-8");
+            if (parseBoolean(req.getParameter("download"), false)) {
+                resp.setHeader("Content-Disposition", "attachment; filename=\"ai-gateway-audit.ndjson\"");
+            }
+            resp.getWriter().write(gatewayAuditLog.exportJsonLines(limit, filterEndpoint, filterTenant, filterModel, filterModality));
+            return;
+        }
         if ("/gateway-audit".equals(path) && gatewayAuditLog != null) {
             usageService.recordControlPlaneAccess("/api/gateway-audit");
             int limit = parseInteger(req.getParameter("limit"), 50);
@@ -411,6 +436,13 @@ public class AiPlatformApiServlet extends HttpServlet {
         String path = normalizePath(req.getPathInfo());
         String body = req.getReader().lines().collect(Collectors.joining("\n"));
         try {
+            if ("/models/deployment-plan".equals(path)) {
+                usageService.recordControlPlaneAccess("/api/models/deployment-plan");
+                AiModelDeploymentPlanner.DeploymentPlan plan =
+                        AiModelDeploymentPlanner.plan(registryService, readRegistrationRequest(req, body), req.getContextPath());
+                resp.getWriter().write(AiPlatformApiJson.deploymentPlan(plan));
+                return;
+            }
             if ("/models".equals(path)) {
                 if (!configuration.getServer().getAiPlatform().getPlatform().isModelRegistrationEnabled()) {
                     unavailable(resp, "Model registration is disabled in configuration");
@@ -569,6 +601,8 @@ public class AiPlatformApiServlet extends HttpServlet {
             notFound(resp, "Not Found");
         } catch (IllegalArgumentException e) {
             badRequest(resp, e.getMessage());
+        } catch (IllegalStateException e) {
+            badRequest(resp, e.getMessage());
         } catch (NoSuchElementException e) {
             String hint = e.getMessage();
             if (hint != null && hint.contains("Model")) {
@@ -599,6 +633,15 @@ public class AiPlatformApiServlet extends HttpServlet {
         String[] segments = Arrays.stream(path.split("/"))
                 .filter(segment -> !segment.isBlank())
                 .toArray(String[]::new);
+        if (segments.length == 5 && "tenants".equals(segments[0]) && "keys".equals(segments[2]) && "rotate".equals(segments[4])) {
+            usageService.recordControlPlaneAccess("/api/tenants/{id}/keys/{keyId}/rotate");
+            long graceSeconds = parseLong(firstNonBlank(req.getParameter("graceSeconds"), extractJsonNumber(body, "graceSeconds")), 0L);
+            String label = firstNonBlank(req.getParameter("label"), extractJsonString(body, "label"));
+            AiTenantKeyRotationResult rotation = tenantService.rotateApiKey(segments[1], segments[3], label, graceSeconds);
+            resp.setStatus(HttpServletResponse.SC_CREATED);
+            resp.getWriter().write(AiPlatformExtendedJson.rotatedTenantKey(rotation));
+            return;
+        }
         if (segments.length == 3 && "tenants".equals(segments[0]) && "keys".equals(segments[2])) {
             usageService.recordControlPlaneAccess("/api/tenants/{id}/keys");
             AiTenantIssuedKey issuedKey = tenantService.issueApiKey(segments[1], firstNonBlank(req.getParameter("label"), extractJsonString(body, "label")));

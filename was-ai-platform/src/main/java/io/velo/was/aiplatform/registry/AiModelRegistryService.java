@@ -123,19 +123,32 @@ public class AiModelRegistryService {
             if (activeVersion == null || !model.enabled || !isRouteEligible(activeVersion)) {
                 continue;
             }
-            routed.add(new ServerConfiguration.ModelProfile(
-                    model.name,
-                    model.category,
-                    model.provider,
-                    activeVersion.version,
-                    activeVersion.latencyTier,
-                    activeVersion.latencyMs,
-                    activeVersion.accuracyScore,
-                    activeVersion.defaultSelected,
-                    true
-            ));
+            routed.add(toModelProfile(model, activeVersion, trafficWeight(activeVersion)));
         }
         routed.sort(Comparator.comparing(ServerConfiguration.ModelProfile::getName));
+        return List.copyOf(routed);
+    }
+
+    public synchronized List<ServerConfiguration.ModelProfile> weightedRoutingModels() {
+        List<ServerConfiguration.ModelProfile> routed = new ArrayList<>();
+        for (MutableRegisteredModel model : models.values()) {
+            if (!model.enabled) {
+                continue;
+            }
+            for (MutableVersion version : model.versions.values()) {
+                if (!isRouteEligible(version)) {
+                    continue;
+                }
+                int weight = trafficWeight(version);
+                if (weight > 0) {
+                    routed.add(toModelProfile(model, version, weight));
+                }
+            }
+        }
+        routed.sort(Comparator
+                .comparing(ServerConfiguration.ModelProfile::getName)
+                .thenComparingInt((ServerConfiguration.ModelProfile profile) -> statusSortWeight(profile.getTrafficWeight()))
+                .thenComparing(ServerConfiguration.ModelProfile::getVersion));
         return List.copyOf(routed);
     }
 
@@ -241,6 +254,33 @@ public class AiModelRegistryService {
                 && version.enabled
                 && !"INACTIVE".equals(version.status)
                 && !"DEPRECATED".equals(version.status);
+    }
+
+    private ServerConfiguration.ModelProfile toModelProfile(MutableRegisteredModel model, MutableVersion version, int trafficWeight) {
+        return new ServerConfiguration.ModelProfile(
+                model.name,
+                model.category,
+                model.provider,
+                version.version,
+                version.latencyTier,
+                version.latencyMs,
+                version.accuracyScore,
+                version.defaultSelected,
+                true,
+                trafficWeight
+        );
+    }
+
+    private int trafficWeight(MutableVersion version) {
+        return switch (version.status) {
+            case "ACTIVE" -> 100;
+            case "CANARY" -> 10;
+            default -> 0;
+        };
+    }
+
+    private static int statusSortWeight(int trafficWeight) {
+        return trafficWeight >= 100 ? 0 : 1;
     }
 
     private int statusRank(MutableVersion version) {

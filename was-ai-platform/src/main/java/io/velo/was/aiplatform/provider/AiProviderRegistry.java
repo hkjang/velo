@@ -23,18 +23,39 @@ public class AiProviderRegistry {
 
     private final ConcurrentMap<String, AiProviderAdapter> adapters = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ProviderData> providerDataMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ProviderRuntimeState> runtimeStates = new ConcurrentHashMap<>();
     private volatile AiPlatformDataStore dataStore;
+    private volatile long healthCacheTtlMillis = 10_000L;
+    private volatile int circuitFailureThreshold = 2;
+    private volatile long circuitOpenMillis = 30_000L;
 
     public void setDataStore(AiPlatformDataStore dataStore) {
         this.dataStore = dataStore;
         loadFromDisk();
     }
 
+    public void configureCircuitBreaker(long healthCacheTtlMillis, int failureThreshold, long openMillis) {
+        if (healthCacheTtlMillis <= 0) {
+            throw new IllegalArgumentException("healthCacheTtlMillis must be positive");
+        }
+        if (failureThreshold <= 0) {
+            throw new IllegalArgumentException("failureThreshold must be positive");
+        }
+        if (openMillis <= 0) {
+            throw new IllegalArgumentException("openMillis must be positive");
+        }
+        this.healthCacheTtlMillis = healthCacheTtlMillis;
+        this.circuitFailureThreshold = failureThreshold;
+        this.circuitOpenMillis = openMillis;
+    }
+
     public void register(AiProviderAdapter adapter) {
         if (adapter == null || adapter.providerId() == null || adapter.providerId().isBlank()) {
             throw new IllegalArgumentException("Adapter must have a non-blank providerId");
         }
-        adapters.put(adapter.providerId().trim().toLowerCase(), adapter);
+        String key = normalizeKey(adapter.providerId());
+        adapters.put(key, adapter);
+        runtimeStates.computeIfAbsent(key, ignored -> new ProviderRuntimeState());
     }
 
     /**
@@ -65,6 +86,7 @@ public class AiProviderRegistry {
         String key = providerId.trim().toLowerCase();
         AiProviderAdapter removed = adapters.remove(key);
         providerDataMap.remove(key);
+        runtimeStates.remove(key);
         if (removed != null) { saveToDisk(); LOG.info("Dynamic provider removed: " + key); }
         return removed != null;
     }
@@ -86,7 +108,9 @@ public class AiProviderRegistry {
         if (providerId == null) {
             return null;
         }
-        return adapters.remove(providerId.trim().toLowerCase());
+        String key = normalizeKey(providerId);
+        runtimeStates.remove(key);
+        return adapters.remove(key);
     }
 
     public List<AiProviderInfo> listProviders() {
@@ -99,11 +123,34 @@ public class AiProviderRegistry {
                             adapter.displayName(),
                             adapter.protocol(),
                             adapter.supportsStreaming(),
-                            safeHealthCheck(adapter),
+                            cachedHealthCheck(adapter),
                             pd != null ? pd.getBaseUrl() : "",
                             pd != null ? pd.getModels() : List.of(),
                             pd != null ? pd.getType() : "unknown",
-                            pd != null
+                            pd != null,
+                            circuitState(adapter.providerId(), System.currentTimeMillis()),
+                            stateFor(adapter.providerId()).failureCount,
+                            stateFor(adapter.providerId()).openUntilEpochMillis,
+                            stateFor(adapter.providerId()).lastHealthCheckEpochMillis
+                    );
+                })
+                .toList();
+    }
+
+    public List<AiProviderCircuitInfo> listCircuitBreakers() {
+        long now = System.currentTimeMillis();
+        return adapters.keySet().stream()
+                .sorted()
+                .map(providerId -> {
+                    ProviderRuntimeState state = stateFor(providerId);
+                    return new AiProviderCircuitInfo(
+                            providerId,
+                            circuitState(providerId, now),
+                            state.failureCount,
+                            state.openUntilEpochMillis,
+                            state.lastHealthCheckEpochMillis,
+                            state.lastHealthy,
+                            state.lastError
                     );
                 })
                 .toList();
@@ -113,10 +160,29 @@ public class AiProviderRegistry {
         return adapters.size();
     }
 
-    private static boolean safeHealthCheck(AiProviderAdapter adapter) {
+    private boolean cachedHealthCheck(AiProviderAdapter adapter) {
+        String key = normalizeKey(adapter.providerId());
+        ProviderRuntimeState state = stateFor(key);
+        long now = System.currentTimeMillis();
+        if (!isCallAllowed(key, now)) {
+            return false;
+        }
+        if (state.lastHealthCheckEpochMillis > 0
+                && now - state.lastHealthCheckEpochMillis < healthCacheTtlMillis) {
+            return state.lastHealthy;
+        }
         try {
-            return adapter.healthCheck();
+            boolean healthy = adapter.healthCheck();
+            state.lastHealthCheckEpochMillis = now;
+            if (healthy) {
+                recordSuccess(key, now);
+            } else {
+                recordFailure(key, "healthCheck returned false", now);
+            }
+            return healthy;
         } catch (RuntimeException e) {
+            state.lastHealthCheckEpochMillis = now;
+            recordFailure(key, e.getMessage(), now);
             return false;
         }
     }
@@ -130,7 +196,19 @@ public class AiProviderRegistry {
         if (adapter == null) {
             return null;
         }
-        return adapter.chatCompletion(request);
+        String key = normalizeKey(providerId);
+        long now = System.currentTimeMillis();
+        if (!isCallAllowed(key, now)) {
+            return null;
+        }
+        try {
+            AiProviderResponse response = adapter.chatCompletion(request);
+            recordSuccess(key, now);
+            return response;
+        } catch (RuntimeException e) {
+            recordFailure(key, e.getMessage(), now);
+            throw e;
+        }
     }
 
     /**
@@ -147,14 +225,26 @@ public class AiProviderRegistry {
         if (adapter == null) {
             return null;
         }
-        return switch (modality != null ? modality : "text") {
-            case "vision" -> adapter.chatCompletion(request); // vision uses chat with image content
-            case "image_gen" -> adapter.imageGeneration(request);
-            case "stt" -> adapter.speechToText(request);
-            case "tts" -> adapter.textToSpeech(request);
-            case "embedding" -> adapter.embeddings(request);
-            default -> adapter.chatCompletion(request);
-        };
+        String key = normalizeKey(providerId);
+        long now = System.currentTimeMillis();
+        if (!isCallAllowed(key, now)) {
+            return null;
+        }
+        try {
+            AiProviderResponse response = switch (modality != null ? modality : "text") {
+                case "vision" -> adapter.chatCompletion(request); // vision uses chat with image content
+                case "image_gen" -> adapter.imageGeneration(request);
+                case "stt" -> adapter.speechToText(request);
+                case "tts" -> adapter.textToSpeech(request);
+                case "embedding" -> adapter.embeddings(request);
+                default -> adapter.chatCompletion(request);
+            };
+            recordSuccess(key, now);
+            return response;
+        } catch (RuntimeException e) {
+            recordFailure(key, e.getMessage(), now);
+            throw e;
+        }
     }
 
     // ── 영속화 ──────────────────────────────────────────────────
@@ -189,8 +279,68 @@ public class AiProviderRegistry {
         };
     }
 
+    private ProviderRuntimeState stateFor(String providerId) {
+        return runtimeStates.computeIfAbsent(normalizeKey(providerId), ignored -> new ProviderRuntimeState());
+    }
+
+    private boolean isCallAllowed(String providerId, long now) {
+        return stateFor(providerId).openUntilEpochMillis <= now;
+    }
+
+    private void recordSuccess(String providerId, long now) {
+        ProviderRuntimeState state = stateFor(providerId);
+        state.failureCount = 0;
+        state.openUntilEpochMillis = 0L;
+        state.lastHealthy = true;
+        state.lastError = "";
+        state.lastSuccessEpochMillis = now;
+    }
+
+    private void recordFailure(String providerId, String error, long now) {
+        ProviderRuntimeState state = stateFor(providerId);
+        state.failureCount++;
+        state.lastHealthy = false;
+        state.lastError = error == null || error.isBlank() ? "provider call failed" : error;
+        state.lastFailureEpochMillis = now;
+        if (state.failureCount >= circuitFailureThreshold) {
+            state.openUntilEpochMillis = now + circuitOpenMillis;
+        }
+    }
+
+    private String circuitState(String providerId, long now) {
+        ProviderRuntimeState state = stateFor(providerId);
+        if (state.openUntilEpochMillis > now) {
+            return "OPEN";
+        }
+        if (state.failureCount >= circuitFailureThreshold && state.openUntilEpochMillis > 0) {
+            return "HALF_OPEN";
+        }
+        return "CLOSED";
+    }
+
+    private static String normalizeKey(String value) {
+        return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private static final class ProviderRuntimeState {
+        private volatile int failureCount;
+        private volatile long openUntilEpochMillis;
+        private volatile long lastHealthCheckEpochMillis;
+        private volatile boolean lastHealthy = true;
+        private volatile String lastError = "";
+        private volatile long lastSuccessEpochMillis;
+        private volatile long lastFailureEpochMillis;
+    }
+
     public record AiProviderInfo(String providerId, String displayName, String protocol,
                                  boolean supportsStreaming, boolean healthy,
-                                 String baseUrl, List<String> models, String type, boolean dynamic) {
+                                 String baseUrl, List<String> models, String type, boolean dynamic,
+                                 String circuitState, int failureCount,
+                                 long circuitOpenUntilEpochMillis, long lastHealthCheckEpochMillis) {
+    }
+
+    public record AiProviderCircuitInfo(String providerId, String state, int failureCount,
+                                        long openUntilEpochMillis, long lastHealthCheckEpochMillis,
+                                        boolean lastHealthy, String lastError) {
     }
 }

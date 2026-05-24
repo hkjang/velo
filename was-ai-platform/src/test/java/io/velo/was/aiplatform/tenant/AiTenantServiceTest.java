@@ -12,6 +12,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -110,6 +111,39 @@ class AiTenantServiceTest {
                 .findFirst()
                 .orElseThrow()
                 .active());
+    }
+
+    @Test
+    void rotatesApiKeyAndRevokesOldKeyImmediatelyByDefault() {
+        AiTenantService service = new AiTenantService(multiTenantConfig());
+        service.registerOrUpdate(new AiTenantRegistrationRequest("tenant-rotate", "Rotate", "starter", 10, 500L, true));
+        AiTenantIssuedKey issuedKey = service.issueApiKey("tenant-rotate", "primary");
+
+        AiTenantKeyRotationResult rotation = service.rotateApiKey("tenant-rotate", issuedKey.keyId(), "replacement", 0);
+
+        assertNotEquals(issuedKey.apiKey(), rotation.newKey().apiKey());
+        assertFalse(rotation.oldKeyStillActive());
+        assertThrows(SecurityException.class, () -> service.authorize(issuedKey.apiKey()));
+        assertEquals("tenant-rotate", service.authorize(rotation.newKey().apiKey()).tenantId());
+    }
+
+    @Test
+    void rotatesApiKeyWithGracePeriod() {
+        AiTenantService service = new AiTenantService(multiTenantConfig());
+        service.registerOrUpdate(new AiTenantRegistrationRequest("tenant-grace", "Grace", "starter", 10, 500L, true));
+        AiTenantIssuedKey issuedKey = service.issueApiKey("tenant-grace", "primary");
+
+        AiTenantKeyRotationResult rotation = service.rotateApiKey("tenant-grace", issuedKey.keyId(), "replacement", 60);
+
+        assertTrue(rotation.oldKeyStillActive());
+        assertTrue(rotation.graceExpiresAtEpochMillis() > System.currentTimeMillis());
+        assertEquals("tenant-grace", service.authorize(issuedKey.apiKey()).tenantId());
+        assertEquals("tenant-grace", service.authorize(rotation.newKey().apiKey()).tenantId());
+        assertTrue(service.getTenant("tenant-grace").apiKeys().stream()
+                .filter(key -> issuedKey.keyId().equals(key.keyId()))
+                .findFirst()
+                .orElseThrow()
+                .expiresAtEpochMillis() > 0);
     }
 
     @Test

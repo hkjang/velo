@@ -5,5 +5,6 @@ public record AiTenantApiKeyInfo(String keyId,
                                  String secretPreview,
                                  boolean active,
                                  long createdAtEpochMillis,
-                                 long lastUsedAtEpochMillis) {
+                                 long lastUsedAtEpochMillis,
+                                 long expiresAtEpochMillis) {
 }

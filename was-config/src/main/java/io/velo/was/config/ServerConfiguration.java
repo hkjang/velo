@@ -749,6 +749,7 @@ public class ServerConfiguration {
         private int accuracyScore = 75;
         private boolean defaultSelected;
         private boolean enabled = true;
+        private int trafficWeight = 100;
 
         public ModelProfile() {
         }
@@ -756,6 +757,13 @@ public class ServerConfiguration {
         public ModelProfile(String name, String category, String provider, String version,
                             String latencyTier, int latencyMs, int accuracyScore,
                             boolean defaultSelected, boolean enabled) {
+            this(name, category, provider, version, latencyTier, latencyMs, accuracyScore,
+                    defaultSelected, enabled, 100);
+        }
+
+        public ModelProfile(String name, String category, String provider, String version,
+                            String latencyTier, int latencyMs, int accuracyScore,
+                            boolean defaultSelected, boolean enabled, int trafficWeight) {
             this.name = name;
             this.category = category;
             this.provider = provider;
@@ -765,6 +773,7 @@ public class ServerConfiguration {
             this.accuracyScore = accuracyScore;
             this.defaultSelected = defaultSelected;
             this.enabled = enabled;
+            this.trafficWeight = trafficWeight;
         }
 
         public String getName() { return name; }
@@ -785,6 +794,8 @@ public class ServerConfiguration {
         public void setDefaultSelected(boolean defaultSelected) { this.defaultSelected = defaultSelected; }
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public int getTrafficWeight() { return trafficWeight; }
+        public void setTrafficWeight(int trafficWeight) { this.trafficWeight = trafficWeight; }
 
         public void validate() {
             if (name == null || name.isBlank()) {
@@ -795,6 +806,9 @@ public class ServerConfiguration {
             }
             if (accuracyScore < 0 || accuracyScore > 100) {
                 throw new IllegalArgumentException("server.aiPlatform.serving.models.accuracyScore must be between 0 and 100");
+            }
+            if (trafficWeight < 0) {
+                throw new IllegalArgumentException("server.aiPlatform.serving.models.trafficWeight must be >= 0");
             }
         }
     }
@@ -927,6 +941,10 @@ public class ServerConfiguration {
         private int intentAnalysisWindow = 8000;
         private boolean observabilityEnabled = true;
         private boolean gpuSchedulingEnabled = false;
+        private boolean readinessFailureStatusEnabled = false;
+        private long providerHealthCacheTtlMillis = 10_000L;
+        private int providerCircuitFailureThreshold = 2;
+        private long providerCircuitOpenMillis = 30_000L;
 
         public boolean isPromptRoutingEnabled() { return promptRoutingEnabled; }
         public void setPromptRoutingEnabled(boolean promptRoutingEnabled) { this.promptRoutingEnabled = promptRoutingEnabled; }
@@ -950,6 +968,14 @@ public class ServerConfiguration {
         public void setObservabilityEnabled(boolean observabilityEnabled) { this.observabilityEnabled = observabilityEnabled; }
         public boolean isGpuSchedulingEnabled() { return gpuSchedulingEnabled; }
         public void setGpuSchedulingEnabled(boolean gpuSchedulingEnabled) { this.gpuSchedulingEnabled = gpuSchedulingEnabled; }
+        public boolean isReadinessFailureStatusEnabled() { return readinessFailureStatusEnabled; }
+        public void setReadinessFailureStatusEnabled(boolean readinessFailureStatusEnabled) { this.readinessFailureStatusEnabled = readinessFailureStatusEnabled; }
+        public long getProviderHealthCacheTtlMillis() { return providerHealthCacheTtlMillis; }
+        public void setProviderHealthCacheTtlMillis(long providerHealthCacheTtlMillis) { this.providerHealthCacheTtlMillis = providerHealthCacheTtlMillis; }
+        public int getProviderCircuitFailureThreshold() { return providerCircuitFailureThreshold; }
+        public void setProviderCircuitFailureThreshold(int providerCircuitFailureThreshold) { this.providerCircuitFailureThreshold = providerCircuitFailureThreshold; }
+        public long getProviderCircuitOpenMillis() { return providerCircuitOpenMillis; }
+        public void setProviderCircuitOpenMillis(long providerCircuitOpenMillis) { this.providerCircuitOpenMillis = providerCircuitOpenMillis; }
 
         public void validate() {
             String normalizedMode = promptRoutingMode == null ? "HYBRID" : promptRoutingMode.trim().toUpperCase();
@@ -959,6 +985,18 @@ public class ServerConfiguration {
             promptRoutingMode = normalizedMode;
             if (contextCacheTtlSeconds <= 0) {
                 throw new IllegalArgumentException("server.aiPlatform.advanced.contextCacheTtlSeconds must be positive");
+            }
+            if (intentAnalysisWindow <= 0) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced.intentAnalysisWindow must be positive");
+            }
+            if (providerHealthCacheTtlMillis <= 0) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced.providerHealthCacheTtlMillis must be positive");
+            }
+            if (providerCircuitFailureThreshold <= 0) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced.providerCircuitFailureThreshold must be positive");
+            }
+            if (providerCircuitOpenMillis <= 0) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced.providerCircuitOpenMillis must be positive");
             }
         }
     }

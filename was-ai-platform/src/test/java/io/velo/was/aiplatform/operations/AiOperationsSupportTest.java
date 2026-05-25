@@ -81,4 +81,28 @@ class AiOperationsSupportTest {
         assertTrue(snapshot.findings().stream().anyMatch(f -> "PROMPT_FIREWALL_DISABLED".equals(f.code())));
         assertTrue(snapshot.runbook().stream().anyMatch(step -> "/api/config/diagnostics".equals(step.endpoint())));
     }
+
+    @Test
+    void remediationPlanMapsDiagnosticsToPatchSnippets() {
+        ServerConfiguration configuration = new ServerConfiguration();
+        configuration.getServer().getAiPlatform().getAdvanced().setPromptFirewallEnabled(false);
+        configuration.validate();
+        AiGatewayService gatewayService = new AiGatewayService(configuration);
+        AiModelRegistryService registryService = new AiModelRegistryService(configuration);
+        AiPlatformUsageService usageService = new AiPlatformUsageService();
+        AiTenantService tenantService = new AiTenantService(configuration);
+
+        AiPlatformDiagnosticsService.RemediationPlan plan = new AiPlatformDiagnosticsService(
+                configuration,
+                registryService.summary(),
+                usageService.snapshot(false, gatewayService, registryService),
+                tenantService.snapshot(),
+                new AiProviderRegistry()
+        ).remediationPlan();
+
+        assertTrue(plan.actionCount() > 0);
+        assertTrue(plan.actions().stream().anyMatch(action ->
+                "PROMPT_FIREWALL_DISABLED".equals(action.findingCode())
+                        && action.patchSnippet().contains("promptFirewallEnabled: true")));
+    }
 }

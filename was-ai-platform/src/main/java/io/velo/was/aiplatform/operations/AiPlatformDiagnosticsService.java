@@ -179,6 +179,27 @@ public class AiPlatformDiagnosticsService {
         );
     }
 
+    public RemediationPlan remediationPlan() {
+        DiagnosticsSnapshot diagnostics = snapshot();
+        List<RemediationAction> actions = new ArrayList<>();
+        int priority = 1;
+        for (DiagnosticFinding finding : diagnostics.findings()) {
+            RemediationAction action = remediationAction(priority, finding);
+            if (action != null) {
+                actions.add(action);
+                priority++;
+            }
+        }
+        return new RemediationPlan(
+                diagnostics.posture(),
+                diagnostics.score(),
+                diagnostics.criticalCount(),
+                diagnostics.warningCount(),
+                actions.size(),
+                List.copyOf(actions)
+        );
+    }
+
     private static void finding(List<DiagnosticFinding> findings, String severity, String code, String title,
                                 String detail, String recommendation, String path) {
         findings.add(new DiagnosticFinding(severity, code, title, detail, recommendation, path));
@@ -246,6 +267,95 @@ public class AiPlatformDiagnosticsService {
         return false;
     }
 
+    private static RemediationAction remediationAction(int priority, DiagnosticFinding finding) {
+        return switch (finding.code()) {
+            case "AI_PLATFORM_DISABLED" -> action(priority, finding, true, "LOW",
+                    "Enable the AI Platform before exposing AI routes.",
+                    "server.aiPlatform.enabled: true",
+                    "Restart or reload the WAS configuration after enabling the platform.");
+            case "NO_ROUTABLE_MODELS" -> action(priority, finding, false, "MEDIUM",
+                    "Register or enable at least one routable model.",
+                    "server.aiPlatform.serving.models[0].enabled: true",
+                    "Use /api/models to verify an active model version exists.");
+            case "READINESS_STATUS_SOFT" -> action(priority, finding, true, "LOW",
+                    "Make readiness fail with HTTP 503 when serving is unavailable.",
+                    "server.aiPlatform.advanced.readinessFailureStatusEnabled: true",
+                    "This improves orchestrator behavior without changing inference routing.");
+            case "PROMPT_FIREWALL_DISABLED" -> action(priority, finding, true, "LOW",
+                    "Enable prompt firewall protections.",
+                    "server.aiPlatform.advanced.promptFirewallEnabled: true",
+                    "Review blocked terms before internet-facing rollout.");
+            case "OBSERVABILITY_EXPORT_LIMITED" -> action(priority, finding, true, "LOW",
+                    "Enable AI Platform observability and Prometheus export.",
+                    "server.aiPlatform.advanced.observabilityEnabled: true\nserver.aiPlatform.advanced.observabilityExportEnabled: true",
+                    "Wire /api/metrics/prometheus into monitoring after rollout.");
+            case "BILLING_WITHOUT_TENANTS" -> action(priority, finding, false, "MEDIUM",
+                    "Enable tenant attribution or disable billing until tenants are ready.",
+                    "server.aiPlatform.platform.multiTenantEnabled: true",
+                    "Issue tenant API keys before enforcing external traffic.");
+            case "NO_ACTIVE_TENANTS" -> action(priority, finding, false, "MEDIUM",
+                    "Create at least one active tenant and issue a key.",
+                    "POST /api/tenants\nPOST /api/tenants/{id}/keys",
+                    "Keep tenant model allowlists explicit for paid plans.");
+            case "PROVIDER_FAILOVER_DISABLED" -> action(priority, finding, true, "LOW",
+                    "Enable provider failover.",
+                    "server.aiPlatform.advanced.providerFailoverEnabled: true",
+                    "Confirm at least one fallback provider/model is healthy.");
+            case "PROVIDER_RETRY_LOW" -> action(priority, finding, true, "LOW",
+                    "Use a small retry budget for transient upstream failures.",
+                    "server.aiPlatform.advanced.providerRetryEnabled: true\nserver.aiPlatform.advanced.providerMaxRetries: 1",
+                    "Keep retry backoff small to avoid hurting p99 latency.");
+            case "SEMANTIC_CACHE_DISABLED" -> action(priority, finding, true, "LOW",
+                    "Enable semantic cache for repetitive workloads.",
+                    "server.aiPlatform.advanced.semanticCacheEnabled: true",
+                    "Start with conservative similarity threshold before production broadening.");
+            case "SHADOW_MODEL_MISSING" -> action(priority, finding, false, "LOW",
+                    "Set a registered shadow model target.",
+                    "server.aiPlatform.advanced.shadowModelName: <candidate-model>",
+                    "Use shadow mode only after validating tenant data boundaries.");
+            case "CANARY_AUTOMATION_DISABLED" -> action(priority, finding, true, "LOW",
+                    "Enable canary automation or manually evaluate canary decisions.",
+                    "server.aiPlatform.advanced.canaryAutomationEnabled: true",
+                    "Use /api/operations/canary/evaluate?apply=true only after reviewing decisions.");
+            case "GPU_QUEUE_SMALL" -> action(priority, finding, true, "LOW",
+                    "Increase GPU scheduler queue capacity.",
+                    "server.aiPlatform.advanced.gpuQueueCapacity: <routable-models-or-burst-capacity>",
+                    "Size queue capacity from observed burst traffic and GPU worker count.");
+            case "SAAS_GUARDRAILS_INCOMPLETE" -> action(priority, finding, false, "MEDIUM",
+                    "Enable SaaS guardrails before external onboarding.",
+                    "server.aiPlatform.platform.multiTenantEnabled: true\nserver.aiPlatform.platform.billingEnabled: true",
+                    "Pair with tenant API key rotation and allowlist policies.");
+            case "ROUTE_TARGET_UNAVAILABLE" -> action(priority, finding, false, "MEDIUM",
+                    "Update route policy target to an enabled model.",
+                    "server.aiPlatform.serving.routePolicies[].targetModel: <enabled-model>",
+                    "Validate with /api/config/diagnostics before reopening traffic.");
+            case "PROVIDER_CIRCUIT_OPEN" -> action(priority, finding, false, "MEDIUM",
+                    "Investigate provider health and reset traffic after recovery.",
+                    "GET /api/providers/circuit-breakers",
+                    "Check provider credentials, base URL, model name, and upstream health.");
+            default -> action(priority, finding, false, "LOW",
+                    finding.recommendation(),
+                    finding.configPath(),
+                    "Review the diagnostic finding before changing production settings.");
+        };
+    }
+
+    private static RemediationAction action(int priority, DiagnosticFinding finding, boolean autoApplicable,
+                                            String risk, String action, String patchSnippet, String validationHint) {
+        return new RemediationAction(
+                priority,
+                finding.severity(),
+                finding.code(),
+                finding.title(),
+                autoApplicable,
+                risk,
+                action,
+                finding.configPath(),
+                patchSnippet,
+                validationHint
+        );
+    }
+
     public record DiagnosticsSnapshot(String mode,
                                       String posture,
                                       int score,
@@ -277,5 +387,25 @@ public class AiPlatformDiagnosticsService {
                               String action,
                               String endpoint,
                               String operatorHint) {
+    }
+
+    public record RemediationPlan(String posture,
+                                  int score,
+                                  int criticalCount,
+                                  int warningCount,
+                                  int actionCount,
+                                  List<RemediationAction> actions) {
+    }
+
+    public record RemediationAction(int priority,
+                                    String severity,
+                                    String findingCode,
+                                    String title,
+                                    boolean autoApplicable,
+                                    String risk,
+                                    String action,
+                                    String configPath,
+                                    String patchSnippet,
+                                    String validationHint) {
     }
 }

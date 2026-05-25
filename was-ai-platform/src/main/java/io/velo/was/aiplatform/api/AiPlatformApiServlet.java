@@ -306,6 +306,18 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(buildDiagnosticsJson(diagnostics.snapshot()));
             return;
         }
+        if ("/config/remediation-plan".equals(path) || "/operations/remediation-plan".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/config/remediation-plan");
+            AiPlatformDiagnosticsService diagnostics = new AiPlatformDiagnosticsService(
+                    configuration,
+                    summary,
+                    usage,
+                    tenantService.snapshot(),
+                    providerRegistry
+            );
+            resp.getWriter().write(buildRemediationPlanJson(diagnostics.remediationPlan()));
+            return;
+        }
         if ("/operations/canary".equals(path)) {
             usageService.recordControlPlaneAccess("/api/operations/canary");
             AiCanaryPolicyService canary = new AiCanaryPolicyService(configuration, registryService, gatewayAuditLog);
@@ -970,6 +982,33 @@ public class AiPlatformApiServlet extends HttpServlet {
                     .append(",\"action\":\"").append(esc(step.action())).append("\"")
                     .append(",\"endpoint\":\"").append(esc(step.endpoint())).append("\"")
                     .append(",\"operatorHint\":\"").append(esc(step.operatorHint())).append("\"}");
+        }
+        return sb.append("]}").toString();
+    }
+
+    private static String buildRemediationPlanJson(AiPlatformDiagnosticsService.RemediationPlan plan) {
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("{\"posture\":\"").append(esc(plan.posture())).append("\"");
+        sb.append(",\"score\":").append(plan.score());
+        sb.append(",\"summary\":{");
+        sb.append("\"critical\":").append(plan.criticalCount()).append(",");
+        sb.append("\"warnings\":").append(plan.warningCount()).append(",");
+        sb.append("\"actions\":").append(plan.actionCount());
+        sb.append("},\"actions\":[");
+        boolean first = true;
+        for (AiPlatformDiagnosticsService.RemediationAction action : plan.actions()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"priority\":").append(action.priority())
+                    .append(",\"severity\":\"").append(esc(action.severity())).append("\"")
+                    .append(",\"findingCode\":\"").append(esc(action.findingCode())).append("\"")
+                    .append(",\"title\":\"").append(esc(action.title())).append("\"")
+                    .append(",\"autoApplicable\":").append(action.autoApplicable())
+                    .append(",\"risk\":\"").append(esc(action.risk())).append("\"")
+                    .append(",\"action\":\"").append(esc(action.action())).append("\"")
+                    .append(",\"configPath\":\"").append(esc(action.configPath())).append("\"")
+                    .append(",\"patchSnippet\":\"").append(esc(action.patchSnippet())).append("\"")
+                    .append(",\"validationHint\":\"").append(esc(action.validationHint())).append("\"}");
         }
         return sb.append("]}").toString();
     }

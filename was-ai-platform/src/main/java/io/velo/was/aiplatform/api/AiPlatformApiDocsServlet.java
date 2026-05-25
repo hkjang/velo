@@ -156,6 +156,10 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append(",\n");
         apiPath(s, "/api/config/presets", "get", "Control Plane", "List recommended AI platform config presets", null, false);
         s.append(",\n");
+        apiPath(s, "/api/config/diagnostics", "get", "Control Plane", "Get AI platform readiness findings and operator runbook", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/operations/runbook", "get", "Control Plane", "Get the generated AI platform operator runbook", "Alias of /api/config/diagnostics with runbook steps included.", false);
+        s.append(",\n");
         apiPath(s, "/api/operations/canary", "get", "Control Plane", "Evaluate canary promotion or rollback recommendations", null, false);
         s.append(",\n");
         apiPath(s, "/api/operations/canary/evaluate", "post", "Control Plane", "Evaluate and optionally apply canary actions", "Set apply=true to promote or rollback eligible canaries.", true);

@@ -16,6 +16,7 @@ import io.velo.was.aiplatform.observability.AiPlatformUsageSnapshot;
 import io.velo.was.aiplatform.operations.AiCanaryPolicyService;
 import io.velo.was.aiplatform.operations.AiGpuSchedulerService;
 import io.velo.was.aiplatform.operations.AiModelBundleService;
+import io.velo.was.aiplatform.operations.AiPlatformDiagnosticsService;
 import io.velo.was.aiplatform.operations.AiPlatformMetricsExporter;
 import io.velo.was.aiplatform.publishing.AiPublishedApiService;
 import io.velo.was.aiplatform.registry.AiModelDeploymentPlanner;
@@ -291,6 +292,18 @@ public class AiPlatformApiServlet extends HttpServlet {
         if ("/config/presets".equals(path)) {
             usageService.recordControlPlaneAccess("/api/config/presets");
             resp.getWriter().write(buildConfigPresetsJson());
+            return;
+        }
+        if ("/config/diagnostics".equals(path) || "/operations/runbook".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/config/diagnostics");
+            AiPlatformDiagnosticsService diagnostics = new AiPlatformDiagnosticsService(
+                    configuration,
+                    summary,
+                    usage,
+                    tenantService.snapshot(),
+                    providerRegistry
+            );
+            resp.getWriter().write(buildDiagnosticsJson(diagnostics.snapshot()));
             return;
         }
         if ("/operations/canary".equals(path)) {
@@ -919,6 +932,46 @@ public class AiPlatformApiServlet extends HttpServlet {
 
     private static String preset(String id, String title, String summary) {
         return "{\"id\":\"" + esc(id) + "\",\"title\":\"" + esc(title) + "\",\"summary\":\"" + esc(summary) + "\"}";
+    }
+
+    private static String buildDiagnosticsJson(AiPlatformDiagnosticsService.DiagnosticsSnapshot snapshot) {
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("{\"mode\":\"").append(esc(snapshot.mode())).append("\"");
+        sb.append(",\"posture\":\"").append(esc(snapshot.posture())).append("\"");
+        sb.append(",\"score\":").append(snapshot.score());
+        sb.append(",\"scoreLabel\":\"").append(esc(snapshot.scoreLabel())).append("\"");
+        sb.append(",\"summary\":{");
+        sb.append("\"critical\":").append(snapshot.criticalCount()).append(",");
+        sb.append("\"warnings\":").append(snapshot.warningCount()).append(",");
+        sb.append("\"info\":").append(snapshot.infoCount()).append(",");
+        sb.append("\"routableModels\":").append(snapshot.routableModels()).append(",");
+        sb.append("\"providers\":").append(snapshot.providerCount()).append(",");
+        sb.append("\"activeTenants\":").append(snapshot.activeTenants()).append(",");
+        sb.append("\"inferenceCalls\":").append(snapshot.inferenceCalls());
+        sb.append("},\"findings\":[");
+        boolean first = true;
+        for (AiPlatformDiagnosticsService.DiagnosticFinding finding : snapshot.findings()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"severity\":\"").append(esc(finding.severity())).append("\"")
+                    .append(",\"code\":\"").append(esc(finding.code())).append("\"")
+                    .append(",\"title\":\"").append(esc(finding.title())).append("\"")
+                    .append(",\"detail\":\"").append(esc(finding.detail())).append("\"")
+                    .append(",\"recommendation\":\"").append(esc(finding.recommendation())).append("\"")
+                    .append(",\"configPath\":\"").append(esc(finding.configPath())).append("\"}");
+        }
+        sb.append("],\"runbook\":[");
+        first = true;
+        for (AiPlatformDiagnosticsService.RunbookStep step : snapshot.runbook()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"order\":").append(step.order())
+                    .append(",\"phase\":\"").append(esc(step.phase())).append("\"")
+                    .append(",\"action\":\"").append(esc(step.action())).append("\"")
+                    .append(",\"endpoint\":\"").append(esc(step.endpoint())).append("\"")
+                    .append(",\"operatorHint\":\"").append(esc(step.operatorHint())).append("\"}");
+        }
+        return sb.append("]}").toString();
     }
 
     private static String buildCanaryJson(java.util.List<AiCanaryPolicyService.CanaryDecision> decisions) {

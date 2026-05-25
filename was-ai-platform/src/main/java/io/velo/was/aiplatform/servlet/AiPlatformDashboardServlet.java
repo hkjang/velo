@@ -363,6 +363,7 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("<div class=\"card-desc\">Canary, Provider retry/fallback, semantic cache, prompt firewall, GPU scheduling \uc124\uc815\uc744 \ud55c \uacf3\uc5d0\uc11c \ud655\uc778\ud569\ub2c8\ub2e4.</div>");
         b.append("<div class=\"btns\">");
         b.append("<button class=\"btn btn-secondary\" onclick=\"refreshConfigPresets()\">\ud504\ub9ac\uc14b \ubcf4\uae30</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshDiagnostics()\">\uc124\uc815 \uc9c4\ub2e8</button>");
         b.append("<button class=\"btn btn-secondary\" onclick=\"refreshCanaryOps(false)\">Canary \ud3c9\uac00</button>");
         b.append("<button class=\"btn btn-secondary\" onclick=\"refreshGpuScheduler()\">GPU \uc2a4\ucf00\uc904\ub7ec</button>");
         b.append("<button class=\"btn btn-secondary\" onclick=\"refreshPrometheus()\">Prometheus \uc9c0\ud45c</button>");
@@ -786,6 +787,7 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("async function refreshTenants(){showJson('tenantJson',await api('/api/tenants'))}\n");
         b.append("async function refreshConfig(){showJson('configJson',await api('/api/config'))}\n");
         b.append("async function refreshConfigPresets(){showJson('configPresetJson',await api('/api/config/presets'))}\n");
+        b.append("async function refreshDiagnostics(){showJson('opsJson',await api('/api/config/diagnostics'))}\n");
         b.append("async function refreshCanaryOps(apply){showJson('opsJson',await api('/api/operations/canary'+(apply?'/evaluate?apply=true':''),apply?{method:'POST'}:undefined))}\n");
         b.append("async function refreshGpuScheduler(){showJson('opsJson',await api('/api/gpu/scheduler'))}\n");
         b.append("async function refreshPrometheus(){showJson('opsJson',await api('/api/metrics/prometheus'))}\n");

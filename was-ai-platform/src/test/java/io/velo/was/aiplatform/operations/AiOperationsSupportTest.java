@@ -58,4 +58,27 @@ class AiOperationsSupportTest {
         assertTrue(snapshot.enabled());
         assertTrue(snapshot.queueCapacity() == 16);
     }
+
+    @Test
+    void diagnosticsServiceProducesFindingsAndRunbook() {
+        ServerConfiguration configuration = new ServerConfiguration();
+        configuration.getServer().getAiPlatform().getAdvanced().setPromptFirewallEnabled(false);
+        configuration.validate();
+        AiGatewayService gatewayService = new AiGatewayService(configuration);
+        AiModelRegistryService registryService = new AiModelRegistryService(configuration);
+        AiPlatformUsageService usageService = new AiPlatformUsageService();
+        AiTenantService tenantService = new AiTenantService(configuration);
+
+        AiPlatformDiagnosticsService.DiagnosticsSnapshot snapshot = new AiPlatformDiagnosticsService(
+                configuration,
+                registryService.summary(),
+                usageService.snapshot(false, gatewayService, registryService),
+                tenantService.snapshot(),
+                new AiProviderRegistry()
+        ).snapshot();
+
+        assertTrue(snapshot.score() < 100);
+        assertTrue(snapshot.findings().stream().anyMatch(f -> "PROMPT_FIREWALL_DISABLED".equals(f.code())));
+        assertTrue(snapshot.runbook().stream().anyMatch(step -> "/api/config/diagnostics".equals(step.endpoint())));
+    }
 }

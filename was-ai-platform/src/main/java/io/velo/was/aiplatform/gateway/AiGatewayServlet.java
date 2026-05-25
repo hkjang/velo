@@ -79,6 +79,7 @@ public class AiGatewayServlet extends HttpServlet {
             case "/route" -> {
                 try {
                     AiGatewayRouteDecision decision = gatewayService.route(gatewayRequest);
+                    tenantService.assertModelAllowed(tenantAccess, decision.modelName());
                     usageService.recordRoute(decision);
                     tenantService.recordUsage(tenantAccess, 0);
                     applyTenantHeaders(resp, tenantAccess, 0);
@@ -88,12 +89,16 @@ public class AiGatewayServlet extends HttpServlet {
                 } catch (Exception e) {
                     auditFailure(tenantAccess, "gateway/route", null, null,
                             gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+                    if (writeClientError(resp, e)) {
+                        return;
+                    }
                     throw e;
                 }
             }
             case "/infer" -> {
                 try {
                     AiGatewayInferenceResult result = gatewayService.infer(gatewayRequest);
+                    tenantService.assertModelAllowed(tenantAccess, result.decision().modelName());
                     usageService.recordInference(result, false);
                     tenantService.recordUsage(tenantAccess, result.estimatedTokens());
                     applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
@@ -104,6 +109,9 @@ public class AiGatewayServlet extends HttpServlet {
                 } catch (Exception e) {
                     auditFailure(tenantAccess, "gateway/infer", null, null,
                             gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+                    if (writeClientError(resp, e)) {
+                        return;
+                    }
                     throw e;
                 }
             }
@@ -113,6 +121,7 @@ public class AiGatewayServlet extends HttpServlet {
             case "/ensemble" -> {
                 try {
                     AiEnsembleResult ensembleResult = gatewayService.inferEnsemble(gatewayRequest);
+                    tenantService.assertModelAllowed(tenantAccess, ensembleResult.selected().decision().modelName());
                     usageService.recordInference(ensembleResult.selected(), false);
                     tenantService.recordUsage(tenantAccess, ensembleResult.totalEstimatedTokens());
                     applyTenantHeaders(resp, tenantAccess, ensembleResult.totalEstimatedTokens());
@@ -125,6 +134,9 @@ public class AiGatewayServlet extends HttpServlet {
                 } catch (Exception e) {
                     auditFailure(tenantAccess, "gateway/ensemble", null, null,
                             gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+                    if (writeClientError(resp, e)) {
+                        return;
+                    }
                     throw e;
                 }
             }
@@ -132,6 +144,7 @@ public class AiGatewayServlet extends HttpServlet {
                 try {
                     io.velo.was.aiplatform.intent.IntentRouteDecision intentDecision =
                             gatewayService.intentRoute(gatewayRequest.prompt(), tenantAccess.tenantId());
+                    tenantService.assertModelAllowed(tenantAccess, intentDecision.modelName());
                     usageService.recordIntentRoute();
                     tenantService.recordUsage(tenantAccess, 0);
                     applyTenantHeaders(resp, tenantAccess, 0);
@@ -142,6 +155,9 @@ public class AiGatewayServlet extends HttpServlet {
                 } catch (Exception e) {
                     auditFailure(tenantAccess, "gateway/intent-route", null, null,
                             gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+                    if (writeClientError(resp, e)) {
+                        return;
+                    }
                     throw e;
                 }
             }
@@ -175,6 +191,18 @@ public class AiGatewayServlet extends HttpServlet {
         return null;
     }
 
+    private boolean writeClientError(HttpServletResponse resp, Exception e) throws IOException {
+        if (e instanceof SecurityException) {
+            tenantError(resp, HttpServletResponse.SC_FORBIDDEN, e.getMessage());
+            return true;
+        }
+        if (e instanceof IllegalArgumentException) {
+            tenantError(resp, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            return true;
+        }
+        return false;
+    }
+
     private void writeDiscovery(HttpServletResponse resp, String contextPath, AiTenantAccessGrant tenantAccess) throws IOException {
         returnJson(resp);
         applyTenantHeaders(resp, tenantAccess, 0);
@@ -206,6 +234,7 @@ public class AiGatewayServlet extends HttpServlet {
 
         try {
             AiGatewayInferenceResult result = gatewayService.infer(gatewayRequest);
+            tenantService.assertModelAllowed(tenantAccess, result.decision().modelName());
             usageService.recordInference(result, true);
             tenantService.recordUsage(tenantAccess, result.estimatedTokens());
             resp.setContentType("text/event-stream; charset=UTF-8");
@@ -232,6 +261,9 @@ public class AiGatewayServlet extends HttpServlet {
         } catch (Exception e) {
             auditFailure(tenantAccess, "gateway/stream", null, null,
                     gatewayRequest, auditStart, e.getMessage(), remoteAddr);
+            if (writeClientError(resp, e)) {
+                return;
+            }
             throw e;
         }
     }

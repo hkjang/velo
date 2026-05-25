@@ -124,6 +124,8 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append(",\n");
         apiPath(s, "/api/models/deployment-plan", "post", "Control Plane", "Preview model deployment impact", "Dry-run a model registration request without mutating the registry.", true);
         s.append(",\n");
+        apiPath(s, "/api/models/{name}/bundle", "get", "Control Plane", "Generate model bundle manifest", "Returns Docker runner, health probe, versions, and rollback metadata.", false);
+        s.append(",\n");
         apiPath(s, "/api/models/{name}/versions/{version}/status", "post", "Control Plane", "Change model version status", "Promote ACTIVE, keep CANARY, or retire a version.", false);
         s.append(",\n");
         apiPath(s, "/api/usage", "get", "Control Plane", "Get usage and metering counters", null, false);
@@ -138,6 +140,8 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append(",\n");
         apiPath(s, "/api/tenants/{id}/keys/{keyId}/rotate", "post", "Control Plane", "Rotate a tenant API key", "Issues a replacement key and optionally keeps the previous key active for graceSeconds.", true);
         s.append(",\n");
+        apiPath(s, "/api/tenants/{id}/policies", "post", "Control Plane", "Configure tenant model allowlist", "Empty allowedModels keeps all models available.", true);
+        s.append(",\n");
         apiPath(s, "/api/tenants/{id}/usage", "get", "Control Plane", "Get tenant usage metrics", null, false);
         s.append(",\n");
         apiPath(s, "/api/providers", "get", "Control Plane", "List AI providers", null, false);
@@ -149,6 +153,16 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         apiPath(s, "/api/published-apis", "get", "Control Plane", "List published generated APIs", null, false);
         s.append(",\n");
         apiPath(s, "/api/config", "get", "Control Plane", "Get current AI platform configuration", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/config/presets", "get", "Control Plane", "List recommended AI platform config presets", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/operations/canary", "get", "Control Plane", "Evaluate canary promotion or rollback recommendations", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/operations/canary/evaluate", "post", "Control Plane", "Evaluate and optionally apply canary actions", "Set apply=true to promote or rollback eligible canaries.", true);
+        s.append(",\n");
+        apiPath(s, "/api/gpu/scheduler", "get", "Control Plane", "Get GPU scheduler capacity snapshot", null, false);
+        s.append(",\n");
+        apiPath(s, "/api/metrics/prometheus", "get", "Control Plane", "Export AI platform metrics in Prometheus text format", null, false);
         s.append(",\n");
         // Intent routing
         apiPath(s, "/gateway/intent-route", "post", "Gateway", "Intent-based routing decision", "Analyze prompt keywords to determine optimal model routing.", true);

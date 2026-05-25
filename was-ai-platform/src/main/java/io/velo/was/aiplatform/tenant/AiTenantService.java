@@ -7,6 +7,7 @@ import io.velo.was.config.ServerConfiguration;
 
 import java.security.SecureRandom;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -77,6 +78,23 @@ public class AiTenantService {
         if (tenant == null) {
             throw new NoSuchElementException("Tenant not found: " + tenantId);
         }
+        return snapshotTenant(tenant);
+    }
+
+    public synchronized AiTenantProfile setAllowedModels(String tenantId, List<String> modelNames) {
+        MutableTenant tenant = tenants.get(normalizeKey(tenantId));
+        if (tenant == null) {
+            throw new NoSuchElementException("Tenant not found: " + tenantId);
+        }
+        tenant.allowedModels.clear();
+        if (modelNames != null) {
+            modelNames.stream()
+                    .map(model -> model == null ? "" : model.trim())
+                    .filter(model -> !model.isBlank())
+                    .map(AiTenantService::normalizeKey)
+                    .forEach(tenant.allowedModels::add);
+        }
+        persistTenants();
         return snapshotTenant(tenant);
     }
 
@@ -247,6 +265,19 @@ public class AiTenantService {
         persistTenants();
     }
 
+    public synchronized void assertModelAllowed(AiTenantAccessGrant grant, String modelName) {
+        if (grant == null || !grant.tracked() || modelName == null || modelName.isBlank()) {
+            return;
+        }
+        MutableTenant tenant = tenants.get(normalizeKey(grant.tenantId()));
+        if (tenant == null || tenant.allowedModels.isEmpty()) {
+            return;
+        }
+        if (!tenant.allowedModels.contains(normalizeKey(modelName))) {
+            throw new SecurityException("Model is not allowed for tenant " + grant.tenantId() + ": " + modelName);
+        }
+    }
+
     private AiTenantIssuedKey createApiKey(MutableTenant tenant, String label, long now) {
         String normalizedLabel = label == null || label.isBlank() ? "default" : label.trim();
         String keyId = "key-" + Long.toString(issuedKeySequence.incrementAndGet(), 36);
@@ -302,6 +333,7 @@ public class AiTenantService {
                 tenant.rateLimitPerMinute,
                 tenant.tokenQuota,
                 tenant.createdAtEpochMillis,
+                tenant.allowedModels.stream().sorted().toList(),
                 apiKeys,
                 usage
         );
@@ -348,6 +380,7 @@ public class AiTenantService {
         private long tokenQuota = 250_000L;
         private final long createdAtEpochMillis;
         private final ConcurrentMap<String, MutableApiKey> apiKeys = new ConcurrentHashMap<>();
+        private final java.util.Set<String> allowedModels = ConcurrentHashMap.newKeySet();
         private long totalRequests;
         private long totalTokens;
         private long currentWindowEpochMinute;
@@ -398,6 +431,12 @@ public class AiTenantService {
                 tenant.currentWindowRequests = td.currentWindowRequests();
                 tenant.lastActivityEpochMillis = td.lastActivityAt();
                 tenants.put(normalizeKey(td.tenantId()), tenant);
+                if (td.allowedModels() != null) {
+                    td.allowedModels().stream()
+                            .map(AiTenantService::normalizeKey)
+                            .filter(model -> !model.isBlank())
+                            .forEach(tenant.allowedModels::add);
+                }
                 if (td.apiKeys() != null) {
                     for (TenantData.ApiKeyData akd : td.apiKeys()) {
                         if (isLegacyDemoKey(td.tenantId(), akd.secret())) {
@@ -438,7 +477,8 @@ public class AiTenantService {
                 data.add(new TenantData(t.tenantId, t.displayName, t.plan, t.active,
                         t.rateLimitPerMinute, t.tokenQuota, t.createdAtEpochMillis,
                         t.totalRequests, t.totalTokens, t.currentWindowEpochMinute,
-                        t.currentWindowRequests, t.lastActivityEpochMillis, keys));
+                        t.currentWindowRequests, t.lastActivityEpochMillis, keys,
+                        new ArrayList<>(t.allowedModels)));
             }
             dataStore.save(TENANTS_FILE, data);
         } catch (Exception ignored) {

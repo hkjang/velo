@@ -29,14 +29,18 @@ public class AiGatewayService {
     private final AiModelRegistryService registryService;
     private final AiProviderRegistry providerRegistry;
     private final ConcurrentMap<String, CacheEntry> contextCache = new ConcurrentHashMap<>();
+    private final AiSemanticCache semanticCache = new AiSemanticCache();
     private final ConcurrentMap<String, AtomicLong> modelRequestCounts = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, AtomicLong> abTestGroupA = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, AtomicLong> abTestGroupB = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, AtomicLong> shadowModelCounts = new ConcurrentHashMap<>();
     private final AtomicLong totalRequests = new AtomicLong();
     private final AtomicLong cacheHits = new AtomicLong();
+    private final AtomicLong semanticCacheHits = new AtomicLong();
     private final AtomicLong failoverCount = new AtomicLong();
     private final AtomicLong ensembleCount = new AtomicLong();
     private final AtomicLong intentRouteCount = new AtomicLong();
+    private final AtomicLong shadowRequestCount = new AtomicLong();
     private volatile RouteDecisionEngine intentEngine;
 
     public AiGatewayService(ServerConfiguration configuration) {
@@ -68,6 +72,11 @@ public class AiGatewayService {
         ServerConfiguration.Differentiation differentiation = ai.getDifferentiation();
 
         String prompt = normalizePrompt(request.prompt());
+        AiPromptFirewall.Decision firewall = AiPromptFirewall.inspect(prompt, advanced);
+        if (!firewall.allowed()) {
+            throw new IllegalArgumentException("Prompt firewall blocked the request: " + firewall.reason()
+                    + (firewall.matchedTerm().isBlank() ? "" : " (" + firewall.matchedTerm() + ")"));
+        }
         String requestedType = normalizeRequestType(request.requestType());
         RequestResolution resolution = resolveRequestType(requestedType, prompt, advanced);
         String cacheKey = buildCacheKey(request.sessionId(), resolution.resolvedType(), prompt, advanced.isContextCacheEnabled());
@@ -194,10 +203,15 @@ public class AiGatewayService {
         AiProviderRequest providerRequest = buildProviderRequest(decision, request, prompt, effectiveModality);
 
         // Try real provider adapter first with modality-aware dispatch
+        ServerConfiguration.Advanced advanced = configuration.getServer().getAiPlatform().getAdvanced();
+        AiSemanticCache.LookupResult semanticHit = advanced.isSemanticCacheEnabled()
+                ? semanticCache.lookup(decision.modelName(), prompt, advanced.getSemanticCacheSimilarityThreshold())
+                : null;
         AiProviderResponse providerResponse = null;
         try {
-            providerResponse = providerRegistry.tryInferMultimodal(
-                    decision.provider(), providerRequest, effectiveModality);
+            if (semanticHit == null) {
+                providerResponse = invokeProviderWithPolicy(decision.provider(), providerRequest, effectiveModality, advanced);
+            }
         } catch (UnsupportedOperationException ignored) {
             // Modality not supported by provider — fall back to mock
         } catch (Exception ignored) {
@@ -207,7 +221,12 @@ public class AiGatewayService {
         String outputText;
         int estimatedTokens;
         double confidence;
-        if (providerResponse != null && (
+        if (semanticHit != null) {
+            semanticCacheHits.incrementAndGet();
+            outputText = semanticHit.entry().outputText();
+            estimatedTokens = semanticHit.entry().estimatedTokens();
+            confidence = semanticHit.entry().confidence();
+        } else if (providerResponse != null && (
                 (providerResponse.content() != null && !providerResponse.content().isBlank())
                 || providerResponse.hasBinaryData())) {
             outputText = providerResponse.content() != null ? providerResponse.content()
@@ -219,7 +238,94 @@ public class AiGatewayService {
             estimatedTokens = Math.max(32, outputText.length() / 4);
             confidence = Math.min(0.99d, Math.max(0.55d, decision.accuracyScore() / 100.0d));
         }
-        return new AiGatewayInferenceResult(decision, outputText, estimatedTokens, confidence);
+        AiGatewayInferenceResult result = new AiGatewayInferenceResult(decision, outputText, estimatedTokens, confidence);
+        if (advanced.isSemanticCacheEnabled() && semanticHit == null) {
+            semanticCache.put(decision.modelName(), prompt, result, advanced.getSemanticCacheMaxEntries());
+        }
+        recordShadowTraffic(request, prompt, decision, advanced);
+        return result;
+    }
+
+    private AiProviderResponse invokeProviderWithPolicy(String providerId,
+                                                        AiProviderRequest request,
+                                                        String modality,
+                                                        ServerConfiguration.Advanced advanced) {
+        List<String> providers = new ArrayList<>();
+        if (providerId != null && !providerId.isBlank()) {
+            providers.add(providerId);
+        }
+        if (advanced.isProviderFailoverEnabled()) {
+            providerRegistry.providerIds().stream()
+                    .filter(candidate -> providers.stream().noneMatch(existing -> existing.equalsIgnoreCase(candidate)))
+                    .forEach(providers::add);
+        }
+        int maxRetries = advanced.isProviderRetryEnabled() ? advanced.getProviderMaxRetries() : 0;
+        for (String candidate : providers) {
+            for (int attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    AiProviderResponse response = providerRegistry.tryInferMultimodal(candidate, request, modality);
+                    if (response != null) {
+                        if (!candidate.equalsIgnoreCase(providerId)) {
+                            failoverCount.incrementAndGet();
+                        }
+                        return response;
+                    }
+                } catch (UnsupportedOperationException ignored) {
+                    break;
+                } catch (Exception ignored) {
+                    if (attempt < maxRetries) {
+                        sleepQuietly(advanced.getProviderRetryBackoffMillis());
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private void recordShadowTraffic(AiGatewayRequest request, String prompt,
+                                     AiGatewayRouteDecision decision,
+                                     ServerConfiguration.Advanced advanced) {
+        if (!advanced.isShadowTestingEnabled()) {
+            return;
+        }
+        String shadowModel = advanced.getShadowModelName();
+        if (shadowModel == null || shadowModel.isBlank()
+                || shadowModel.equalsIgnoreCase(decision.modelName())) {
+            return;
+        }
+        shadowRequestCount.incrementAndGet();
+        shadowModelCounts.computeIfAbsent(shadowModel, ignored -> new AtomicLong()).incrementAndGet();
+        generateOutput(new AiGatewayRouteDecision(
+                decision.requestedType(),
+                decision.resolvedType(),
+                shadowModel,
+                decision.modelCategory(),
+                decision.provider(),
+                decision.version(),
+                "shadow",
+                decision.strategyApplied(),
+                false,
+                decision.promptRouted(),
+                request.streamingRequested(),
+                decision.contextCacheEnabled(),
+                decision.expectedLatencyMs(),
+                decision.accuracyScore(),
+                decision.totalRequests(),
+                decision.modelRequestCount(),
+                "",
+                "Shadow evaluation copy"
+        ), prompt);
+    }
+
+    private static void sleepQuietly(long millis) {
+        if (millis <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private AiProviderRequest buildProviderRequest(AiGatewayRouteDecision decision,
@@ -285,9 +391,17 @@ public class AiGatewayService {
         return cacheHits.get();
     }
 
+    public long getSemanticCacheHitCount() {
+        return semanticCacheHits.get();
+    }
+
     public int getContextCacheSize() {
         evictExpiredEntries();
         return contextCache.size();
+    }
+
+    public int getSemanticCacheSize() {
+        return semanticCache.size();
     }
 
     public long getFailoverCount() {
@@ -300,6 +414,14 @@ public class AiGatewayService {
 
     public long getEnsembleCount() {
         return ensembleCount.get();
+    }
+
+    public long getShadowRequestCount() {
+        return shadowRequestCount.get();
+    }
+
+    public Map<String, Long> getShadowModelCounts() {
+        return snapshotCounters(shadowModelCounts);
     }
 
     public Map<String, Long> getAbTestGroupACounts() {

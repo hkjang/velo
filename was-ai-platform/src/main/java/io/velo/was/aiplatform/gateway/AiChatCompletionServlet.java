@@ -101,6 +101,7 @@ public class AiChatCompletionServlet extends HttpServlet {
 
         try {
             AiGatewayInferenceResult result = gatewayService.infer(gatewayRequest);
+            tenantService.assertModelAllowed(tenantAccess, result.decision().modelName());
             usageService.recordInference(result, stream);
             tenantService.recordUsage(tenantAccess, result.estimatedTokens());
 
@@ -112,6 +113,12 @@ public class AiChatCompletionServlet extends HttpServlet {
                 resp.getWriter().write(toOpenAiResponse(result));
             }
             auditChatSuccess(tenantAccess, result, prompt, stream, auditStart, remoteAddr, intentName);
+        } catch (SecurityException e) {
+            auditChatFailure(tenantAccess, prompt, stream, auditStart, e.getMessage(), remoteAddr, intentName);
+            writeOpenAiError(resp, HttpServletResponse.SC_FORBIDDEN, e.getMessage(), "permission_error");
+        } catch (IllegalArgumentException e) {
+            auditChatFailure(tenantAccess, prompt, stream, auditStart, e.getMessage(), remoteAddr, intentName);
+            writeOpenAiError(resp, HttpServletResponse.SC_BAD_REQUEST, e.getMessage(), "invalid_request_error");
         } catch (IllegalStateException e) {
             // Failover: if first model fails, try with fallback
             auditChatFailure(tenantAccess, prompt, stream, auditStart, e.getMessage(), remoteAddr, intentName);
@@ -120,17 +127,21 @@ public class AiChatCompletionServlet extends HttpServlet {
                 AiGatewayRequest fallbackRequest = new AiGatewayRequest("CHAT", prompt,
                         "openai-compat-failover-" + UUID.randomUUID().toString().substring(0, 8), stream);
                 AiGatewayInferenceResult result = gatewayService.infer(fallbackRequest);
+                tenantService.assertModelAllowed(tenantAccess, result.decision().modelName());
                 usageService.recordInference(result, stream);
                 tenantService.recordUsage(tenantAccess, result.estimatedTokens());
                 returnJson(resp);
                 applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
                 resp.getWriter().write(toOpenAiResponse(result));
                 auditChatSuccess(tenantAccess, result, prompt, stream, failoverStart, remoteAddr, intentName);
+            } catch (SecurityException fallbackError) {
+                writeOpenAiError(resp, HttpServletResponse.SC_FORBIDDEN, fallbackError.getMessage(), "permission_error");
+                auditChatFailure(tenantAccess, prompt, stream, auditStart, "failover: " + fallbackError.getMessage(), remoteAddr, intentName);
+            } catch (IllegalArgumentException fallbackError) {
+                writeOpenAiError(resp, HttpServletResponse.SC_BAD_REQUEST, fallbackError.getMessage(), "invalid_request_error");
+                auditChatFailure(tenantAccess, prompt, stream, auditStart, "failover: " + fallbackError.getMessage(), remoteAddr, intentName);
             } catch (Exception fallbackError) {
-                returnJson(resp);
-                resp.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
-                resp.getWriter().write("{\"error\":{\"message\":\"" + AiGatewayServlet.escapeJson(e.getMessage())
-                        + "\",\"type\":\"server_error\"}}");
+                writeOpenAiError(resp, HttpServletResponse.SC_SERVICE_UNAVAILABLE, e.getMessage(), "server_error");
                 auditChatFailure(tenantAccess, prompt, stream, auditStart, "failover: " + fallbackError.getMessage(), remoteAddr, intentName);
             }
         }
@@ -261,6 +272,13 @@ public class AiChatCompletionServlet extends HttpServlet {
         resp.setContentType("application/json; charset=UTF-8");
         resp.setCharacterEncoding("UTF-8");
         resp.setHeader("Cache-Control", "no-store");
+    }
+
+    private static void writeOpenAiError(HttpServletResponse resp, int status, String message, String type) throws IOException {
+        returnJson(resp);
+        resp.setStatus(status);
+        resp.getWriter().write("{\"error\":{\"message\":\"" + AiGatewayServlet.escapeJson(message)
+                + "\",\"type\":\"" + AiGatewayServlet.escapeJson(type) + "\"}}");
     }
 
     private static String extractJsonString(String body, String field) {

@@ -359,6 +359,16 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("<div class=\"card\"><div class=\"card-header\">\ud604\uc7ac \uc124\uc815 (JSON)</div><div class=\"card-desc\">\uc11c\ubc84\uc5d0\uc11c \ub85c\ub4dc\ub41c \ud604\uc7ac AI \ud50c\ub7ab\ud3fc \uc124\uc815\uc744 API\ub85c \uc870\ud68c\ud569\ub2c8\ub2e4.</div>");
         b.append("<div class=\"btns\"><button class=\"btn btn-primary\" onclick=\"refreshConfig()\">\uc124\uc815 \ub85c\ub4dc</button></div>");
         b.append("<pre class=\"json-box\" id=\"configJson\">\ub85c\ub529 \uc911...</pre></div>\n");
+        b.append("<div class=\"card\"><div class=\"card-header\">\uc6b4\uc601 \ud504\ub9ac\uc14b / \uace0\uae09 \uc124\uc815</div>");
+        b.append("<div class=\"card-desc\">Canary, Provider retry/fallback, semantic cache, prompt firewall, GPU scheduling \uc124\uc815\uc744 \ud55c \uacf3\uc5d0\uc11c \ud655\uc778\ud569\ub2c8\ub2e4.</div>");
+        b.append("<div class=\"btns\">");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshConfigPresets()\">\ud504\ub9ac\uc14b \ubcf4\uae30</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshCanaryOps(false)\">Canary \ud3c9\uac00</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshGpuScheduler()\">GPU \uc2a4\ucf00\uc904\ub7ec</button>");
+        b.append("<button class=\"btn btn-secondary\" onclick=\"refreshPrometheus()\">Prometheus \uc9c0\ud45c</button>");
+        b.append("</div>");
+        b.append("<pre class=\"json-box\" id=\"configPresetJson\">\uc6b4\uc601 \ud504\ub9ac\uc14b\uc744 \ub85c\ub4dc\ud558\uba74 \uc5ec\uae30\uc5d0 \ud45c\uc2dc\ub429\ub2c8\ub2e4.</pre>");
+        b.append("<pre class=\"json-box\" id=\"opsJson\">Canary/GPU/\uc9c0\ud45c \uc870\ud68c \uacb0\uacfc</pre></div>\n");
         b.append("<div class=\"card\"><div class=\"card-header\">YAML \uc124\uc815 \ubbf8\ub9ac\ubcf4\uae30</div><div class=\"card-desc\">\ud604\uc7ac server.aiPlatform \uc124\uc815 \uc694\uc57d</div>");
         b.append("<pre class=\"code-box\">").append(h(buildYamlPreview(ai))).append("</pre></div>\n");
         b.append("</div>\n");
@@ -775,6 +785,10 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         b.append("async function refreshBilling(){showJson('billingJson',await api('/api/billing'))}\n");
         b.append("async function refreshTenants(){showJson('tenantJson',await api('/api/tenants'))}\n");
         b.append("async function refreshConfig(){showJson('configJson',await api('/api/config'))}\n");
+        b.append("async function refreshConfigPresets(){showJson('configPresetJson',await api('/api/config/presets'))}\n");
+        b.append("async function refreshCanaryOps(apply){showJson('opsJson',await api('/api/operations/canary'+(apply?'/evaluate?apply=true':''),apply?{method:'POST'}:undefined))}\n");
+        b.append("async function refreshGpuScheduler(){showJson('opsJson',await api('/api/gpu/scheduler'))}\n");
+        b.append("async function refreshPrometheus(){showJson('opsJson',await api('/api/metrics/prometheus'))}\n");
         // Registry CRUD
         b.append("function registryPayload(){return{name:document.getElementById('registryModelName').value,category:document.getElementById('registryCategory').value,provider:document.getElementById('registryProvider').value,version:document.getElementById('registryVersion').value,latencyTier:'balanced',latencyMs:Number(document.getElementById('registryLatency').value||0),accuracyScore:Number(document.getElementById('registryAccuracy').value||0),defaultSelected:false,enabled:true,status:document.getElementById('registryStatus').value,source:'runtime'}}\n");
         b.append("async function registerRegistryModel(){showJson('registryMutationOutput',await api('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(registryPayload())}));refreshRegistry();refreshOverview()}\n");
@@ -1281,6 +1295,15 @@ public class AiPlatformDashboardServlet extends HttpServlet {
         sb.append("      contextCacheEnabled: ").append(ai.getAdvanced().isContextCacheEnabled()).append("\n");
         sb.append("      aiGatewayEnabled: ").append(ai.getAdvanced().isAiGatewayEnabled()).append("\n");
         sb.append("      observabilityEnabled: ").append(ai.getAdvanced().isObservabilityEnabled()).append("\n");
+        sb.append("      canaryAutomationEnabled: ").append(ai.getAdvanced().isCanaryAutomationEnabled()).append("\n");
+        sb.append("      providerRetryEnabled: ").append(ai.getAdvanced().isProviderRetryEnabled()).append("\n");
+        sb.append("      providerFailoverEnabled: ").append(ai.getAdvanced().isProviderFailoverEnabled()).append("\n");
+        sb.append("      semanticCacheEnabled: ").append(ai.getAdvanced().isSemanticCacheEnabled()).append("\n");
+        sb.append("      shadowTestingEnabled: ").append(ai.getAdvanced().isShadowTestingEnabled()).append("\n");
+        sb.append("      promptFirewallEnabled: ").append(ai.getAdvanced().isPromptFirewallEnabled()).append("\n");
+        sb.append("      observabilityExportEnabled: ").append(ai.getAdvanced().isObservabilityExportEnabled()).append("\n");
+        sb.append("      modelBundleEnabled: ").append(ai.getAdvanced().isModelBundleEnabled()).append("\n");
+        sb.append("      gpuSchedulingEnabled: ").append(ai.getAdvanced().isGpuSchedulingEnabled()).append("\n");
         sb.append("    roadmap:\n");
         sb.append("      currentStage: ").append(ai.getRoadmap().getCurrentStage()).append("\n");
         return sb.toString();

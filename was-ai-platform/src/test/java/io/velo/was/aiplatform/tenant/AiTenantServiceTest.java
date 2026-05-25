@@ -147,6 +147,20 @@ class AiTenantServiceTest {
     }
 
     @Test
+    void tenantAllowedModelsRestrictGatewayModelAccess() {
+        AiTenantService service = new AiTenantService(multiTenantConfig());
+        service.registerOrUpdate(new AiTenantRegistrationRequest("tenant-policy", "Policy", "starter", 10, 500L, true));
+        AiTenantIssuedKey issuedKey = service.issueApiKey("tenant-policy", "primary");
+        AiTenantAccessGrant grant = service.authorize(issuedKey.apiKey());
+
+        service.setAllowedModels("tenant-policy", List.of("llm-general"));
+
+        service.assertModelAllowed(grant, "llm-general");
+        assertThrows(SecurityException.class, () -> service.assertModelAllowed(grant, "vision-edge"));
+        assertEquals(List.of("llm-general"), service.getTenant("tenant-policy").allowedModels());
+    }
+
+    @Test
     void persistsUsageAcrossRestart() {
         ServerConfiguration configuration = multiTenantConfig();
         AiPlatformDataStore dataStore = new AiPlatformDataStore(tempDir);

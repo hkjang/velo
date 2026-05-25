@@ -18,8 +18,27 @@ public record TenantData(
         long currentWindowEpochMinute,
         int currentWindowRequests,
         long lastActivityAt,
-        List<ApiKeyData> apiKeys
+        List<ApiKeyData> apiKeys,
+        List<String> allowedModels
 ) {
+    public TenantData(String tenantId,
+                      String displayName,
+                      String plan,
+                      boolean active,
+                      int rateLimitPerMinute,
+                      long tokenQuota,
+                      long createdAt,
+                      long totalRequests,
+                      long totalTokens,
+                      long currentWindowEpochMinute,
+                      int currentWindowRequests,
+                      long lastActivityAt,
+                      List<ApiKeyData> apiKeys) {
+        this(tenantId, displayName, plan, active, rateLimitPerMinute, tokenQuota, createdAt,
+                totalRequests, totalTokens, currentWindowEpochMinute, currentWindowRequests,
+                lastActivityAt, apiKeys, List.of());
+    }
+
     public TenantData(String tenantId,
                       String displayName,
                       String plan,
@@ -29,7 +48,7 @@ public record TenantData(
                       long createdAt,
                       List<ApiKeyData> apiKeys) {
         this(tenantId, displayName, plan, active, rateLimitPerMinute, tokenQuota, createdAt,
-                0L, 0L, 0L, 0, 0L, apiKeys);
+                0L, 0L, 0L, 0, 0L, apiKeys, List.of());
     }
 
     public record ApiKeyData(

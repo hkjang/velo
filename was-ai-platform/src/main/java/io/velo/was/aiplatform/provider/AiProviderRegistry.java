@@ -160,6 +160,10 @@ public class AiProviderRegistry {
         return adapters.size();
     }
 
+    public List<String> providerIds() {
+        return adapters.keySet().stream().sorted().toList();
+    }
+
     private boolean cachedHealthCheck(AiProviderAdapter adapter) {
         String key = normalizeKey(adapter.providerId());
         ProviderRuntimeState state = stateFor(key);

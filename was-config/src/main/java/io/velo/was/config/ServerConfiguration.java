@@ -945,6 +945,30 @@ public class ServerConfiguration {
         private long providerHealthCacheTtlMillis = 10_000L;
         private int providerCircuitFailureThreshold = 2;
         private long providerCircuitOpenMillis = 30_000L;
+        private boolean canaryAutomationEnabled = true;
+        private int canaryPromotionMinRequests = 20;
+        private double canaryPromotionSuccessRate = 98.0d;
+        private double canaryRollbackSuccessRate = 90.0d;
+        private long canaryMaxAvgLatencyMs = 2_000L;
+        private boolean providerRetryEnabled = true;
+        private int providerMaxRetries = 1;
+        private long providerRetryBackoffMillis = 25L;
+        private boolean providerFailoverEnabled = true;
+        private boolean semanticCacheEnabled = false;
+        private double semanticCacheSimilarityThreshold = 0.82d;
+        private int semanticCacheMaxEntries = 256;
+        private boolean shadowTestingEnabled = false;
+        private String shadowModelName = "";
+        private boolean promptFirewallEnabled = true;
+        private int promptFirewallMaxChars = 20_000;
+        private List<String> promptFirewallBlockedTerms = new ArrayList<>(List.of(
+                "ignore previous instructions",
+                "reveal system prompt",
+                "dump api key"
+        ));
+        private boolean observabilityExportEnabled = true;
+        private boolean modelBundleEnabled = true;
+        private int gpuQueueCapacity = 64;
 
         public boolean isPromptRoutingEnabled() { return promptRoutingEnabled; }
         public void setPromptRoutingEnabled(boolean promptRoutingEnabled) { this.promptRoutingEnabled = promptRoutingEnabled; }
@@ -976,6 +1000,46 @@ public class ServerConfiguration {
         public void setProviderCircuitFailureThreshold(int providerCircuitFailureThreshold) { this.providerCircuitFailureThreshold = providerCircuitFailureThreshold; }
         public long getProviderCircuitOpenMillis() { return providerCircuitOpenMillis; }
         public void setProviderCircuitOpenMillis(long providerCircuitOpenMillis) { this.providerCircuitOpenMillis = providerCircuitOpenMillis; }
+        public boolean isCanaryAutomationEnabled() { return canaryAutomationEnabled; }
+        public void setCanaryAutomationEnabled(boolean canaryAutomationEnabled) { this.canaryAutomationEnabled = canaryAutomationEnabled; }
+        public int getCanaryPromotionMinRequests() { return canaryPromotionMinRequests; }
+        public void setCanaryPromotionMinRequests(int canaryPromotionMinRequests) { this.canaryPromotionMinRequests = canaryPromotionMinRequests; }
+        public double getCanaryPromotionSuccessRate() { return canaryPromotionSuccessRate; }
+        public void setCanaryPromotionSuccessRate(double canaryPromotionSuccessRate) { this.canaryPromotionSuccessRate = canaryPromotionSuccessRate; }
+        public double getCanaryRollbackSuccessRate() { return canaryRollbackSuccessRate; }
+        public void setCanaryRollbackSuccessRate(double canaryRollbackSuccessRate) { this.canaryRollbackSuccessRate = canaryRollbackSuccessRate; }
+        public long getCanaryMaxAvgLatencyMs() { return canaryMaxAvgLatencyMs; }
+        public void setCanaryMaxAvgLatencyMs(long canaryMaxAvgLatencyMs) { this.canaryMaxAvgLatencyMs = canaryMaxAvgLatencyMs; }
+        public boolean isProviderRetryEnabled() { return providerRetryEnabled; }
+        public void setProviderRetryEnabled(boolean providerRetryEnabled) { this.providerRetryEnabled = providerRetryEnabled; }
+        public int getProviderMaxRetries() { return providerMaxRetries; }
+        public void setProviderMaxRetries(int providerMaxRetries) { this.providerMaxRetries = providerMaxRetries; }
+        public long getProviderRetryBackoffMillis() { return providerRetryBackoffMillis; }
+        public void setProviderRetryBackoffMillis(long providerRetryBackoffMillis) { this.providerRetryBackoffMillis = providerRetryBackoffMillis; }
+        public boolean isProviderFailoverEnabled() { return providerFailoverEnabled; }
+        public void setProviderFailoverEnabled(boolean providerFailoverEnabled) { this.providerFailoverEnabled = providerFailoverEnabled; }
+        public boolean isSemanticCacheEnabled() { return semanticCacheEnabled; }
+        public void setSemanticCacheEnabled(boolean semanticCacheEnabled) { this.semanticCacheEnabled = semanticCacheEnabled; }
+        public double getSemanticCacheSimilarityThreshold() { return semanticCacheSimilarityThreshold; }
+        public void setSemanticCacheSimilarityThreshold(double semanticCacheSimilarityThreshold) { this.semanticCacheSimilarityThreshold = semanticCacheSimilarityThreshold; }
+        public int getSemanticCacheMaxEntries() { return semanticCacheMaxEntries; }
+        public void setSemanticCacheMaxEntries(int semanticCacheMaxEntries) { this.semanticCacheMaxEntries = semanticCacheMaxEntries; }
+        public boolean isShadowTestingEnabled() { return shadowTestingEnabled; }
+        public void setShadowTestingEnabled(boolean shadowTestingEnabled) { this.shadowTestingEnabled = shadowTestingEnabled; }
+        public String getShadowModelName() { return shadowModelName; }
+        public void setShadowModelName(String shadowModelName) { this.shadowModelName = shadowModelName; }
+        public boolean isPromptFirewallEnabled() { return promptFirewallEnabled; }
+        public void setPromptFirewallEnabled(boolean promptFirewallEnabled) { this.promptFirewallEnabled = promptFirewallEnabled; }
+        public int getPromptFirewallMaxChars() { return promptFirewallMaxChars; }
+        public void setPromptFirewallMaxChars(int promptFirewallMaxChars) { this.promptFirewallMaxChars = promptFirewallMaxChars; }
+        public List<String> getPromptFirewallBlockedTerms() { return promptFirewallBlockedTerms; }
+        public void setPromptFirewallBlockedTerms(List<String> promptFirewallBlockedTerms) { this.promptFirewallBlockedTerms = promptFirewallBlockedTerms; }
+        public boolean isObservabilityExportEnabled() { return observabilityExportEnabled; }
+        public void setObservabilityExportEnabled(boolean observabilityExportEnabled) { this.observabilityExportEnabled = observabilityExportEnabled; }
+        public boolean isModelBundleEnabled() { return modelBundleEnabled; }
+        public void setModelBundleEnabled(boolean modelBundleEnabled) { this.modelBundleEnabled = modelBundleEnabled; }
+        public int getGpuQueueCapacity() { return gpuQueueCapacity; }
+        public void setGpuQueueCapacity(int gpuQueueCapacity) { this.gpuQueueCapacity = gpuQueueCapacity; }
 
         public void validate() {
             String normalizedMode = promptRoutingMode == null ? "HYBRID" : promptRoutingMode.trim().toUpperCase();
@@ -997,6 +1061,31 @@ public class ServerConfiguration {
             }
             if (providerCircuitOpenMillis <= 0) {
                 throw new IllegalArgumentException("server.aiPlatform.advanced.providerCircuitOpenMillis must be positive");
+            }
+            if (canaryPromotionMinRequests < 0) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced.canaryPromotionMinRequests must be >= 0");
+            }
+            if (canaryPromotionSuccessRate < 0 || canaryPromotionSuccessRate > 100
+                    || canaryRollbackSuccessRate < 0 || canaryRollbackSuccessRate > 100) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced.canary success rates must be between 0 and 100");
+            }
+            if (canaryMaxAvgLatencyMs <= 0) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced.canaryMaxAvgLatencyMs must be positive");
+            }
+            if (providerMaxRetries < 0 || providerRetryBackoffMillis < 0) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced.provider retry values must be >= 0");
+            }
+            if (semanticCacheSimilarityThreshold <= 0 || semanticCacheSimilarityThreshold > 1) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced.semanticCacheSimilarityThreshold must be > 0 and <= 1");
+            }
+            if (semanticCacheMaxEntries <= 0 || promptFirewallMaxChars <= 0 || gpuQueueCapacity <= 0) {
+                throw new IllegalArgumentException("server.aiPlatform.advanced cache/firewall/gpu limits must be positive");
+            }
+            if (shadowModelName == null) {
+                shadowModelName = "";
+            }
+            if (promptFirewallBlockedTerms == null) {
+                promptFirewallBlockedTerms = new ArrayList<>();
             }
         }
     }

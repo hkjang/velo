@@ -13,7 +13,10 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,7 +29,7 @@ class ClusteredHttpSessionStoreTest {
     @Test
     void sessionSurvivesNodeHopAndKeepsStickyRoute() throws Exception {
         InMemorySessionRepository repository = new InMemorySessionRepository();
-        InMemorySessionReplicationChannel replicationChannel = new InMemorySessionReplicationChannel();
+        DirectSessionReplicationChannel replicationChannel = new DirectSessionReplicationChannel();
         ClusteredHttpSessionStore storeA = new ClusteredHttpSessionStore(
                 "node-a",
                 "node-a",
@@ -217,5 +220,29 @@ class ClusteredHttpSessionStoreTest {
             Thread.sleep(25);
         }
         assertTrue(condition.getAsBoolean(), "Condition was not satisfied within timeout");
+    }
+
+    private static final class DirectSessionReplicationChannel implements SessionReplicationChannel {
+        private final Map<String, Consumer<SessionReplicationMessage>> subscribers = new ConcurrentHashMap<>();
+
+        @Override
+        public Subscription subscribe(String nodeId, Consumer<SessionReplicationMessage> consumer) {
+            subscribers.put(nodeId, consumer);
+            return () -> subscribers.remove(nodeId, consumer);
+        }
+
+        @Override
+        public void publish(SessionReplicationMessage message) {
+            subscribers.forEach((nodeId, consumer) -> {
+                if (!nodeId.equals(message.originNodeId())) {
+                    consumer.accept(message);
+                }
+            });
+        }
+
+        @Override
+        public void close() {
+            subscribers.clear();
+        }
     }
 }

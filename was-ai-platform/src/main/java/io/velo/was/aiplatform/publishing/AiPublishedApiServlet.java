@@ -60,10 +60,14 @@ public class AiPublishedApiServlet extends HttpServlet {
         }
         try {
             AiPublishedInvocationResult result = publishedApiService.invoke(req.getContextPath(), modelName, prompt, req.getParameter("sessionId"));
+            tenantService.assertModelAllowed(tenantAccess, result.endpoint().modelName());
             usageService.recordPublishedInvocation(result.endpoint().modelName(), result.estimatedTokens());
             tenantService.recordUsage(tenantAccess, result.estimatedTokens());
             applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
             resp.getWriter().write(AiPlatformExtendedJson.publishedInvocation(result));
+        } catch (SecurityException e) {
+            resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            resp.getWriter().write("{\"error\":\"" + AiGatewayServlet.escapeJson(e.getMessage()) + "\"}");
         } catch (IllegalStateException e) {
             resp.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             resp.getWriter().write("{\"error\":\"" + AiGatewayServlet.escapeJson(e.getMessage()) + "\"}");

@@ -45,8 +45,10 @@ class AiPlatformApiDocsServletTest {
         assertTrue(spec.at("/paths/~1api~1tenants~1{id}~1policies").has("post"));
         assertTrue(spec.at("/paths/~1api~1config~1diagnostics").has("get"));
         assertTrue(spec.at("/paths/~1api~1config~1remediation-plan").has("get"));
+        assertTrue(spec.at("/paths/~1api~1config~1patch-bundle").has("get"));
         assertTrue(spec.at("/paths/~1api~1operations~1runbook").has("get"));
         assertTrue(spec.at("/paths/~1api~1operations~1remediation-plan").has("get"));
+        assertTrue(spec.at("/paths/~1api~1operations~1config-patch").has("get"));
         assertTrue(spec.at("/paths/~1api~1operations~1canary").has("get"));
         assertTrue(spec.at("/paths/~1api~1metrics~1prometheus").has("get"));
         assertTrue(spec.at("/paths/~1api~1providers~1circuit-breakers").has("get"));

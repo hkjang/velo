@@ -8,8 +8,11 @@ import io.velo.was.config.ServerConfiguration;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class AiPlatformDiagnosticsService {
@@ -200,6 +203,32 @@ public class AiPlatformDiagnosticsService {
         );
     }
 
+    public ConfigPatchBundle configPatchBundle() {
+        RemediationPlan plan = remediationPlan();
+        List<RemediationAction> safeActions = new ArrayList<>();
+        List<RemediationAction> manualActions = new ArrayList<>();
+        for (RemediationAction action : plan.actions()) {
+            if (isSafeConfigPatch(action)) {
+                safeActions.add(action);
+            } else {
+                manualActions.add(action);
+            }
+        }
+        List<String> patchLines = patchLines(safeActions);
+        return new ConfigPatchBundle(
+                plan.posture(),
+                plan.score(),
+                safeActions.size(),
+                manualActions.size(),
+                !safeActions.isEmpty(),
+                "/api/config/diagnostics",
+                propertyPatch(patchLines),
+                yamlPatch(patchLines),
+                List.copyOf(safeActions),
+                List.copyOf(manualActions)
+        );
+    }
+
     private static void finding(List<DiagnosticFinding> findings, String severity, String code, String title,
                                 String detail, String recommendation, String path) {
         findings.add(new DiagnosticFinding(severity, code, title, detail, recommendation, path));
@@ -356,6 +385,100 @@ public class AiPlatformDiagnosticsService {
         );
     }
 
+    private static boolean isSafeConfigPatch(RemediationAction action) {
+        if (!action.autoApplicable()) {
+            return false;
+        }
+        boolean hasPatchLine = false;
+        for (String rawLine : action.patchSnippet().split("\\R")) {
+            String line = rawLine.trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+            int colon = line.indexOf(':');
+            if (colon <= 0 || line.contains("<")) {
+                return false;
+            }
+            if (!line.substring(0, colon).trim().startsWith("server.aiPlatform.")) {
+                return false;
+            }
+            hasPatchLine = true;
+        }
+        return hasPatchLine;
+    }
+
+    private static List<String> patchLines(List<RemediationAction> actions) {
+        LinkedHashSet<String> lines = new LinkedHashSet<>();
+        for (RemediationAction action : actions) {
+            for (String rawLine : action.patchSnippet().split("\\R")) {
+                String line = rawLine.trim();
+                if (!line.isEmpty()) {
+                    lines.add(line);
+                }
+            }
+        }
+        return List.copyOf(lines);
+    }
+
+    private static String propertyPatch(List<String> patchLines) {
+        if (patchLines.isEmpty()) {
+            return "# No safe automatic configuration patch is currently available.\n";
+        }
+        StringBuilder sb = new StringBuilder(512);
+        sb.append("# Velo AI Platform remediation patch\n");
+        sb.append("# Review, merge into application.yaml, then validate with /api/config/diagnostics.\n");
+        for (String line : patchLines) {
+            sb.append(line).append('\n');
+        }
+        return sb.toString();
+    }
+
+    private static String yamlPatch(List<String> patchLines) {
+        if (patchLines.isEmpty()) {
+            return "# No safe automatic configuration patch is currently available.\n";
+        }
+        LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+        for (String line : patchLines) {
+            int colon = line.indexOf(':');
+            if (colon <= 0) {
+                continue;
+            }
+            putYamlValue(root, line.substring(0, colon).trim(), line.substring(colon + 1).trim());
+        }
+        StringBuilder sb = new StringBuilder(512);
+        appendYaml(sb, root, 0);
+        return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void putYamlValue(Map<String, Object> root, String dottedPath, String value) {
+        String[] segments = dottedPath.split("\\.");
+        Map<String, Object> current = root;
+        for (int i = 0; i < segments.length - 1; i++) {
+            Object next = current.get(segments[i]);
+            if (!(next instanceof Map)) {
+                next = new LinkedHashMap<String, Object>();
+                current.put(segments[i], next);
+            }
+            current = (Map<String, Object>) next;
+        }
+        current.put(segments[segments.length - 1], value);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void appendYaml(StringBuilder sb, Map<String, Object> node, int indent) {
+        String spaces = " ".repeat(indent);
+        for (Map.Entry<String, Object> entry : node.entrySet()) {
+            Object value = entry.getValue();
+            if (value instanceof Map) {
+                sb.append(spaces).append(entry.getKey()).append(":\n");
+                appendYaml(sb, (Map<String, Object>) value, indent + 2);
+            } else {
+                sb.append(spaces).append(entry.getKey()).append(": ").append(value).append('\n');
+            }
+        }
+    }
+
     public record DiagnosticsSnapshot(String mode,
                                       String posture,
                                       int score,
@@ -395,6 +518,18 @@ public class AiPlatformDiagnosticsService {
                                   int warningCount,
                                   int actionCount,
                                   List<RemediationAction> actions) {
+    }
+
+    public record ConfigPatchBundle(String posture,
+                                    int score,
+                                    int safePatchCount,
+                                    int manualReviewCount,
+                                    boolean restartRequired,
+                                    String validationEndpoint,
+                                    String propertyPatch,
+                                    String yamlPatch,
+                                    List<RemediationAction> safeActions,
+                                    List<RemediationAction> manualReviewActions) {
     }
 
     public record RemediationAction(int priority,

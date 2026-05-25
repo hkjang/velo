@@ -318,6 +318,18 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(buildRemediationPlanJson(diagnostics.remediationPlan()));
             return;
         }
+        if ("/config/patch-bundle".equals(path) || "/operations/config-patch".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/config/patch-bundle");
+            AiPlatformDiagnosticsService diagnostics = new AiPlatformDiagnosticsService(
+                    configuration,
+                    summary,
+                    usage,
+                    tenantService.snapshot(),
+                    providerRegistry
+            );
+            resp.getWriter().write(buildConfigPatchBundleJson(diagnostics.configPatchBundle()));
+            return;
+        }
         if ("/operations/canary".equals(path)) {
             usageService.recordControlPlaneAccess("/api/operations/canary");
             AiCanaryPolicyService canary = new AiCanaryPolicyService(configuration, registryService, gatewayAuditLog);
@@ -1011,6 +1023,42 @@ public class AiPlatformApiServlet extends HttpServlet {
                     .append(",\"validationHint\":\"").append(esc(action.validationHint())).append("\"}");
         }
         return sb.append("]}").toString();
+    }
+
+    private static String buildConfigPatchBundleJson(AiPlatformDiagnosticsService.ConfigPatchBundle bundle) {
+        StringBuilder sb = new StringBuilder(8192);
+        sb.append("{\"posture\":\"").append(esc(bundle.posture())).append("\"");
+        sb.append(",\"score\":").append(bundle.score());
+        sb.append(",\"summary\":{");
+        sb.append("\"safePatches\":").append(bundle.safePatchCount()).append(",");
+        sb.append("\"manualReviews\":").append(bundle.manualReviewCount()).append(",");
+        sb.append("\"restartRequired\":").append(bundle.restartRequired());
+        sb.append("},\"validationEndpoint\":\"").append(esc(bundle.validationEndpoint())).append("\"");
+        sb.append(",\"propertyPatch\":\"").append(esc(bundle.propertyPatch())).append("\"");
+        sb.append(",\"yamlPatch\":\"").append(esc(bundle.yamlPatch())).append("\"");
+        sb.append(",\"safeActions\":[");
+        appendRemediationActions(sb, bundle.safeActions());
+        sb.append("],\"manualReviewActions\":[");
+        appendRemediationActions(sb, bundle.manualReviewActions());
+        return sb.append("]}").toString();
+    }
+
+    private static void appendRemediationActions(StringBuilder sb, java.util.List<AiPlatformDiagnosticsService.RemediationAction> actions) {
+        boolean first = true;
+        for (AiPlatformDiagnosticsService.RemediationAction action : actions) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"priority\":").append(action.priority())
+                    .append(",\"severity\":\"").append(esc(action.severity())).append("\"")
+                    .append(",\"findingCode\":\"").append(esc(action.findingCode())).append("\"")
+                    .append(",\"title\":\"").append(esc(action.title())).append("\"")
+                    .append(",\"autoApplicable\":").append(action.autoApplicable())
+                    .append(",\"risk\":\"").append(esc(action.risk())).append("\"")
+                    .append(",\"action\":\"").append(esc(action.action())).append("\"")
+                    .append(",\"configPath\":\"").append(esc(action.configPath())).append("\"")
+                    .append(",\"patchSnippet\":\"").append(esc(action.patchSnippet())).append("\"")
+                    .append(",\"validationHint\":\"").append(esc(action.validationHint())).append("\"}");
+        }
     }
 
     private static String buildCanaryJson(java.util.List<AiCanaryPolicyService.CanaryDecision> decisions) {

@@ -160,9 +160,13 @@ public class AiPlatformApiDocsServlet extends HttpServlet {
         s.append(",\n");
         apiPath(s, "/api/config/remediation-plan", "get", "Control Plane", "Get safe remediation actions for diagnostics findings", null, false);
         s.append(",\n");
+        apiPath(s, "/api/config/patch-bundle", "get", "Control Plane", "Get copyable AI platform configuration patch bundle", "Builds a safe application.yaml patch from remediation actions and lists manual review items separately.", false);
+        s.append(",\n");
         apiPath(s, "/api/operations/runbook", "get", "Control Plane", "Get the generated AI platform operator runbook", "Alias of /api/config/diagnostics with runbook steps included.", false);
         s.append(",\n");
         apiPath(s, "/api/operations/remediation-plan", "get", "Control Plane", "Get generated remediation actions for operators", "Alias of /api/config/remediation-plan.", false);
+        s.append(",\n");
+        apiPath(s, "/api/operations/config-patch", "get", "Control Plane", "Get generated safe configuration patch", "Alias of /api/config/patch-bundle.", false);
         s.append(",\n");
         apiPath(s, "/api/operations/canary", "get", "Control Plane", "Evaluate canary promotion or rollback recommendations", null, false);
         s.append(",\n");

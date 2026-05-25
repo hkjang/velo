@@ -105,4 +105,31 @@ class AiOperationsSupportTest {
                 "PROMPT_FIREWALL_DISABLED".equals(action.findingCode())
                         && action.patchSnippet().contains("promptFirewallEnabled: true")));
     }
+
+    @Test
+    void configPatchBundleBuildsCopyableYamlForSafeActions() {
+        ServerConfiguration configuration = new ServerConfiguration();
+        configuration.getServer().getAiPlatform().getAdvanced().setPromptFirewallEnabled(false);
+        configuration.getServer().getAiPlatform().getAdvanced().setProviderFailoverEnabled(false);
+        configuration.validate();
+        AiGatewayService gatewayService = new AiGatewayService(configuration);
+        AiModelRegistryService registryService = new AiModelRegistryService(configuration);
+        AiPlatformUsageService usageService = new AiPlatformUsageService();
+        AiTenantService tenantService = new AiTenantService(configuration);
+
+        AiPlatformDiagnosticsService.ConfigPatchBundle bundle = new AiPlatformDiagnosticsService(
+                configuration,
+                registryService.summary(),
+                usageService.snapshot(false, gatewayService, registryService),
+                tenantService.snapshot(),
+                new AiProviderRegistry()
+        ).configPatchBundle();
+
+        assertTrue(bundle.safePatchCount() > 0);
+        assertTrue(bundle.restartRequired());
+        assertTrue(bundle.propertyPatch().contains("server.aiPlatform.advanced.promptFirewallEnabled: true"));
+        assertTrue(bundle.yamlPatch().contains("server:\n  aiPlatform:\n    advanced:"));
+        assertTrue(bundle.yamlPatch().contains("promptFirewallEnabled: true"));
+        assertTrue(bundle.validationEndpoint().contains("/api/config/diagnostics"));
+    }
 }

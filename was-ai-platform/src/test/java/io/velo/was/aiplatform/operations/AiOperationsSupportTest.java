@@ -8,6 +8,8 @@ import io.velo.was.aiplatform.tenant.AiTenantService;
 import io.velo.was.config.ServerConfiguration;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AiOperationsSupportTest {
@@ -131,5 +133,54 @@ class AiOperationsSupportTest {
         assertTrue(bundle.yamlPatch().contains("server:\n  aiPlatform:\n    advanced:"));
         assertTrue(bundle.yamlPatch().contains("promptFirewallEnabled: true"));
         assertTrue(bundle.validationEndpoint().contains("/api/config/diagnostics"));
+    }
+
+    @Test
+    void rolloutGateBlocksCriticalFindings() {
+        ServerConfiguration configuration = new ServerConfiguration();
+        configuration.getServer().getAiPlatform().setEnabled(false);
+        configuration.validate();
+        AiGatewayService gatewayService = new AiGatewayService(configuration);
+        AiModelRegistryService registryService = new AiModelRegistryService(configuration);
+        AiPlatformUsageService usageService = new AiPlatformUsageService();
+        AiTenantService tenantService = new AiTenantService(configuration);
+
+        AiPlatformDiagnosticsService.RolloutGate gate = new AiPlatformDiagnosticsService(
+                configuration,
+                registryService.summary(),
+                usageService.snapshot(false, gatewayService, registryService),
+                tenantService.snapshot(),
+                new AiProviderRegistry()
+        ).rolloutGate();
+
+        assertEquals("BLOCK", gate.decision());
+        assertFalse(gate.canPromote());
+        assertTrue(gate.blockers() > 0);
+        assertTrue(gate.nextActions().stream().anyMatch(action -> "/api/readiness".equals(action.endpoint())));
+    }
+
+    @Test
+    void rolloutGateSurfacesReviewWhenSafePatchesExist() {
+        ServerConfiguration configuration = new ServerConfiguration();
+        configuration.getServer().getAiPlatform().getAdvanced().setPromptFirewallEnabled(false);
+        configuration.validate();
+        AiGatewayService gatewayService = new AiGatewayService(configuration);
+        AiModelRegistryService registryService = new AiModelRegistryService(configuration);
+        AiPlatformUsageService usageService = new AiPlatformUsageService();
+        AiTenantService tenantService = new AiTenantService(configuration);
+
+        AiPlatformDiagnosticsService.RolloutGate gate = new AiPlatformDiagnosticsService(
+                configuration,
+                registryService.summary(),
+                usageService.snapshot(false, gatewayService, registryService),
+                tenantService.snapshot(),
+                new AiProviderRegistry()
+        ).rolloutGate();
+
+        assertEquals("REVIEW", gate.decision());
+        assertTrue(gate.safePatchCount() > 0);
+        assertTrue(gate.checks().stream().anyMatch(check ->
+                "security".equals(check.id()) && "WARN".equals(check.status())));
+        assertTrue(gate.nextActions().stream().anyMatch(action -> "/api/config/patch-bundle".equals(action.endpoint())));
     }
 }

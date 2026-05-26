@@ -330,6 +330,18 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(buildConfigPatchBundleJson(diagnostics.configPatchBundle()));
             return;
         }
+        if ("/operations/rollout-gate".equals(path) || "/config/rollout-gate".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/operations/rollout-gate");
+            AiPlatformDiagnosticsService diagnostics = new AiPlatformDiagnosticsService(
+                    configuration,
+                    summary,
+                    usage,
+                    tenantService.snapshot(),
+                    providerRegistry
+            );
+            resp.getWriter().write(buildRolloutGateJson(diagnostics.rolloutGate()));
+            return;
+        }
         if ("/operations/canary".equals(path)) {
             usageService.recordControlPlaneAccess("/api/operations/canary");
             AiCanaryPolicyService canary = new AiCanaryPolicyService(configuration, registryService, gatewayAuditLog);
@@ -1059,6 +1071,42 @@ public class AiPlatformApiServlet extends HttpServlet {
                     .append(",\"patchSnippet\":\"").append(esc(action.patchSnippet())).append("\"")
                     .append(",\"validationHint\":\"").append(esc(action.validationHint())).append("\"}");
         }
+    }
+
+    private static String buildRolloutGateJson(AiPlatformDiagnosticsService.RolloutGate gate) {
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("{\"decision\":\"").append(esc(gate.decision())).append("\"");
+        sb.append(",\"posture\":\"").append(esc(gate.posture())).append("\"");
+        sb.append(",\"score\":").append(gate.score());
+        sb.append(",\"canPromote\":").append(gate.canPromote());
+        sb.append(",\"trafficRecommendation\":\"").append(esc(gate.trafficRecommendation())).append("\"");
+        sb.append(",\"operatorSummary\":\"").append(esc(gate.operatorSummary())).append("\"");
+        sb.append(",\"summary\":{");
+        sb.append("\"blockers\":").append(gate.blockers()).append(",");
+        sb.append("\"warnings\":").append(gate.warnings()).append(",");
+        sb.append("\"safePatches\":").append(gate.safePatchCount()).append(",");
+        sb.append("\"manualReviews\":").append(gate.manualReviewCount());
+        sb.append("},\"checks\":[");
+        boolean first = true;
+        for (AiPlatformDiagnosticsService.GateCheck check : gate.checks()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"id\":\"").append(esc(check.id())).append("\"")
+                    .append(",\"status\":\"").append(esc(check.status())).append("\"")
+                    .append(",\"title\":\"").append(esc(check.title())).append("\"")
+                    .append(",\"detail\":\"").append(esc(check.detail())).append("\"}");
+        }
+        sb.append("],\"nextActions\":[");
+        first = true;
+        for (AiPlatformDiagnosticsService.RolloutAction action : gate.nextActions()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"order\":").append(action.order())
+                    .append(",\"title\":\"").append(esc(action.title())).append("\"")
+                    .append(",\"endpoint\":\"").append(esc(action.endpoint())).append("\"")
+                    .append(",\"operatorHint\":\"").append(esc(action.operatorHint())).append("\"}");
+        }
+        return sb.append("]}").toString();
     }
 
     private static String buildCanaryJson(java.util.List<AiCanaryPolicyService.CanaryDecision> decisions) {

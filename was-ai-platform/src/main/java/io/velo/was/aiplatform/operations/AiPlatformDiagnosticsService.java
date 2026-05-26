@@ -229,6 +229,70 @@ public class AiPlatformDiagnosticsService {
         );
     }
 
+    public RolloutGate rolloutGate() {
+        DiagnosticsSnapshot diagnostics = snapshot();
+        ConfigPatchBundle patchBundle = configPatchBundle();
+        ServerConfiguration.AiPlatform ai = configuration.getServer().getAiPlatform();
+
+        List<GateCheck> checks = new ArrayList<>();
+        checks.add(gateCheck("readiness",
+                diagnostics.criticalCount() > 0 ? "BLOCK" : diagnostics.warningCount() > 0 ? "WARN" : "PASS",
+                "Readiness posture",
+                diagnostics.posture() + " with score " + diagnostics.scoreLabel()));
+        checks.add(gateCheck("routing",
+                diagnostics.routableModels() > 0 && !has(diagnostics.findings(), "ROUTE_TARGET_UNAVAILABLE") ? "PASS" : "BLOCK",
+                "Model routing",
+                diagnostics.routableModels() + " routable model(s) available."));
+        checks.add(gateCheck("security",
+                ai.getAdvanced().isPromptFirewallEnabled() ? "PASS" : "WARN",
+                "Prompt firewall",
+                ai.getAdvanced().isPromptFirewallEnabled()
+                        ? "Prompt firewall is enabled."
+                        : "Prompt firewall is disabled before rollout."));
+        checks.add(gateCheck("observability",
+                ai.getAdvanced().isObservabilityEnabled() && ai.getAdvanced().isObservabilityExportEnabled() ? "PASS" : "WARN",
+                "Observability export",
+                ai.getAdvanced().isObservabilityExportEnabled()
+                        ? "Metrics export is available for rollout monitoring."
+                        : "Metrics export is limited; watch rollout manually."));
+        if (ai.getPlatform().isMultiTenantEnabled()) {
+            checks.add(gateCheck("tenancy",
+                    diagnostics.activeTenants() > 0 ? "PASS" : "BLOCK",
+                    "Tenant readiness",
+                    diagnostics.activeTenants() + " active tenant(s) configured."));
+        }
+        checks.add(gateCheck("canary",
+                has(diagnostics.findings(), "CANARY_AUTOMATION_DISABLED") ? "WARN" : "PASS",
+                "Canary automation",
+                ai.getAdvanced().isCanaryAutomationEnabled()
+                        ? "Canary automation is enabled."
+                        : "Use manual canary evaluation before promotion."));
+        checks.add(gateCheck("rollback",
+                ai.getAdvanced().isModelBundleEnabled() ? "PASS" : "WARN",
+                "Rollback manifest",
+                ai.getAdvanced().isModelBundleEnabled()
+                        ? "Model bundle manifests are available for rollback."
+                        : "Model bundle manifests are disabled."));
+
+        int blockers = countStatus(checks, "BLOCK");
+        int warnings = countStatus(checks, "WARN");
+        String decision = blockers > 0 ? "BLOCK" : warnings > 0 || patchBundle.safePatchCount() > 0 ? "REVIEW" : "GO";
+        return new RolloutGate(
+                decision,
+                diagnostics.posture(),
+                diagnostics.score(),
+                blockers,
+                warnings,
+                patchBundle.safePatchCount(),
+                patchBundle.manualReviewCount(),
+                "GO".equals(decision),
+                trafficRecommendation(decision),
+                operatorSummary(decision, blockers, warnings, patchBundle),
+                List.copyOf(checks),
+                rolloutActions(decision, patchBundle)
+        );
+    }
+
     private static void finding(List<DiagnosticFinding> findings, String severity, String code, String title,
                                 String detail, String recommendation, String path) {
         findings.add(new DiagnosticFinding(severity, code, title, detail, recommendation, path));
@@ -294,6 +358,60 @@ public class AiPlatformDiagnosticsService {
             }
         }
         return false;
+    }
+
+    private static GateCheck gateCheck(String id, String status, String title, String detail) {
+        return new GateCheck(id, status, title, detail);
+    }
+
+    private static int countStatus(List<GateCheck> checks, String status) {
+        int count = 0;
+        for (GateCheck check : checks) {
+            if (status.equals(check.status())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static String trafficRecommendation(String decision) {
+        return switch (decision) {
+            case "GO" -> "Proceed with configured rollout policy.";
+            case "REVIEW" -> "Limit to canary or low-percentage traffic until warnings are reviewed.";
+            default -> "Hold external traffic until blockers are resolved.";
+        };
+    }
+
+    private static String operatorSummary(String decision, int blockers, int warnings, ConfigPatchBundle patchBundle) {
+        return switch (decision) {
+            case "GO" -> "All rollout gates passed. Continue monitoring metrics and rollback readiness.";
+            case "REVIEW" -> "Review " + warnings + " warning gate(s), " + patchBundle.safePatchCount()
+                    + " safe patch(es), and " + patchBundle.manualReviewCount() + " manual item(s) before promotion.";
+            default -> "Resolve " + blockers + " blocker gate(s) before exposing production traffic.";
+        };
+    }
+
+    private static List<RolloutAction> rolloutActions(String decision, ConfigPatchBundle patchBundle) {
+        List<RolloutAction> actions = new ArrayList<>();
+        int order = 1;
+        if (patchBundle.safePatchCount() > 0) {
+            actions.add(new RolloutAction(order++, "Apply safe configuration patch",
+                    "/api/config/patch-bundle", "Review yamlPatch, merge it into application.yaml, then reload."));
+        }
+        if (patchBundle.manualReviewCount() > 0) {
+            actions.add(new RolloutAction(order++, "Review manual remediation actions",
+                    "/api/config/remediation-plan", "Resolve tenant, routing, provider, or model-specific items manually."));
+        }
+        actions.add(new RolloutAction(order++, "Re-run diagnostics",
+                "/api/config/diagnostics", "Confirm critical findings are gone and warnings are understood."));
+        if ("BLOCK".equals(decision)) {
+            actions.add(new RolloutAction(order, "Keep traffic closed",
+                    "/api/readiness", "Expect rollout readiness to remain blocked until all blocker gates pass."));
+        } else {
+            actions.add(new RolloutAction(order, "Evaluate canary promotion",
+                    "/api/operations/canary", "Promote only after latency, success rate, and rollback readiness look healthy."));
+        }
+        return List.copyOf(actions);
     }
 
     private static RemediationAction remediationAction(int priority, DiagnosticFinding finding) {
@@ -530,6 +648,32 @@ public class AiPlatformDiagnosticsService {
                                     String yamlPatch,
                                     List<RemediationAction> safeActions,
                                     List<RemediationAction> manualReviewActions) {
+    }
+
+    public record RolloutGate(String decision,
+                              String posture,
+                              int score,
+                              int blockers,
+                              int warnings,
+                              int safePatchCount,
+                              int manualReviewCount,
+                              boolean canPromote,
+                              String trafficRecommendation,
+                              String operatorSummary,
+                              List<GateCheck> checks,
+                              List<RolloutAction> nextActions) {
+    }
+
+    public record GateCheck(String id,
+                            String status,
+                            String title,
+                            String detail) {
+    }
+
+    public record RolloutAction(int order,
+                                String title,
+                                String endpoint,
+                                String operatorHint) {
     }
 
     public record RemediationAction(int priority,

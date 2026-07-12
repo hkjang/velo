@@ -223,6 +223,11 @@ public final class AdminPageLayout {
      * Generates the HTML head section.
      */
     public static String head(String title) {
+        return head(title, "");
+    }
+
+    public static String head(String title, String contextPath) {
+        String normalizedContextPath = contextPath == null || contextPath.equals("/") ? "" : contextPath;
         return """
                 <!DOCTYPE html>
                 <html lang="ko">
@@ -230,23 +235,28 @@ public final class AdminPageLayout {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>%s - Velo Web Admin</title>
+                <link rel="icon" href="%s/static/favicon.png" type="image/png">
                 <style>
                 %s
                 </style>
                 </head>
                 <body>
                 <a href="#main-content" class="skip-link">Skip to content</a>
-                """.formatted(title, CSS);
+                """.formatted(title, normalizedContextPath, CSS);
     }
 
     /**
      * Generates the header bar with search and user info.
      */
     public static String header(String serverName, String nodeId, String contextPath) {
+        String normalizedContextPath = contextPath == null || contextPath.equals("/") ? "" : contextPath;
         return """
                 <div class="header" role="banner">
                   <div class="header-left">
-                    <div class="logo">Velo<span> Web Admin</span></div>
+                    <div class="logo" style="display:flex;align-items:center;gap:8px;">
+                      <img src="%s/static/logo.png" alt="Velo Logo" style="height:24px;width:24px;border-radius:4px;object-fit:contain;">
+                      Velo<span> Web Admin</span>
+                    </div>
                     <div class="status-badge"><span class="status-dot"></span><span data-i18n="header.running">Running</span></div>
                   </div>
                   <div class="header-right">
@@ -281,7 +291,7 @@ public final class AdminPageLayout {
                   </div>
                 </div>
                 %s
-                """.formatted(escapeHtml(serverName), escapeHtml(nodeId), contextPath,
+                """.formatted(normalizedContextPath, escapeHtml(serverName), escapeHtml(nodeId), contextPath,
                 commandPalette(contextPath));
     }
 
@@ -649,7 +659,7 @@ public final class AdminPageLayout {
      */
     public static String page(String title, String serverName, String nodeId,
                               String contextPath, String activePage, String bodyContent) {
-        return head(title)
+        return head(title, contextPath)
                 + header(serverName, nodeId, contextPath)
                 + sidebar(contextPath, activePage)
                 + "<div class=\"main\" id=\"main-content\" role=\"main\" tabindex=\"-1\">\n" + bodyContent + "\n</div>\n"

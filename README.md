@@ -1,7 +1,7 @@
 # velo-was
 
 <p align="center">
-  <img src="docs/images/velo_was_icon.png" alt="Velo WAS Logo" width="120px">
+  <img src="docs/images/velo_was_logo_transparent.png" alt="Velo WAS Logo" width="120px">
 </p>
 
 Netty 기반 엔터프라이즈 WAS 파운데이션.

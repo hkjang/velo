@@ -118,10 +118,10 @@ public class AdminLoginServlet extends HttpServlet {
         );
         String normalizedContextPath = contextPath == null || contextPath.equals("/") ? "" : contextPath;
         html = html.replace("<title>Velo Web Admin - Login</title>",
-                "<title>Velo Web Admin - Login</title>\n<link rel=\"icon\" href=\"" + normalizedContextPath + "/static/favicon.png\" type=\"image/png\">");
+                "<title>Velo Web Admin - Login</title>\n<link rel=\"icon\" href=\"" + normalizedContextPath + "/static/favicon.svg\" type=\"image/svg+xml\">");
         html = html.replace("<div class=\"logo-text\">Velo<span> WAS</span></div>",
                 "<div style=\"display:flex;justify-content:center;align-items:center;gap:12px;margin-bottom:8px;\">" +
-                "<img src=\"" + normalizedContextPath + "/static/logo.png\" alt=\"Velo Logo\" style=\"height:42px;width:42px;border-radius:8px;\">" +
+                "<img src=\"" + normalizedContextPath + "/static/logo.svg\" alt=\"Velo Logo\" style=\"height:42px;width:42px;border-radius:8px;\">" +
                 "<div class=\"logo-text\" style=\"margin-bottom:0;\">Velo<span> WAS</span></div></div>");
         out.write(html);
     }

@@ -235,7 +235,7 @@ public final class AdminPageLayout {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>%s - Velo Web Admin</title>
-                <link rel="icon" href="%s/static/favicon.png" type="image/png">
+                <link rel="icon" href="%s/static/favicon.svg" type="image/svg+xml">
                 <style>
                 %s
                 </style>
@@ -254,7 +254,7 @@ public final class AdminPageLayout {
                 <div class="header" role="banner">
                   <div class="header-left">
                     <div class="logo" style="display:flex;align-items:center;gap:8px;">
-                      <img src="%s/static/logo.png" alt="Velo Logo" style="height:24px;width:24px;border-radius:4px;object-fit:contain;">
+                      <img src="%s/static/logo.svg" alt="Velo Logo" style="height:24px;width:24px;border-radius:4px;object-fit:contain;">
                       Velo<span> Web Admin</span>
                     </div>
                     <div class="status-badge"><span class="status-dot"></span><span data-i18n="header.running">Running</span></div>

@@ -1,5 +1,9 @@
 # velo-was
 
+<p align="center">
+  <img src="docs/images/velo_was_logo_simple.png" alt="Velo WAS Logo" width="120px">
+</p>
+
 Netty 기반 엔터프라이즈 WAS 파운데이션.
 
 - **Tomcat급 서블릿 호환성** - Jakarta Servlet 6.1 API 기반 컨테이너

@@ -108,14 +108,22 @@ public class AdminLoginServlet extends HttpServlet {
                 (uptimeSec % 3600) / 60, uptimeSec % 60);
         int heapPct = heapMax > 0 ? (int) (heapUsed * 100 / heapMax) : 0;
 
-        out.write(renderPage(
+        String html = renderPage(
                 errorDisplay, lastLoginDisplay, errorClass, errorMessage,
                 lastLoginInfo, contextPath, csrfToken,
                 isLocked ? "disabled" : "",
                 isLocked ? lockoutRemaining : 0,
                 sessionTimeoutSeconds,
                 heapUsed, heapMax, heapPct, threadCount, uptimeStr
-        ));
+        );
+        String normalizedContextPath = contextPath == null || contextPath.equals("/") ? "" : contextPath;
+        html = html.replace("<title>Velo Web Admin - Login</title>",
+                "<title>Velo Web Admin - Login</title>\n<link rel=\"icon\" href=\"" + normalizedContextPath + "/static/favicon.png\" type=\"image/png\">");
+        html = html.replace("<div class=\"logo-text\">Velo<span> WAS</span></div>",
+                "<div style=\"display:flex;justify-content:center;align-items:center;gap:12px;margin-bottom:8px;\">" +
+                "<img src=\"" + normalizedContextPath + "/static/logo.png\" alt=\"Velo Logo\" style=\"height:42px;width:42px;border-radius:8px;\">" +
+                "<div class=\"logo-text\" style=\"margin-bottom:0;\">Velo<span> WAS</span></div></div>");
+        out.write(html);
     }
 
     private String renderPage(

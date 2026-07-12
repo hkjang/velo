@@ -916,7 +916,7 @@ public class AdminApiDocsServlet extends HttpServlet {
         String ctx = server.getWebAdmin().getContextPath();
 
         PrintWriter out = resp.getWriter();
-        out.write(AdminPageLayout.head("API Documentation"));
+        out.write(AdminPageLayout.head("API Documentation", ctx));
         out.write(AdminPageLayout.header(server.getName(), server.getNodeId(), ctx));
         out.write(AdminPageLayout.sidebar(ctx, "api-docs"));
         out.write("""

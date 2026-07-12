@@ -1,57 +1,47 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
   <defs>
-    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00f2fe" />
-      <stop offset="100%" stop-color="#4facfe" />
+    <!-- Cute bright lime-to-teal gradient for the baby dino -->
+    <linearGradient id="backGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a8ff78" />
+      <stop offset="100%" stop-color="#78ffd6" />
     </linearGradient>
   </defs>
 
-  <!-- Instrument/V-Shape Body -->
-  <!-- Plump, rounded cello body forming a friendly outline -->
-  <path d="M 60,30 
-           C 45,30 35,40 35,50 
-           C 35,58 45,62 40,70 
-           C 35,78 25,85 40,95
-           C 50,102 60,98 60,98
-           C 60,98 70,102 80,95
-           C 95,85 85,78 80,70
-           C 75,62 85,58 85,50
-           C 85,40 75,30 60,30 Z" 
-        fill="url(#bodyGrad)" />
+  <!-- Baby Dinosaur (Velo) Body -->
+  <!-- Cute rounded head & back -->
+  <path d="M 60,25 
+           C 40,25 35,40 35,55 
+           C 35,68 45,78 50,85 
+           C 52,88 50,95 62,95 
+           C 75,95 85,85 85,70 
+           C 85,55 80,25 60,25 Z" 
+        fill="url(#backGrad)" />
 
-  <!-- Cello F-holes styled as cute curved lines -->
-  <path d="M 48,53 C 46,53 45,56 47,58 C 49,60 49,63 47,65" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" />
-  <path d="M 72,53 C 74,53 75,56 73,58 C 71,60 71,63 73,65" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" />
+  <!-- Cheek/Snout -->
+  <path d="M 35,55 
+           C 25,58 22,70 35,72 
+           C 42,73 48,70 48,60 Z" 
+        fill="url(#backGrad)" />
 
-  <!-- Cello Neck and Fingerboard -->
-  <rect x="57" y="12" width="6" height="28" rx="1.5" fill="#1e293b" />
-  
-  <!-- Scroll -->
-  <circle cx="60" cy="9" r="4.5" fill="#1e293b" />
-  <!-- Pegs -->
-  <line x1="53" y1="14" x2="57" y2="14" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" />
-  <line x1="63" y1="14" x2="67" y2="14" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" />
-  <line x1="53" y1="20" x2="57" y2="20" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" />
-  <line x1="63" y1="20" x2="67" y2="20" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round" />
+  <!-- Big Cute Eye -->
+  <circle cx="45" cy="48" r="9" fill="#1e293b" />
+  <!-- Eye Highlights -->
+  <circle cx="42" cy="45" r="3.5" fill="#ffffff" />
+  <circle cx="48" cy="51" r="1.5" fill="#ffffff" />
 
-  <!-- Bridge -->
-  <path d="M 53,74 L 67,74 L 64,71 L 56,71 Z" fill="#cbd5e1" />
+  <!-- Cute Rosy Cheek -->
+  <circle cx="38" cy="62" r="5" fill="#ff758c" opacity="0.6" />
 
-  <!-- Tailpiece -->
-  <path d="M 55,78 L 65,78 L 60,92 Z" fill="#1e293b" />
+  <!-- Happy Smile Line -->
+  <path d="M 28,64 Q 33,67 36,63" fill="none" stroke="#1e293b" stroke-width="2" stroke-linecap="round" />
 
-  <!-- Strings -->
-  <line x1="58.5" y1="28" x2="58.5" y2="78" stroke="#f8fafc" stroke-width="0.8" opacity="0.95" />
-  <line x1="60" y1="28" x2="60" y2="78" stroke="#f8fafc" stroke-width="0.8" opacity="0.95" />
-  <line x1="61.5" y1="28" x2="61.5" y2="78" stroke="#f8fafc" stroke-width="0.8" opacity="0.95" />
+  <!-- Dino Back Spikes (Stylized to look like speed chevrons) -->
+  <path d="M 72,27 L 82,23 L 78,35 Z" fill="#3b82f6" />
+  <path d="M 80,40 L 90,36 L 86,48 Z" fill="#3b82f6" />
+  <path d="M 84,55 L 94,51 L 90,63 Z" fill="#3b82f6" />
 
-  <!-- Cute Bow placed diagonally (creating a dynamic overlapping layout) -->
-  <g transform="rotate(25 60 60)">
-    <!-- Bow Stick -->
-    <line x1="12" y1="83" x2="108" y2="83" stroke="#6366f1" stroke-width="2.8" stroke-linecap="round" />
-    <!-- Bow Hair -->
-    <line x1="15" y1="86" x2="105" y2="86" stroke="#f1f5f9" stroke-width="0.9" opacity="0.9" />
-    <!-- Bow Frog -->
-    <rect x="92" y="81" width="8" height="5" rx="0.8" fill="#1e293b" />
-  </g>
+  <!-- Tiny Dino Arms holding a lightning bolt -->
+  <path d="M 52,72 C 48,72 45,78 50,80 C 53,81 55,75 52,72 Z" fill="#1e293b" />
+  <!-- A tiny glowing cyan lightning/energy bolt representing performance/Velo -->
+  <path d="M 45,78 L 38,84 L 43,84 L 40,90 L 48,82 L 43,82 Z" fill="#00f2fe" />
 </svg>

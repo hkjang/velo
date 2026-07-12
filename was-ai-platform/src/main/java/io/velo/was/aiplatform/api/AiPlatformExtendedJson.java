@@ -103,6 +103,16 @@ public final class AiPlatformExtendedJson {
                 .append(q("rateLimitPerMinute")).append(':').append(tenant.rateLimitPerMinute()).append(',')
                 .append(q("tokenQuota")).append(':').append(tenant.tokenQuota()).append(',')
                 .append(q("createdAt")).append(':').append(q(Instant.ofEpochMilli(tenant.createdAtEpochMillis()).toString())).append(',')
+                .append(q("allowedModels")).append(':').append('[');
+        boolean modelFirst = true;
+        for (String modelName : tenant.allowedModels()) {
+            if (!modelFirst) {
+                json.append(',');
+            }
+            modelFirst = false;
+            json.append(q(modelName));
+        }
+        json.append("],")
                 .append(q("apiKeys")).append(':').append('[');
         boolean first = true;
         for (AiTenantApiKeyInfo keyInfo : tenant.apiKeys()) {

@@ -88,12 +88,19 @@ public class AiTextCompletionServlet extends HttpServlet {
 
         try {
             AiGatewayInferenceResult result = gatewayService.infer(gatewayRequest);
+            tenantService.assertModelAllowed(tenantAccess, result.decision().modelName());
             usageService.recordInference(result, false);
             tenantService.recordUsage(tenantAccess, result.estimatedTokens());
             returnJson(resp);
             applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
             resp.getWriter().write(toCompletionResponse(result));
             auditTextSuccess(tenantAccess, result, prompt, auditStart, remoteAddr, intentName);
+        } catch (SecurityException e) {
+            auditTextFailure(tenantAccess, prompt, auditStart, e.getMessage(), remoteAddr, intentName);
+            writeOpenAiError(resp, HttpServletResponse.SC_FORBIDDEN, e.getMessage(), "permission_error");
+        } catch (IllegalArgumentException e) {
+            auditTextFailure(tenantAccess, prompt, auditStart, e.getMessage(), remoteAddr, intentName);
+            writeOpenAiError(resp, HttpServletResponse.SC_BAD_REQUEST, e.getMessage(), "invalid_request_error");
         } catch (Exception e) {
             auditTextFailure(tenantAccess, prompt, auditStart, e.getMessage(), remoteAddr, intentName);
             // Failover
@@ -102,17 +109,21 @@ public class AiTextCompletionServlet extends HttpServlet {
                 AiGatewayRequest fallback = new AiGatewayRequest("CHAT", prompt,
                         "completions-failover-" + UUID.randomUUID().toString().substring(0, 8), false);
                 AiGatewayInferenceResult result = gatewayService.infer(fallback);
+                tenantService.assertModelAllowed(tenantAccess, result.decision().modelName());
                 usageService.recordInference(result, false);
                 tenantService.recordUsage(tenantAccess, result.estimatedTokens());
                 returnJson(resp);
                 applyTenantHeaders(resp, tenantAccess, result.estimatedTokens());
                 resp.getWriter().write(toCompletionResponse(result));
                 auditTextSuccess(tenantAccess, result, prompt, failoverStart, remoteAddr, intentName);
+            } catch (SecurityException fallbackErr) {
+                writeOpenAiError(resp, HttpServletResponse.SC_FORBIDDEN, fallbackErr.getMessage(), "permission_error");
+                auditTextFailure(tenantAccess, prompt, auditStart, "failover: " + fallbackErr.getMessage(), remoteAddr, intentName);
+            } catch (IllegalArgumentException fallbackErr) {
+                writeOpenAiError(resp, HttpServletResponse.SC_BAD_REQUEST, fallbackErr.getMessage(), "invalid_request_error");
+                auditTextFailure(tenantAccess, prompt, auditStart, "failover: " + fallbackErr.getMessage(), remoteAddr, intentName);
             } catch (Exception fallbackErr) {
-                returnJson(resp);
-                resp.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
-                resp.getWriter().write("{\"error\":{\"message\":\"" + AiGatewayServlet.escapeJson(e.getMessage())
-                        + "\",\"type\":\"server_error\"}}");
+                writeOpenAiError(resp, HttpServletResponse.SC_SERVICE_UNAVAILABLE, e.getMessage(), "server_error");
                 auditTextFailure(tenantAccess, prompt, auditStart, "failover: " + fallbackErr.getMessage(), remoteAddr, intentName);
             }
         }
@@ -185,6 +196,13 @@ public class AiTextCompletionServlet extends HttpServlet {
         resp.setContentType("application/json; charset=UTF-8");
         resp.setCharacterEncoding("UTF-8");
         resp.setHeader("Cache-Control", "no-store");
+    }
+
+    private static void writeOpenAiError(HttpServletResponse resp, int status, String message, String type) throws IOException {
+        returnJson(resp);
+        resp.setStatus(status);
+        resp.getWriter().write("{\"error\":{\"message\":\"" + AiGatewayServlet.escapeJson(message)
+                + "\",\"type\":\"" + AiGatewayServlet.escapeJson(type) + "\"}}");
     }
 
     private static String extractJsonString(String body, String field) {

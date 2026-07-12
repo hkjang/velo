@@ -13,6 +13,11 @@ import io.velo.was.aiplatform.gateway.AiGatewayService;
 import io.velo.was.aiplatform.gateway.AiGatewayServlet;
 import io.velo.was.aiplatform.observability.AiPlatformUsageService;
 import io.velo.was.aiplatform.observability.AiPlatformUsageSnapshot;
+import io.velo.was.aiplatform.operations.AiCanaryPolicyService;
+import io.velo.was.aiplatform.operations.AiGpuSchedulerService;
+import io.velo.was.aiplatform.operations.AiModelBundleService;
+import io.velo.was.aiplatform.operations.AiPlatformDiagnosticsService;
+import io.velo.was.aiplatform.operations.AiPlatformMetricsExporter;
 import io.velo.was.aiplatform.publishing.AiPublishedApiService;
 import io.velo.was.aiplatform.registry.AiModelDeploymentPlanner;
 import io.velo.was.aiplatform.registry.AiModelRegistrationRequest;
@@ -167,6 +172,21 @@ public class AiPlatformApiServlet extends HttpServlet {
             resp.getWriter().write(AiPlatformApiJson.models(registryService.listModels(), summary));
             return;
         }
+        if (path.startsWith("/models/") && path.endsWith("/bundle")) {
+            usageService.recordControlPlaneAccess("/api/models/{name}/bundle");
+            if (!configuration.getServer().getAiPlatform().getAdvanced().isModelBundleEnabled()) {
+                unavailable(resp, "Model bundle manifest is disabled in configuration");
+                return;
+            }
+            String modelName = path.substring("/models/".length(), path.length() - "/bundle".length());
+            AiRegisteredModel model = registryService.findModel(modelName);
+            if (model == null) {
+                notFound(resp, "Model not found: " + modelName);
+                return;
+            }
+            resp.getWriter().write(AiModelBundleService.manifest(model));
+            return;
+        }
         if (path.startsWith("/models/")) {
             usageService.recordControlPlaneAccess("/api/models/{name}");
             String modelName = path.substring("/models/".length());
@@ -185,6 +205,21 @@ public class AiPlatformApiServlet extends HttpServlet {
         if ("/usage".equals(path) || "/metrics".equals(path)) {
             usageService.recordControlPlaneAccess("/api/usage");
             resp.getWriter().write(AiPlatformApiJson.usage(usage));
+            return;
+        }
+        if ("/metrics/prometheus".equals(path)) {
+            if (!configuration.getServer().getAiPlatform().getAdvanced().isObservabilityExportEnabled()) {
+                unavailable(resp, "Observability export is disabled in configuration");
+                return;
+            }
+            usageService.recordControlPlaneAccess("/api/metrics/prometheus");
+            resp.setContentType("text/plain; version=0.0.4; charset=UTF-8");
+            resp.getWriter().write(AiPlatformMetricsExporter.prometheus(
+                    gatewayService,
+                    usage,
+                    tenantService.snapshot(),
+                    providerRegistry
+            ));
             return;
         }
         if ("/published-apis".equals(path)) {
@@ -252,6 +287,70 @@ public class AiPlatformApiServlet extends HttpServlet {
         if ("/config".equals(path)) {
             usageService.recordControlPlaneAccess("/api/config");
             resp.getWriter().write(buildConfigJson());
+            return;
+        }
+        if ("/config/presets".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/config/presets");
+            resp.getWriter().write(buildConfigPresetsJson());
+            return;
+        }
+        if ("/config/diagnostics".equals(path) || "/operations/runbook".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/config/diagnostics");
+            AiPlatformDiagnosticsService diagnostics = new AiPlatformDiagnosticsService(
+                    configuration,
+                    summary,
+                    usage,
+                    tenantService.snapshot(),
+                    providerRegistry
+            );
+            resp.getWriter().write(buildDiagnosticsJson(diagnostics.snapshot()));
+            return;
+        }
+        if ("/config/remediation-plan".equals(path) || "/operations/remediation-plan".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/config/remediation-plan");
+            AiPlatformDiagnosticsService diagnostics = new AiPlatformDiagnosticsService(
+                    configuration,
+                    summary,
+                    usage,
+                    tenantService.snapshot(),
+                    providerRegistry
+            );
+            resp.getWriter().write(buildRemediationPlanJson(diagnostics.remediationPlan()));
+            return;
+        }
+        if ("/config/patch-bundle".equals(path) || "/operations/config-patch".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/config/patch-bundle");
+            AiPlatformDiagnosticsService diagnostics = new AiPlatformDiagnosticsService(
+                    configuration,
+                    summary,
+                    usage,
+                    tenantService.snapshot(),
+                    providerRegistry
+            );
+            resp.getWriter().write(buildConfigPatchBundleJson(diagnostics.configPatchBundle()));
+            return;
+        }
+        if ("/operations/rollout-gate".equals(path) || "/config/rollout-gate".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/operations/rollout-gate");
+            AiPlatformDiagnosticsService diagnostics = new AiPlatformDiagnosticsService(
+                    configuration,
+                    summary,
+                    usage,
+                    tenantService.snapshot(),
+                    providerRegistry
+            );
+            resp.getWriter().write(buildRolloutGateJson(diagnostics.rolloutGate()));
+            return;
+        }
+        if ("/operations/canary".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/operations/canary");
+            AiCanaryPolicyService canary = new AiCanaryPolicyService(configuration, registryService, gatewayAuditLog);
+            resp.getWriter().write(buildCanaryJson(canary.evaluate(false)));
+            return;
+        }
+        if ("/gpu/scheduler".equals(path)) {
+            usageService.recordControlPlaneAccess("/api/gpu/scheduler");
+            resp.getWriter().write(buildGpuSchedulerJson(new AiGpuSchedulerService(configuration, registryService).snapshot()));
             return;
         }
         // Intent routing API
@@ -441,6 +540,13 @@ public class AiPlatformApiServlet extends HttpServlet {
                 AiModelDeploymentPlanner.DeploymentPlan plan =
                         AiModelDeploymentPlanner.plan(registryService, readRegistrationRequest(req, body), req.getContextPath());
                 resp.getWriter().write(AiPlatformApiJson.deploymentPlan(plan));
+                return;
+            }
+            if ("/operations/canary/evaluate".equals(path)) {
+                usageService.recordControlPlaneAccess("/api/operations/canary/evaluate");
+                boolean apply = parseBoolean(firstNonBlank(req.getParameter("apply"), extractJsonBoolean(body, "apply")), false);
+                AiCanaryPolicyService canary = new AiCanaryPolicyService(configuration, registryService, gatewayAuditLog);
+                resp.getWriter().write(buildCanaryJson(canary.evaluate(apply)));
                 return;
             }
             if ("/models".equals(path)) {
@@ -633,6 +739,18 @@ public class AiPlatformApiServlet extends HttpServlet {
         String[] segments = Arrays.stream(path.split("/"))
                 .filter(segment -> !segment.isBlank())
                 .toArray(String[]::new);
+        if (segments.length == 3 && "tenants".equals(segments[0]) && "policies".equals(segments[2])) {
+            usageService.recordControlPlaneAccess("/api/tenants/{id}/policies");
+            String models = firstNonBlank(req.getParameter("allowedModels"),
+                    firstNonBlank(extractJsonString(body, "allowedModels"), extractJsonString(body, "models")));
+            java.util.List<String> allowedModels = models.isBlank() ? java.util.List.of()
+                    : java.util.Arrays.stream(models.split("[,;|]"))
+                    .map(String::trim)
+                    .filter(model -> !model.isEmpty())
+                    .toList();
+            resp.getWriter().write(AiPlatformExtendedJson.tenant(tenantService.setAllowedModels(segments[1], allowedModels)));
+            return;
+        }
         if (segments.length == 5 && "tenants".equals(segments[0]) && "keys".equals(segments[2]) && "rotate".equals(segments[4])) {
             usageService.recordControlPlaneAccess("/api/tenants/{id}/keys/{keyId}/rotate");
             long graceSeconds = parseLong(firstNonBlank(req.getParameter("graceSeconds"), extractJsonNumber(body, "graceSeconds")), 0L);
@@ -813,7 +931,17 @@ public class AiPlatformApiServlet extends HttpServlet {
         sb.append("\"aiGatewayEnabled\":").append(ai.getAdvanced().isAiGatewayEnabled()).append(",");
         sb.append("\"intentRoutingEnabled\":").append(ai.getAdvanced().isIntentRoutingEnabled()).append(",");
         sb.append("\"intentAnalysisWindow\":").append(ai.getAdvanced().getIntentAnalysisWindow()).append(",");
-        sb.append("\"observabilityEnabled\":").append(ai.getAdvanced().isObservabilityEnabled());
+        sb.append("\"observabilityEnabled\":").append(ai.getAdvanced().isObservabilityEnabled()).append(",");
+        sb.append("\"canaryAutomationEnabled\":").append(ai.getAdvanced().isCanaryAutomationEnabled()).append(",");
+        sb.append("\"providerRetryEnabled\":").append(ai.getAdvanced().isProviderRetryEnabled()).append(",");
+        sb.append("\"providerMaxRetries\":").append(ai.getAdvanced().getProviderMaxRetries()).append(",");
+        sb.append("\"providerFailoverEnabled\":").append(ai.getAdvanced().isProviderFailoverEnabled()).append(",");
+        sb.append("\"semanticCacheEnabled\":").append(ai.getAdvanced().isSemanticCacheEnabled()).append(",");
+        sb.append("\"shadowTestingEnabled\":").append(ai.getAdvanced().isShadowTestingEnabled()).append(",");
+        sb.append("\"promptFirewallEnabled\":").append(ai.getAdvanced().isPromptFirewallEnabled()).append(",");
+        sb.append("\"observabilityExportEnabled\":").append(ai.getAdvanced().isObservabilityExportEnabled()).append(",");
+        sb.append("\"modelBundleEnabled\":").append(ai.getAdvanced().isModelBundleEnabled()).append(",");
+        sb.append("\"gpuSchedulingEnabled\":").append(ai.getAdvanced().isGpuSchedulingEnabled());
         sb.append("},");
         // differentiation
         sb.append("\"differentiation\":{");
@@ -827,6 +955,187 @@ public class AiPlatformApiServlet extends HttpServlet {
         sb.append("\"roadmapStage\":").append(ai.getRoadmap().getCurrentStage());
         sb.append("}");
         return sb.toString();
+    }
+
+    private String buildConfigPresetsJson() {
+        return "{\"presets\":["
+                + preset("safe-defaults", "Balanced production defaults", "contextCache=true, promptFirewall=true, retry=1, canaryAutomation=true")
+                + "," + preset("low-latency", "Prefer latency and failover", "defaultStrategy=LATENCY_FIRST, semanticCache=true, providerFailover=true")
+                + "," + preset("platform-saas", "SaaS/multi-tenant controls", "multiTenant=true, billing=true, tenantAllowedModels configured")
+                + "," + preset("gpu-serving", "GPU optimized serving", "gpuScheduling=true, provider=vllm|sglang, queueCapacity tuned")
+                + "]}";
+    }
+
+    private static String preset(String id, String title, String summary) {
+        return "{\"id\":\"" + esc(id) + "\",\"title\":\"" + esc(title) + "\",\"summary\":\"" + esc(summary) + "\"}";
+    }
+
+    private static String buildDiagnosticsJson(AiPlatformDiagnosticsService.DiagnosticsSnapshot snapshot) {
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("{\"mode\":\"").append(esc(snapshot.mode())).append("\"");
+        sb.append(",\"posture\":\"").append(esc(snapshot.posture())).append("\"");
+        sb.append(",\"score\":").append(snapshot.score());
+        sb.append(",\"scoreLabel\":\"").append(esc(snapshot.scoreLabel())).append("\"");
+        sb.append(",\"summary\":{");
+        sb.append("\"critical\":").append(snapshot.criticalCount()).append(",");
+        sb.append("\"warnings\":").append(snapshot.warningCount()).append(",");
+        sb.append("\"info\":").append(snapshot.infoCount()).append(",");
+        sb.append("\"routableModels\":").append(snapshot.routableModels()).append(",");
+        sb.append("\"providers\":").append(snapshot.providerCount()).append(",");
+        sb.append("\"activeTenants\":").append(snapshot.activeTenants()).append(",");
+        sb.append("\"inferenceCalls\":").append(snapshot.inferenceCalls());
+        sb.append("},\"findings\":[");
+        boolean first = true;
+        for (AiPlatformDiagnosticsService.DiagnosticFinding finding : snapshot.findings()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"severity\":\"").append(esc(finding.severity())).append("\"")
+                    .append(",\"code\":\"").append(esc(finding.code())).append("\"")
+                    .append(",\"title\":\"").append(esc(finding.title())).append("\"")
+                    .append(",\"detail\":\"").append(esc(finding.detail())).append("\"")
+                    .append(",\"recommendation\":\"").append(esc(finding.recommendation())).append("\"")
+                    .append(",\"configPath\":\"").append(esc(finding.configPath())).append("\"}");
+        }
+        sb.append("],\"runbook\":[");
+        first = true;
+        for (AiPlatformDiagnosticsService.RunbookStep step : snapshot.runbook()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"order\":").append(step.order())
+                    .append(",\"phase\":\"").append(esc(step.phase())).append("\"")
+                    .append(",\"action\":\"").append(esc(step.action())).append("\"")
+                    .append(",\"endpoint\":\"").append(esc(step.endpoint())).append("\"")
+                    .append(",\"operatorHint\":\"").append(esc(step.operatorHint())).append("\"}");
+        }
+        return sb.append("]}").toString();
+    }
+
+    private static String buildRemediationPlanJson(AiPlatformDiagnosticsService.RemediationPlan plan) {
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("{\"posture\":\"").append(esc(plan.posture())).append("\"");
+        sb.append(",\"score\":").append(plan.score());
+        sb.append(",\"summary\":{");
+        sb.append("\"critical\":").append(plan.criticalCount()).append(",");
+        sb.append("\"warnings\":").append(plan.warningCount()).append(",");
+        sb.append("\"actions\":").append(plan.actionCount());
+        sb.append("},\"actions\":[");
+        boolean first = true;
+        for (AiPlatformDiagnosticsService.RemediationAction action : plan.actions()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"priority\":").append(action.priority())
+                    .append(",\"severity\":\"").append(esc(action.severity())).append("\"")
+                    .append(",\"findingCode\":\"").append(esc(action.findingCode())).append("\"")
+                    .append(",\"title\":\"").append(esc(action.title())).append("\"")
+                    .append(",\"autoApplicable\":").append(action.autoApplicable())
+                    .append(",\"risk\":\"").append(esc(action.risk())).append("\"")
+                    .append(",\"action\":\"").append(esc(action.action())).append("\"")
+                    .append(",\"configPath\":\"").append(esc(action.configPath())).append("\"")
+                    .append(",\"patchSnippet\":\"").append(esc(action.patchSnippet())).append("\"")
+                    .append(",\"validationHint\":\"").append(esc(action.validationHint())).append("\"}");
+        }
+        return sb.append("]}").toString();
+    }
+
+    private static String buildConfigPatchBundleJson(AiPlatformDiagnosticsService.ConfigPatchBundle bundle) {
+        StringBuilder sb = new StringBuilder(8192);
+        sb.append("{\"posture\":\"").append(esc(bundle.posture())).append("\"");
+        sb.append(",\"score\":").append(bundle.score());
+        sb.append(",\"summary\":{");
+        sb.append("\"safePatches\":").append(bundle.safePatchCount()).append(",");
+        sb.append("\"manualReviews\":").append(bundle.manualReviewCount()).append(",");
+        sb.append("\"restartRequired\":").append(bundle.restartRequired());
+        sb.append("},\"validationEndpoint\":\"").append(esc(bundle.validationEndpoint())).append("\"");
+        sb.append(",\"propertyPatch\":\"").append(esc(bundle.propertyPatch())).append("\"");
+        sb.append(",\"yamlPatch\":\"").append(esc(bundle.yamlPatch())).append("\"");
+        sb.append(",\"safeActions\":[");
+        appendRemediationActions(sb, bundle.safeActions());
+        sb.append("],\"manualReviewActions\":[");
+        appendRemediationActions(sb, bundle.manualReviewActions());
+        return sb.append("]}").toString();
+    }
+
+    private static void appendRemediationActions(StringBuilder sb, java.util.List<AiPlatformDiagnosticsService.RemediationAction> actions) {
+        boolean first = true;
+        for (AiPlatformDiagnosticsService.RemediationAction action : actions) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"priority\":").append(action.priority())
+                    .append(",\"severity\":\"").append(esc(action.severity())).append("\"")
+                    .append(",\"findingCode\":\"").append(esc(action.findingCode())).append("\"")
+                    .append(",\"title\":\"").append(esc(action.title())).append("\"")
+                    .append(",\"autoApplicable\":").append(action.autoApplicable())
+                    .append(",\"risk\":\"").append(esc(action.risk())).append("\"")
+                    .append(",\"action\":\"").append(esc(action.action())).append("\"")
+                    .append(",\"configPath\":\"").append(esc(action.configPath())).append("\"")
+                    .append(",\"patchSnippet\":\"").append(esc(action.patchSnippet())).append("\"")
+                    .append(",\"validationHint\":\"").append(esc(action.validationHint())).append("\"}");
+        }
+    }
+
+    private static String buildRolloutGateJson(AiPlatformDiagnosticsService.RolloutGate gate) {
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("{\"decision\":\"").append(esc(gate.decision())).append("\"");
+        sb.append(",\"posture\":\"").append(esc(gate.posture())).append("\"");
+        sb.append(",\"score\":").append(gate.score());
+        sb.append(",\"canPromote\":").append(gate.canPromote());
+        sb.append(",\"trafficRecommendation\":\"").append(esc(gate.trafficRecommendation())).append("\"");
+        sb.append(",\"operatorSummary\":\"").append(esc(gate.operatorSummary())).append("\"");
+        sb.append(",\"summary\":{");
+        sb.append("\"blockers\":").append(gate.blockers()).append(",");
+        sb.append("\"warnings\":").append(gate.warnings()).append(",");
+        sb.append("\"safePatches\":").append(gate.safePatchCount()).append(",");
+        sb.append("\"manualReviews\":").append(gate.manualReviewCount());
+        sb.append("},\"checks\":[");
+        boolean first = true;
+        for (AiPlatformDiagnosticsService.GateCheck check : gate.checks()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"id\":\"").append(esc(check.id())).append("\"")
+                    .append(",\"status\":\"").append(esc(check.status())).append("\"")
+                    .append(",\"title\":\"").append(esc(check.title())).append("\"")
+                    .append(",\"detail\":\"").append(esc(check.detail())).append("\"}");
+        }
+        sb.append("],\"nextActions\":[");
+        first = true;
+        for (AiPlatformDiagnosticsService.RolloutAction action : gate.nextActions()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"order\":").append(action.order())
+                    .append(",\"title\":\"").append(esc(action.title())).append("\"")
+                    .append(",\"endpoint\":\"").append(esc(action.endpoint())).append("\"")
+                    .append(",\"operatorHint\":\"").append(esc(action.operatorHint())).append("\"}");
+        }
+        return sb.append("]}").toString();
+    }
+
+    private static String buildCanaryJson(java.util.List<AiCanaryPolicyService.CanaryDecision> decisions) {
+        StringBuilder sb = new StringBuilder(1024);
+        sb.append("{\"count\":").append(decisions.size()).append(",\"decisions\":[");
+        boolean first = true;
+        for (AiCanaryPolicyService.CanaryDecision decision : decisions) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append("{\"modelName\":\"").append(esc(decision.modelName())).append("\"")
+                    .append(",\"version\":\"").append(esc(decision.version())).append("\"")
+                    .append(",\"action\":\"").append(esc(decision.action())).append("\"")
+                    .append(",\"applied\":").append(decision.applied())
+                    .append(",\"requests\":").append(decision.requests())
+                    .append(",\"successRate\":").append(String.format(java.util.Locale.US, "%.2f", decision.successRate()))
+                    .append(",\"avgLatencyMs\":").append(String.format(java.util.Locale.US, "%.1f", decision.avgLatencyMs()))
+                    .append(",\"reason\":\"").append(esc(decision.reason())).append("\"}");
+        }
+        return sb.append("]}").toString();
+    }
+
+    private static String buildGpuSchedulerJson(AiGpuSchedulerService.GpuSchedulerSnapshot snapshot) {
+        return "{\"enabled\":" + snapshot.enabled()
+                + ",\"state\":\"" + esc(snapshot.state()) + "\""
+                + ",\"queueCapacity\":" + snapshot.queueCapacity()
+                + ",\"reservedSlots\":" + snapshot.reservedSlots()
+                + ",\"availableSlots\":" + snapshot.availableSlots()
+                + ",\"gpuCandidateModels\":" + snapshot.gpuCandidateModels()
+                + "}";
     }
 
     // Intent routing JSON builders

@@ -9,6 +9,7 @@ public record AiTenantProfile(String tenantId,
                               int rateLimitPerMinute,
                               long tokenQuota,
                               long createdAtEpochMillis,
+                              List<String> allowedModels,
                               List<AiTenantApiKeyInfo> apiKeys,
                               AiTenantUsageInfo usage) {
 }

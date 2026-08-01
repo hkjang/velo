@@ -157,6 +157,7 @@
 
 <!-- Favicon -->
 <link rel="icon" type="image/svg+xml" href="images/velo_was_logo_animal.svg">
+<link rel="alternate icon" type="image/png" href="images/favicon.png">
 
 <!-- Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -246,6 +247,8 @@ nav {
 .nav-brand img {
   width: 42px;
   height: 42px;
+  object-fit: contain;
+  flex-shrink: 0;
   filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.4));
   transition: transform 0.3s ease;
 }
@@ -929,6 +932,8 @@ footer {
 
 .footer-brand img {
   width: 38px;
+  height: 38px;
+  object-fit: contain;
   margin-bottom: 12px;
 }
 .footer-brand p {
@@ -1041,7 +1046,7 @@ footer {
 <nav>
   <div class="nav-container">
     <a href="#" class="nav-brand">
-      <img src="images/velo_was_logo_animal.svg" alt="Velo WAS Dinosaur Logo">
+      <img src="images/velo_was_logo_animal.svg" alt="Velo WAS Dinosaur Logo" width="42" height="42">
       <div class="nav-brand-text">Velo <span>WAS</span></div>
     </a>
 
@@ -1581,7 +1586,7 @@ open http://localhost:8080/ai-platform</code></pre>
 <footer>
   <div class="footer-container">
     <div class="footer-brand">
-      <img src="images/velo_was_logo_animal.svg" alt="Velo WAS Logo">
+      <img src="images/velo_was_logo_animal.svg" alt="Velo WAS Logo" width="38" height="38">
       <p style="font-weight: 700; color: #fff; margin-top: 4px;">Velo WAS Project</p>
       <p data-i18n="foot_brand_desc">
         Java 21 + Netty Native + Jakarta Servlet 6.1<br>

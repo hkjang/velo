@@ -13,9 +13,13 @@ kramdown:
   hard_wrap: false
   syntax_highlighter: rouge
 
+include:
+  - images
+
 exclude:
-  - images/
-  - "*.png"
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
 
 defaults:
   - scope:
